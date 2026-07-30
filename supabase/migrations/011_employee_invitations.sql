@@ -1,3 +1,5 @@
+create extension if not exists "pgcrypto";
+
 create table if not exists public.employee_invitations (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -34,23 +36,69 @@ alter table public.employee_invitations enable row level security;
 drop policy if exists employee_invitations_select_org_admin on public.employee_invitations;
 create policy employee_invitations_select_org_admin on public.employee_invitations
   for select
-  using (public.current_org_role_code(organization_id) in ('owner', 'admin'));
+  using (
+    exists (
+      select 1
+      from public.organization_members member
+      where member.organization_id = employee_invitations.organization_id
+        and member.user_id = auth.uid()
+        and member.role_code in ('owner', 'admin')
+        and member.status = 'active'
+    )
+  );
 
 drop policy if exists employee_invitations_insert_org_admin on public.employee_invitations;
 create policy employee_invitations_insert_org_admin on public.employee_invitations
   for insert
-  with check (public.current_org_role_code(organization_id) in ('owner', 'admin'));
+  with check (
+    exists (
+      select 1
+      from public.organization_members member
+      where member.organization_id = employee_invitations.organization_id
+        and member.user_id = auth.uid()
+        and member.role_code in ('owner', 'admin')
+        and member.status = 'active'
+    )
+  );
 
 drop policy if exists employee_invitations_update_org_admin on public.employee_invitations;
 create policy employee_invitations_update_org_admin on public.employee_invitations
   for update
-  using (public.current_org_role_code(organization_id) in ('owner', 'admin'))
-  with check (public.current_org_role_code(organization_id) in ('owner', 'admin'));
+  using (
+    exists (
+      select 1
+      from public.organization_members member
+      where member.organization_id = employee_invitations.organization_id
+        and member.user_id = auth.uid()
+        and member.role_code in ('owner', 'admin')
+        and member.status = 'active'
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.organization_members member
+      where member.organization_id = employee_invitations.organization_id
+        and member.user_id = auth.uid()
+        and member.role_code in ('owner', 'admin')
+        and member.status = 'active'
+    )
+  );
+
+create or replace function public.set_employee_invitations_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
 
 drop trigger if exists trg_employee_invitations_updated_at on public.employee_invitations;
 create trigger trg_employee_invitations_updated_at
 before update on public.employee_invitations
-for each row execute function public.set_row_updated_at();
+for each row execute function public.set_employee_invitations_updated_at();
 
 create or replace function public.get_employee_invitation(invite_token text)
 returns table (
@@ -163,28 +211,20 @@ begin
   insert into public.organization_members (
     organization_id,
     user_id,
-    role,
     role_code,
     status,
-    invited_by,
-    created_at,
-    updated_at
+    invited_by
   )
   values (
     invitation_row.organization_id,
     current_uid,
     invitation_row.role_code,
-    invitation_row.role_code,
     'active',
-    invitation_row.invited_by,
-    now(),
-    now()
+    invitation_row.invited_by
   );
 
   update public.profiles
   set
-    role = invitation_row.role_code,
-    status = 'active',
     first_name = coalesce(nullif(public.profiles.first_name, ''), invitation_row.first_name),
     last_name = coalesce(nullif(public.profiles.last_name, ''), invitation_row.last_name),
     phone = coalesce(nullif(public.profiles.phone, ''), invitation_row.phone),
@@ -226,7 +266,14 @@ begin
     raise exception 'AUTH_REQUIRED';
   end if;
 
-  if public.current_org_role_code(target_org_id) not in ('owner', 'admin') then
+  if not exists (
+    select 1
+    from public.organization_members member
+    where member.organization_id = target_org_id
+      and member.user_id = auth.uid()
+      and member.role_code in ('owner', 'admin')
+      and member.status = 'active'
+  ) then
     raise exception 'INVITER_NOT_ALLOWED';
   end if;
 
