@@ -21,6 +21,7 @@ export type ApartmentPhoto = {
 
 export type Apartment = {
   id: string;
+  slug?: string;
   title: string;
   type: string;
   googleLink: string;

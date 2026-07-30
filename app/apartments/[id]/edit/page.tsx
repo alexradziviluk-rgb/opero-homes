@@ -175,7 +175,7 @@ export default function EditApartmentPage() {
 
   function saveDraft() {
     if (!apartment) return;
-    const updatedApartment = buildApartment({ ...form, publicationStatus: "draft" }, apartment.id);
+    const updatedApartment = buildApartment({ ...form, publicationStatus: "draft" }, apartment.id, apartment);
     updatedApartment.photos = photos;
     updatedApartment.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
     void saveApartmentToSupabase(updatedApartment)
@@ -195,7 +195,7 @@ export default function EditApartmentPage() {
       return;
     }
 
-    const updatedApartment = buildApartment(form, apartment.id);
+    const updatedApartment = buildApartment(form, apartment.id, apartment);
     updatedApartment.photos = photos;
     updatedApartment.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
     try {

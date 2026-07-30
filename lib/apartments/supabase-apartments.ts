@@ -6,6 +6,7 @@ import {
   normalizeApartment,
   normalizeLocalApartments,
   saveLocalApartments,
+  slugify,
   toNullableInteger,
   toNullableNumber,
 } from "@/app/apartments/apartment-utils";
@@ -14,6 +15,7 @@ import type { Apartment, ApartmentPhoto } from "@/types/apartment";
 const apartmentSelect = [
   "id",
   "organization_id",
+  "slug",
   "title:name",
   "type",
   "google_link",
@@ -110,6 +112,7 @@ function mapApartmentRow(row: Record<string, unknown>, photos: ApartmentPhoto[])
   const publishStatus = safeString(row.publish_status) || (publicationStatus === "published" ? "Опубликован" : "Черновик");
   const normalized = normalizeApartment({
     id: safeString(row.id),
+    slug: safeString(row.slug) || undefined,
     title: safeString(row.title),
     type: safeString(row.type),
     googleLink: safeString(row.google_link),
@@ -215,6 +218,57 @@ export async function loadApartmentFromSupabase(id: string, options?: { publicOn
   return apartments.find((item) => item.id === id) ?? null;
 }
 
+async function buildUniqueApartmentSlug(params: {
+  apartmentId: string;
+  apartmentTitle: string;
+  existingSlug?: string;
+}) {
+  const { apartmentId, apartmentTitle, existingSlug } = params;
+  const normalizedTitle = apartmentTitle.trim();
+
+  if (!normalizedTitle) {
+    throw new Error("Название объекта обязательно для генерации slug.");
+  }
+
+  if (existingSlug && existingSlug.trim()) {
+    return existingSlug.trim();
+  }
+
+  const baseSlug = slugify(normalizedTitle);
+  if (!baseSlug) {
+    throw new Error("Не удалось сгенерировать slug для объекта.");
+  }
+
+  const supabase = createSupabaseClient();
+  if (!supabase) {
+    return baseSlug;
+  }
+
+  let candidate = baseSlug;
+  let suffix = 2;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("apartments")
+      .select("id")
+      .eq("slug", candidate)
+      .neq("id", apartmentId)
+      .limit(1);
+
+    if (error) {
+      console.error("Failed to check apartment slug uniqueness:", error);
+      throw new Error(error.message);
+    }
+
+    if (!data || data.length === 0) {
+      return candidate;
+    }
+
+    candidate = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+}
+
 export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apartment> {
   const supabase = createSupabaseClient();
   if (!supabase) {
@@ -230,9 +284,21 @@ export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apa
     throw new Error("Organization context is missing");
   }
 
+  const normalizedTitle = apartment.title.trim();
+  if (!normalizedTitle) {
+    throw new Error("Название объекта обязательно.");
+  }
+
+  const slug = await buildUniqueApartmentSlug({
+    apartmentId: apartment.id,
+    apartmentTitle: normalizedTitle,
+    existingSlug: apartment.slug ?? undefined,
+  });
+
   const payload = {
     id: apartment.id,
     organization_id: organizationId,
+    slug,
     name: apartment.title,
     type: apartment.type,
     google_link: apartment.googleLink,

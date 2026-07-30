@@ -265,11 +265,13 @@ export function getAllApartments() {
 export function normalizeApartment(raw: Partial<Apartment>): Apartment {
   const publishStatus = raw.publishStatus ?? "Черновик";
   const publicationStatus = raw.publicationStatus ?? "draft";
+  const derivedSlug = raw.slug ?? (slugify(raw.title ?? "") || undefined);
 
   const now = new Date().toISOString();
 
   return {
     id: raw.id ?? (typeof crypto !== "undefined" ? crypto.randomUUID() : String(Math.random())),
+    slug: derivedSlug,
     title: raw.title ?? "",
     type: raw.type ?? "",
     googleLink: raw.googleLink ?? "",
@@ -363,7 +365,17 @@ export function toNullableInteger(value: string | number | null | undefined): nu
   return parsed === null ? null : Math.trunc(parsed);
 }
 
-export function buildApartment(form: ApartmentForm, id: string): Apartment {
+export function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\u0400-\u04ff]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function buildApartment(form: ApartmentForm, id: string, existingApartment?: Partial<Apartment>): Apartment {
   const publishStatus = form.publishStatus || "Черновик";
   const publicationStatus = form.publicationStatus || "draft";
   const latitude = toNullableNumber(form.latitude);
@@ -379,7 +391,8 @@ export function buildApartment(form: ApartmentForm, id: string): Apartment {
 
   return {
     id,
-    title: form.title,
+    slug: existingApartment?.slug ?? undefined,
+    title: form.title.trim(),
     type: form.type,
     googleLink: form.googleLink,
     city: form.city,
@@ -417,9 +430,11 @@ export function buildApartment(form: ApartmentForm, id: string): Apartment {
     availability: publishStatus === "Опубликован" ? "Свободен" : "На обслуживании",
     publishStatus,
     publicationStatus,
-    createdAt: now,
+    createdAt: existingApartment?.createdAt ?? now,
     updatedAt: now,
-    bookings: 0,
+    bookings: existingApartment?.bookings ?? 0,
+    photos: existingApartment?.photos ?? [],
+    coverPhotoUrl: existingApartment?.coverPhotoUrl ?? null,
   };
 }
 
