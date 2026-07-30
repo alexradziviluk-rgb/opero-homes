@@ -35,7 +35,7 @@ export default function PropertiesWidget() {
   }
 
   const activeLabel =
-    propertiesActive === null ? "Статус operational_status недоступен" : `Активные: ${propertiesActive}`;
+    propertiesActive === null ? "Статус объектов недоступен" : `Активные: ${propertiesActive}`;
 
   return (
     <Link

@@ -73,7 +73,7 @@ async function loadApartmentAssignees(
 ): Promise<ApartmentAssigneeRow | null> {
   const withAssignees = await supabase
     .from("apartments")
-    .select("id,title,responsible_user_id,backup_manager_user_id")
+    .select("id,title:name,responsible_user_id,backup_manager_user_id")
     .eq("organization_id", organizationId)
     .eq("id", apartmentId)
     .maybeSingle();
@@ -88,7 +88,7 @@ async function loadApartmentAssignees(
 
   const fallback = await supabase
     .from("apartments")
-    .select("id,title")
+    .select("id,title:name")
     .eq("organization_id", organizationId)
     .eq("id", apartmentId)
     .maybeSingle();

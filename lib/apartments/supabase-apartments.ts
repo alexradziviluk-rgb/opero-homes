@@ -6,7 +6,7 @@ import type { Apartment, ApartmentPhoto } from "@/types/apartment";
 const apartmentSelect = [
   "id",
   "organization_id",
-  "title",
+  "title:name",
   "type",
   "google_link",
   "city",
@@ -225,7 +225,7 @@ export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apa
   const payload = {
     id: apartment.id,
     organization_id: organizationId,
-    title: apartment.title,
+    name: apartment.title,
     type: apartment.type,
     google_link: apartment.googleLink,
     city: apartment.city,

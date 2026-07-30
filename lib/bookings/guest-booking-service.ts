@@ -69,12 +69,10 @@ type ApartmentRow = {
   minimum_weeks?: number | null;
   minimum_months?: number | null;
   price?: string | null;
-  currency?: string | null;
   publication_status?: string | null;
   publish_status?: string | null;
   status?: string | null;
   availability?: string | null;
-  operational_status?: string | null;
 };
 
 type BookingRow = {
@@ -221,7 +219,7 @@ async function fetchApartment(supabase: SupabaseClient, apartmentId: string): Pr
   const select = [
     "id",
     "organization_id",
-    "title",
+    "title:name",
     "rooms",
     "max_guests",
     "daily_price",
@@ -233,12 +231,10 @@ async function fetchApartment(supabase: SupabaseClient, apartmentId: string): Pr
     "minimum_weeks",
     "minimum_months",
     "price",
-    "currency",
     "publication_status",
     "publish_status",
     "status",
     "availability",
-    "operational_status",
   ].join(",");
 
   const { data, error } = await supabase.from("apartments").select(select).eq("id", apartmentId).maybeSingle();
@@ -385,7 +381,7 @@ async function ensureClientRecord(params: {
 async function loadBookingsForApartment(supabase: SupabaseClient, apartmentId: string, organizationId: string) {
   const { data, error } = await supabase
     .from("bookings")
-    .select("id,organization_id,apartment_id,client_id,guest_name,guest_email,guest_phone,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at")
+    .select("id,organization_id,apartment_id,client_id,guest_name,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at")
     .eq("apartment_id", apartmentId)
     .eq("organization_id", organizationId);
 
@@ -601,7 +597,7 @@ export async function createGuestBooking(
       created_at: insertedAt,
       updated_at: insertedAt,
     })
-    .select("id,organization_id,apartment_id,client_id,guest_name,guest_email,guest_phone,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at")
+    .select("id,organization_id,apartment_id,client_id,guest_name,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at")
     .single();
 
   if (error || !data) {
@@ -676,7 +672,7 @@ export async function listGuestBookings(
   if (apartmentIds.length > 0) {
     const { data: apartmentsData } = await supabase
       .from("apartments")
-      .select("id,title")
+      .select("id,title:name")
       .in("id", apartmentIds);
 
     (apartmentsData ?? []).forEach((row) => {

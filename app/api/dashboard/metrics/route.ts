@@ -6,7 +6,8 @@ import type { DashboardMetrics, DashboardMetricsResponse } from "@/types/dashboa
 type ApartmentRow = {
   id: string;
   title: string | null;
-  operational_status?: string | null;
+  status?: string | null;
+  publication_status?: string | null;
 };
 
 type BookingRow = {
@@ -96,16 +97,16 @@ export async function GET() {
 
   const { data: apartmentsWithStatusData, error: apartmentsWithStatusError } = await supabase
     .from("apartments")
-    .select("id,title,operational_status")
+    .select("id,title:name,status,publication_status")
     .eq("organization_id", organizationId);
 
   let apartments: ApartmentRow[] = [];
-  let hasOperationalStatus = false;
+  let hasStatusFields = false;
 
   if (apartmentsWithStatusError?.code === "42703") {
     const { data: apartmentsData, error: apartmentsError } = await supabase
       .from("apartments")
-      .select("id,title")
+      .select("id,title:name")
       .eq("organization_id", organizationId);
 
     if (apartmentsError) {
@@ -119,14 +120,21 @@ export async function GET() {
     return NextResponse.json(response, { status: 422 });
   } else {
     apartments = (apartmentsWithStatusData ?? []) as unknown as ApartmentRow[];
-    hasOperationalStatus = true;
+    hasStatusFields = true;
   }
 
   const apartmentTitleById = new Map(apartments.map((apartment) => [apartment.id, apartment.title ?? "Объект"]));
 
   metrics.propertiesTotal = apartments.length;
-  if (hasOperationalStatus) {
-    metrics.propertiesActive = apartments.filter((apartment) => normalize(apartment.operational_status) === "active").length;
+  if (hasStatusFields) {
+    metrics.propertiesActive = apartments.filter((apartment) => {
+      if (normalize(apartment.publication_status) === "published") {
+        return true;
+      }
+
+      const status = normalize(apartment.status);
+      return status === "свободно" || status === "занято" || status === "active";
+    }).length;
   }
 
   const { data: bookingsData, error: bookingsError } = await supabase
