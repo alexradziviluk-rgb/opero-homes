@@ -55,6 +55,7 @@ export function isPublicPath(pathname: string) {
     "/admin/login",
     "/guest/login",
     "/guest/register",
+    "/invite",
     "/auth/callback",
     "/forgot-password",
     "/reset-password",

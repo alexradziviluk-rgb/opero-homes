@@ -7,15 +7,13 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions";
-import { userRepository } from "@/lib/repositories/users";
 import type { UserRole } from "@/types/user";
+import { EMPLOYEE_INVITE_ROLE_LABELS, EMPLOYEE_INVITE_ROLE_CODES, mapInviteRoleCodeToUserRoleLabel } from "@/lib/users/invitations";
 
-const roleOptions: Array<{ value: "Менеджер" | "Сотрудник" | "Уборщик" | "Технический специалист"; label: string }> = [
-  { value: "Менеджер", label: "Менеджер" },
-  { value: "Сотрудник", label: "Сотрудник" },
-  { value: "Уборщик", label: "Уборщик" },
-  { value: "Технический специалист", label: "Технический специалист" },
-];
+const roleOptions = EMPLOYEE_INVITE_ROLE_CODES.map((roleCode) => ({
+  value: mapInviteRoleCodeToUserRoleLabel(roleCode) as UserRole,
+  label: EMPLOYEE_INVITE_ROLE_LABELS[roleCode],
+}));
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -32,6 +30,8 @@ export default function InviteUserPage() {
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<UserRole>("Менеджер");
   const [submitError, setSubmitError] = useState("");
+  const [submitSuccess, setSubmitSuccess] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canInvite = hasPermissionInList(effectivePermissions, "users.invite");
 
@@ -43,9 +43,10 @@ export default function InviteUserPage() {
     return null;
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError("");
+    setSubmitSuccess("");
 
     if (!currentUser) {
       setSubmitError("Сессия не найдена. Выполните вход снова.");
@@ -72,19 +73,42 @@ export default function InviteUserPage() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      const invited = userRepository.invite({
+      const response = await fetch("/api/users/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
         firstName,
         lastName,
         email,
         phone,
-        role: role as "Менеджер" | "Сотрудник" | "Уборщик" | "Технический специалист",
-        invitedByUserId: currentUser.id,
+          role,
+        }),
       });
 
-      router.replace(`/users/${invited.id}`);
+      const payload = (await response.json().catch(() => null)) as
+        | { ok: true; data: { message?: string } }
+        | { ok: false; error?: string }
+        | null;
+
+      if (!response.ok || !payload || !payload.ok) {
+        setSubmitError(payload && !payload.ok ? payload.error ?? "Не удалось отправить приглашение" : "Не удалось отправить приглашение");
+        return;
+      }
+
+      setSubmitSuccess(payload.data.message ?? "Приглашение отправлено.");
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setRole("Менеджер");
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Не удалось создать приглашение");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -99,6 +123,7 @@ export default function InviteUserPage() {
               <div>
                 <h1 className="text-2xl font-semibold">Приглашение сотрудника</h1>
                 <p className="text-sm text-slate-400">После принятия приглашения сотрудник перейдет в статус "Ожидает подтверждения".</p>
+                <p className="mt-1 text-xs text-amber-300">SMS-приглашения сейчас недоступны. Приглашение отправляется только по email.</p>
               </div>
               <Link href="/users" className="text-sm text-cyan-300">К списку пользователей</Link>
             </div>
@@ -137,9 +162,10 @@ export default function InviteUserPage() {
                 </div>
 
                 {submitError ? <p className="mt-4 text-sm text-rose-400">{submitError}</p> : null}
+                {submitSuccess ? <p className="mt-4 text-sm text-emerald-300">{submitSuccess}</p> : null}
 
                 <div className="mt-6 flex gap-2">
-                  <button type="submit" className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200">Отправить приглашение</button>
+                  <button type="submit" disabled={isSubmitting} className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Отправляем..." : "Отправить приглашение"}</button>
                   <Link href="/users" className="rounded-2xl bg-white/5 px-4 py-2">Отмена</Link>
                 </div>
               </form>

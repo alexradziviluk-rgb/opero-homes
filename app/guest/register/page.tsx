@@ -34,6 +34,10 @@ export default function GuestRegisterPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setNextPath(getGuestNextPath(params.get("next")));
+    const invitedEmail = params.get("email");
+    if (invitedEmail) {
+      setEmail(invitedEmail);
+    }
   }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -58,6 +62,7 @@ export default function GuestRegisterPage() {
         email: email.trim().toLowerCase(),
         password,
         options: {
+          emailRedirectTo: new URL(`/auth/callback?next=${encodeURIComponent(nextPath)}`, window.location.origin).toString(),
           data: {
             first_name: firstName.trim(),
             last_name: lastName.trim(),
