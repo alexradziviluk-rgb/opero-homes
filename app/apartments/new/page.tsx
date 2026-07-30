@@ -7,7 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import ApartmentPhotoManager from "@/components/apartments/apartment-photo-manager";
 import type { ApartmentPhoto } from "@/types/apartment";
-import { buildApartment, validateForm } from "@/app/apartments/apartment-utils";
+import { buildApartment, getErrorMessage, validateForm } from "@/app/apartments/apartment-utils";
 import { useCallback } from "react";
 import { saveApartmentToSupabase } from "@/lib/apartments/supabase-apartments";
 
@@ -203,7 +203,10 @@ export default function NewApartmentPage() {
     draft.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
     void saveApartmentToSupabase(draft)
       .then(() => showToast("Черновик сохранён"))
-      .catch(() => showToast("Не удалось сохранить черновик"));
+      .catch((error: unknown) => {
+        console.error("Failed to save apartment draft:", error);
+        showToast(`Не удалось сохранить черновик: ${getErrorMessage(error)}`);
+      });
   }
 
   async function handleResolveAddress() {
@@ -252,8 +255,9 @@ export default function NewApartmentPage() {
       setTimeout(() => {
         router.push("/apartments");
       }, 1200);
-    } catch {
-      showToast("Не удалось создать объект");
+    } catch (error: unknown) {
+      console.error("Failed to create apartment:", error);
+      showToast(`Не удалось создать объект: ${getErrorMessage(error)}`);
     }
   }
 

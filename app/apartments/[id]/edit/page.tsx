@@ -9,6 +9,7 @@ import type { Apartment, ApartmentPhoto } from "@/types/apartment";
 import {
   ApartmentForm,
   buildApartment,
+  getErrorMessage,
   initialApartmentForm,
   validateForm,
   apartmentToForm,
@@ -179,7 +180,10 @@ export default function EditApartmentPage() {
     updatedApartment.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
     void saveApartmentToSupabase(updatedApartment)
       .then(() => showToast("Черновик сохранён"))
-      .catch(() => showToast("Не удалось сохранить черновик"));
+      .catch((error: unknown) => {
+        console.error("Failed to save apartment draft:", error);
+        showToast(`Не удалось сохранить черновик: ${getErrorMessage(error)}`);
+      });
   }
 
   async function updateApartment() {
@@ -198,8 +202,9 @@ export default function EditApartmentPage() {
       await saveApartmentToSupabase(updatedApartment);
       showToast("Изменения сохранены");
       setTimeout(() => router.push(`/apartments/${apartment.id}`), 1000);
-    } catch {
-      showToast("Не удалось сохранить изменения");
+    } catch (error: unknown) {
+      console.error("Failed to update apartment:", error);
+      showToast(`Не удалось сохранить изменения: ${getErrorMessage(error)}`);
     }
   }
 
