@@ -44,6 +44,10 @@ export async function proxy(request: NextRequest) {
       code: "supabase_not_configured",
     });
 
+    if (isAuthRoute) {
+      return response;
+    }
+
     if (isProtectedPath(pathname)) {
       return redirectTo("/login");
     }
@@ -66,6 +70,10 @@ export async function proxy(request: NextRequest) {
       message: error.message,
       code: error.code,
     });
+  }
+
+  if (!user && isAuthRoute) {
+    return response;
   }
 
   if (!user && isProtectedPath(pathname)) {
