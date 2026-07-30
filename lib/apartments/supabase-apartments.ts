@@ -1,6 +1,14 @@
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { getAllApartments, getLocalApartments, normalizeApartment, normalizeLocalApartments, saveLocalApartments } from "@/app/apartments/apartment-utils";
+import {
+  getAllApartments,
+  getLocalApartments,
+  normalizeApartment,
+  normalizeLocalApartments,
+  saveLocalApartments,
+  toNullableInteger,
+  toNullableNumber,
+} from "@/app/apartments/apartment-utils";
 import type { Apartment, ApartmentPhoto } from "@/types/apartment";
 
 const apartmentSelect = [
@@ -231,25 +239,25 @@ export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apa
     city: apartment.city,
     district: apartment.district,
     address: apartment.address,
-    latitude: apartment.latitude ?? null,
-    longitude: apartment.longitude ?? null,
+    latitude: toNullableNumber(apartment.latitude),
+    longitude: toNullableNumber(apartment.longitude),
     short_desc: apartment.shortDesc,
-    rooms: apartment.rooms,
-    bedrooms: apartment.bedrooms,
-    bathrooms: apartment.bathrooms,
-    floor: apartment.floor,
-    area: apartment.area,
-    max_guests: apartment.maxGuests,
-    price: apartment.price ?? null,
-    deposit: apartment.deposit,
-    cleaning_fee: apartment.cleaningFee,
+    rooms: toNullableInteger(apartment.rooms),
+    bedrooms: toNullableInteger(apartment.bedrooms),
+    bathrooms: toNullableInteger(apartment.bathrooms),
+    floor: toNullableInteger(apartment.floor),
+    area: toNullableNumber(apartment.area),
+    max_guests: toNullableInteger(apartment.maxGuests),
+    price: toNullableNumber(apartment.price ?? null),
+    deposit: toNullableNumber(apartment.deposit),
+    cleaning_fee: toNullableNumber(apartment.cleaningFee),
     rental_types: apartment.rentalTypes,
-    daily_price: apartment.dailyPrice,
-    weekly_price: apartment.weeklyPrice,
-    monthly_price: apartment.monthlyPrice,
-    minimum_nights: apartment.minimumNights,
-    minimum_weeks: apartment.minimumWeeks,
-    minimum_months: apartment.minimumMonths,
+    daily_price: toNullableNumber(apartment.dailyPrice),
+    weekly_price: toNullableNumber(apartment.weeklyPrice),
+    monthly_price: toNullableNumber(apartment.monthlyPrice),
+    minimum_nights: toNullableInteger(apartment.minimumNights),
+    minimum_weeks: toNullableInteger(apartment.minimumWeeks),
+    minimum_months: toNullableInteger(apartment.minimumMonths),
     owner_name: apartment.ownerName,
     owner_phone: apartment.ownerPhone,
     owner_email: apartment.ownerEmail,
@@ -267,11 +275,13 @@ export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apa
 
   const { error: apartmentError } = await supabase.from("apartments").upsert(payload, { onConflict: "id" });
   if (apartmentError) {
+    console.error("Failed to upsert apartment:", apartmentError);
     throw new Error(apartmentError.message);
   }
 
   const { error: deletePhotosError } = await supabase.from("apartment_photos").delete().eq("apartment_id", apartment.id);
   if (deletePhotosError) {
+    console.error("Failed to delete apartment photos before sync:", deletePhotosError);
     throw new Error(deletePhotosError.message);
   }
 
@@ -294,6 +304,7 @@ export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apa
   if (nextPhotos.length > 0) {
     const { error: photoError } = await supabase.from("apartment_photos").insert(nextPhotos);
     if (photoError) {
+      console.error("Failed to insert apartment photos:", photoError);
       throw new Error(photoError.message);
     }
   }

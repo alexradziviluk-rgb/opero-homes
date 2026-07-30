@@ -348,11 +348,33 @@ export function saveLocalApartments(apartments: Apartment[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
 }
 
+export function toNullableNumber(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const parsed = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function toNullableInteger(value: string | number | null | undefined): number | null {
+  const parsed = toNullableNumber(value);
+  return parsed === null ? null : Math.trunc(parsed);
+}
+
 export function buildApartment(form: ApartmentForm, id: string): Apartment {
   const publishStatus = form.publishStatus || "Черновик";
   const publicationStatus = form.publicationStatus || "draft";
-  const latitude = form.latitude.trim();
-  const longitude = form.longitude.trim();
+  const latitude = toNullableNumber(form.latitude);
+  const longitude = toNullableNumber(form.longitude);
+  const selectedPrice = form.rentalTypes.daily
+    ? form.dailyPrice
+    : form.rentalTypes.weekly
+    ? form.weeklyPrice
+    : form.rentalTypes.monthly
+    ? form.monthlyPrice
+    : "";
   const now = new Date().toISOString();
 
   return {
@@ -363,35 +385,29 @@ export function buildApartment(form: ApartmentForm, id: string): Apartment {
     city: form.city,
     district: form.district,
     address: form.address,
-    latitude,
-    longitude,
+    latitude: latitude ?? undefined,
+    longitude: longitude ?? undefined,
     shortDesc: form.shortDesc,
-    rooms: Number(form.rooms) || 0,
-    bedrooms: Number(form.bedrooms) || 0,
-    bathrooms: Number(form.bathrooms) || 0,
-    floor: form.floor.trim() ? Number(form.floor) : null,
-    area: form.area.trim() ? Number(form.area) : null,
-    maxGuests: Number(form.maxGuests) || 0,
-    price: form.rentalTypes.daily
-      ? form.dailyPrice
-      : form.rentalTypes.weekly
-      ? form.weeklyPrice
-      : form.rentalTypes.monthly
-      ? form.monthlyPrice
-      : "",
-    deposit: form.deposit.trim() ? Number(form.deposit) : null,
-    cleaningFee: form.cleaningFee.trim() ? Number(form.cleaningFee) : null,
+    rooms: toNullableInteger(form.rooms) ?? 0,
+    bedrooms: toNullableInteger(form.bedrooms) ?? 0,
+    bathrooms: toNullableInteger(form.bathrooms) ?? 0,
+    floor: toNullableInteger(form.floor),
+    area: toNullableNumber(form.area),
+    maxGuests: toNullableInteger(form.maxGuests) ?? 0,
+    price: selectedPrice,
+    deposit: toNullableNumber(form.deposit),
+    cleaningFee: toNullableNumber(form.cleaningFee),
     rentalTypes: {
       daily: form.rentalTypes.daily,
       weekly: form.rentalTypes.weekly,
       monthly: form.rentalTypes.monthly,
     },
-    dailyPrice: form.rentalTypes.daily && form.dailyPrice.trim() ? Number(form.dailyPrice) : null,
-    weeklyPrice: form.rentalTypes.weekly && form.weeklyPrice.trim() ? Number(form.weeklyPrice) : null,
-    monthlyPrice: form.rentalTypes.monthly && form.monthlyPrice.trim() ? Number(form.monthlyPrice) : null,
-    minimumNights: form.rentalTypes.daily && form.minimumNights.trim() ? Number(form.minimumNights) : null,
-    minimumWeeks: form.rentalTypes.weekly && form.minimumWeeks.trim() ? Number(form.minimumWeeks) : null,
-    minimumMonths: form.rentalTypes.monthly && form.minimumMonths.trim() ? Number(form.minimumMonths) : null,
+    dailyPrice: form.rentalTypes.daily ? toNullableNumber(form.dailyPrice) : null,
+    weeklyPrice: form.rentalTypes.weekly ? toNullableNumber(form.weeklyPrice) : null,
+    monthlyPrice: form.rentalTypes.monthly ? toNullableNumber(form.monthlyPrice) : null,
+    minimumNights: form.rentalTypes.daily ? toNullableInteger(form.minimumNights) : null,
+    minimumWeeks: form.rentalTypes.weekly ? toNullableInteger(form.minimumWeeks) : null,
+    minimumMonths: form.rentalTypes.monthly ? toNullableInteger(form.minimumMonths) : null,
     ownerName: form.ownerName,
     ownerPhone: form.ownerPhone,
     ownerEmail: form.ownerEmail,
