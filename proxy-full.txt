@@ -23,20 +23,6 @@ export async function proxy(request: NextRequest) {
 
   const { supabase, response } = createSupabaseMiddlewareClient(request);
 
-  function redirectTo(targetPath: string, nextPath?: string) {
-    const targetUrl = new URL(targetPath, request.url);
-
-    if (nextPath) {
-      targetUrl.searchParams.set("next", nextPath);
-    }
-
-    if (targetUrl.pathname === pathname && targetUrl.search === request.nextUrl.search) {
-      return response;
-    }
-
-    return NextResponse.redirect(targetUrl);
-  }
-
   if (!supabase) {
     logServerAuthError({
       stage: "session",
@@ -45,11 +31,13 @@ export async function proxy(request: NextRequest) {
     });
 
     if (isProtectedPath(pathname)) {
-      return redirectTo("/login");
+      return NextResponse.redirect(new URL("/login", request.url));
     }
 
     if (isClientProtectedPath(pathname)) {
-      return redirectTo("/guest/login", currentPathWithSearch);
+      const loginUrl = new URL("/guest/login", request.url);
+      loginUrl.searchParams.set("next", currentPathWithSearch);
+      return NextResponse.redirect(loginUrl);
     }
 
     return response;
@@ -75,7 +63,7 @@ export async function proxy(request: NextRequest) {
       code: "cookie_session_error",
     });
 
-    return redirectTo("/login");
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (!user && isClientProtectedPath(pathname)) {
@@ -85,7 +73,9 @@ export async function proxy(request: NextRequest) {
       code: "cookie_session_error",
     });
 
-    return redirectTo("/guest/login", currentPathWithSearch);
+    const loginUrl = new URL("/guest/login", request.url);
+    loginUrl.searchParams.set("next", currentPathWithSearch);
+    return NextResponse.redirect(loginUrl);
   }
 
   let isGuestUser = false;
@@ -96,25 +86,7 @@ export async function proxy(request: NextRequest) {
     const loaded = await loadCurrentUserContext(supabase, user);
 
     if (!loaded.context) {
-      logServerAuthError({
-        stage: loaded.error?.stage ?? "session",
-        message: loaded.error?.message ?? "Authenticated user context could not be loaded.",
-        code: loaded.error?.supabaseCode ?? loaded.error?.code,
-      });
-
-      if (isAuthRoute) {
-        return response;
-      }
-
-      if (isProtectedPath(pathname)) {
-        return redirectTo("/login");
-      }
-
-      if (isClientProtectedPath(pathname)) {
-        return redirectTo("/guest/login", currentPathWithSearch);
-      }
-
-      return response;
+      return NextResponse.redirect(new URL("/login", request.url));
     }
 
     hasMembership = Boolean(loaded.context.organizationMember);
@@ -125,24 +97,24 @@ export async function proxy(request: NextRequest) {
 
   if (user && isProtectedPath(pathname) && !hasAllowedStaffRole) {
     if (!hasMembership) {
-      return redirectTo("/guest");
+      return NextResponse.redirect(new URL("/guest", request.url));
     }
 
-    return redirectTo("/login");
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (user && isClientProtectedPath(pathname) && !isGuestUser) {
-    return redirectTo("/admin");
+    return NextResponse.redirect(new URL("/admin", request.url));
   }
 
   if (user && isAuthRoute) {
     if (isGuestUser) {
       const next = getGuestNextPath(request.nextUrl.searchParams.get("next"));
-      return redirectTo(next);
+      return NextResponse.redirect(new URL(next, request.url));
     }
 
     const next = getAdminNextPath(request.nextUrl.searchParams.get("next"));
-    return redirectTo(next);
+    return NextResponse.redirect(new URL(next, request.url));
   }
 
   return response;
@@ -151,3 +123,4 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };
+

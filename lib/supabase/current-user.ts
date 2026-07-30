@@ -2,17 +2,15 @@ import type { SupabaseClient, User as SupabaseAuthUser } from "@supabase/supabas
 import type { CurrentUserContext, Organization, OrganizationMember, Profile } from "@/types/auth-context";
 
 export const PRIMARY_ORGANIZATION_SLUG = "opero-homes";
-export const EXPECTED_OWNER_UID = "8c0c7f03-528a-41c8-a96a-3c0393802121";
 
 type SupabaseLikeError = {
   message: string;
   code?: string;
 };
 
-export type CurrentUserLoadStage = "uid_check" | "profiles" | "organization_members" | "organizations";
+export type CurrentUserLoadStage = "profiles" | "organization_members" | "organizations";
 
 export type CurrentUserLoadErrorCode =
-  | "uid_mismatch"
   | "profile_missing"
   | "membership_missing"
   | "organization_missing"
@@ -181,17 +179,6 @@ export async function loadCurrentUserContext(
   supabase: SupabaseClient,
   authUser: SupabaseAuthUser,
 ): Promise<CurrentUserLoadResult> {
-  if (authUser.email === "alex.radziviluk@gmail.com" && authUser.id !== EXPECTED_OWNER_UID) {
-    return {
-      context: null,
-      error: {
-        code: "uid_mismatch",
-        stage: "uid_check",
-        message: `Auth user id ${authUser.id} does not match expected owner UID ${EXPECTED_OWNER_UID}.`,
-      },
-    };
-  }
-
   const profileResult = await loadProfileByIdOrUserId(supabase, authUser.id);
   if (!profileResult.profile) {
     return {
