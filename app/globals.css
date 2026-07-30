@@ -1,8 +1,9 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0B1120; /* Opero Homes dark background */
+  --foreground: #E6EEF8;
 }
 
 @theme inline {
@@ -19,8 +20,26 @@
   }
 }
 
-body {
+html, body, #__next {
+  width: 100%;
+  min-height: 100vh;
   background: var(--background);
+  overflow-x: hidden;
+}
+
+body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Ensure primary flex container fills available width and can shrink correctly */
+.flex-1 {
+  width: 100%;
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+select option {
+  background: white;
+  color: #0f172a;
 }

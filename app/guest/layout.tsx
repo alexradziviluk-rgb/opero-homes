@@ -1,0 +1,54 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import GuestNav from "@/components/guest/GuestNav";
+import { useCurrentUser } from "@/components/auth/current-user-provider";
+
+export default function GuestLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { currentUser, isAuthLoading } = useCurrentUser();
+
+  const isPublicGuestRoute =
+    pathname === "/guest/login" ||
+    pathname === "/guest/register" ||
+    pathname === "/guest/properties" ||
+    pathname.startsWith("/guest/properties/") ||
+    pathname === "/guest/book/new";
+
+  useEffect(() => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    if (isPublicGuestRoute) {
+      return;
+    }
+
+    if (!currentUser) {
+      router.replace("/guest/login");
+      return;
+    }
+
+    if (currentUser.role !== "Гость") {
+      router.replace("/admin");
+    }
+  }, [currentUser, isAuthLoading, isPublicGuestRoute, router]);
+
+  if (isAuthLoading) {
+    return <div className="p-6 text-slate-300">Загрузка...</div>;
+  }
+
+  if (!isPublicGuestRoute && (!currentUser || currentUser.role !== "Гость")) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
+      <GuestNav />
+      <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">{children}</main>
+    </div>
+  );
+}

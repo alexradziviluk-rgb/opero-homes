@@ -1,0 +1,80 @@
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
+
+function canBeResponsible(roleCode: string): boolean {
+  const role = roleCode.trim().toLowerCase();
+  return ["owner", "admin", "manager", "employee", "staff", "cleaner", "maintenance", "technician"].includes(role);
+}
+
+function canBeBackupManager(roleCode: string): boolean {
+  const role = roleCode.trim().toLowerCase();
+  return ["owner", "admin", "manager"].includes(role);
+}
+
+export async function GET() {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ ok: false, error: "Supabase is not configured" }, { status: 500 });
+  }
+
+  const auth = await requireStaffApiAuth();
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const { data: members, error: membersError } = await supabase
+    .from("organization_members")
+    .select("user_id,role_code")
+    .eq("organization_id", auth.context.organization.id);
+
+  if (membersError) {
+    return NextResponse.json({ ok: false, error: membersError.message }, { status: 422 });
+  }
+
+  const memberRows = (members ?? []) as Array<{ user_id: string; role_code: string }>;
+  const userIds = memberRows.map((member) => member.user_id);
+
+  if (userIds.length === 0) {
+    return NextResponse.json({ ok: true, data: { responsible: [], backupManagers: [] } });
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id,first_name,last_name,email,phone,status")
+    .in("id", userIds);
+
+  if (profilesError) {
+    return NextResponse.json({ ok: false, error: profilesError.message }, { status: 422 });
+  }
+
+  const profileMap = new Map(
+    ((profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null; status: string | null }>).map((profile) => [profile.id, profile]),
+  );
+
+  const mapped = memberRows
+    .map((member) => {
+      const profile = profileMap.get(member.user_id);
+      return {
+        userId: member.user_id,
+        roleCode: member.role_code,
+        firstName: profile?.first_name ?? "",
+        lastName: profile?.last_name ?? "",
+        email: profile?.email ?? "",
+        phone: profile?.phone ?? "",
+        status: profile?.status ?? "",
+      };
+    })
+    .filter((item) => Boolean(item.userId));
+
+  const responsible = mapped.filter((item) => canBeResponsible(item.roleCode));
+  const backupManagers = mapped.filter((item) => canBeBackupManager(item.roleCode));
+
+  return NextResponse.json({
+    ok: true,
+    data: {
+      responsible,
+      backupManagers,
+    },
+  });
+}

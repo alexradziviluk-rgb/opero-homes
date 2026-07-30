@@ -1,0 +1,63 @@
+export type RentalTypes = {
+  daily: boolean;
+  weekly: boolean;
+  monthly: boolean;
+};
+
+export type ApartmentPhoto = {
+  id: string;
+  apartmentId: string;
+  url: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  width?: number;
+  height?: number;
+  sortOrder: number;
+  isCover: boolean;
+  createdAt: string;
+};
+
+export type Apartment = {
+  id: string;
+  title: string;
+  type: string;
+  googleLink: string;
+  city: string;
+  district: string;
+  address: string;
+  latitude?: string | number;
+  longitude?: string | number;
+  shortDesc: string;
+  rooms: number;
+  bedrooms: number;
+  bathrooms: number;
+  floor: number | null;
+  area: number | null;
+  maxGuests: number;
+  price?: string;
+  deposit: number | null;
+  cleaningFee: number | null;
+  rentalTypes: RentalTypes;
+  dailyPrice: number | null;
+  weeklyPrice: number | null;
+  monthlyPrice: number | null;
+  minimumNights: number | null;
+  minimumWeeks: number | null;
+  minimumMonths: number | null;
+  ownerName: string;
+  ownerPhone: string;
+  ownerEmail: string;
+  responsibleUserId?: string | null;
+  backupManagerUserId?: string | null;
+  status: "Свободно" | "Занято" | "Черновик";
+  availability: "Свободен" | "Занят" | "На обслуживании";
+  publishStatus: "Опубликован" | "Черновик" | "На обслуживании";
+  publicationStatus?: "draft" | "published" | "hidden" | "archived";
+  createdAt?: string;
+  updatedAt?: string;
+  bookings: number;
+  photos?: ApartmentPhoto[];
+  coverPhotoUrl?: string | null;
+};

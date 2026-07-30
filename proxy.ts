@@ -1,0 +1,125 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { getAdminNextPath, getGuestNextPath } from "@/lib/auth/next-route";
+import { loadCurrentUserContext } from "@/lib/supabase/current-user";
+import {
+  createSupabaseMiddlewareClient,
+  isClientProtectedPath,
+  isProtectedPath,
+  isPublicPath,
+} from "@/lib/supabase/middleware";
+import { logServerAuthError } from "@/lib/supabase/server-auth-log";
+import { getRoleCodeFromContext, isStaffRoleCode } from "@/lib/supabase/role-code";
+
+export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const currentPathWithSearch = `${pathname}${request.nextUrl.search}`;
+  const isStaffAuthRoute = pathname === "/login" || pathname === "/admin/login";
+  const isGuestAuthRoute = pathname === "/guest/login" || pathname === "/guest/register";
+  const isAuthRoute = isStaffAuthRoute || isGuestAuthRoute;
+
+  if (!isAuthRoute && isPublicPath(pathname)) {
+    return NextResponse.next();
+  }
+
+  const { supabase, response } = createSupabaseMiddlewareClient(request);
+
+  if (!supabase) {
+    logServerAuthError({
+      stage: "session",
+      message: "Supabase middleware client is not configured.",
+      code: "supabase_not_configured",
+    });
+
+    if (isProtectedPath(pathname)) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    if (isClientProtectedPath(pathname)) {
+      const loginUrl = new URL("/guest/login", request.url);
+      loginUrl.searchParams.set("next", currentPathWithSearch);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    return response;
+  }
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    logServerAuthError({
+      stage: "session",
+      message: error.message,
+      code: error.code,
+    });
+  }
+
+  if (!user && isProtectedPath(pathname)) {
+    logServerAuthError({
+      stage: "session",
+      message: "No authenticated user found for protected route.",
+      code: "cookie_session_error",
+    });
+
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (!user && isClientProtectedPath(pathname)) {
+    logServerAuthError({
+      stage: "session",
+      message: "No authenticated user found for protected guest route.",
+      code: "cookie_session_error",
+    });
+
+    const loginUrl = new URL("/guest/login", request.url);
+    loginUrl.searchParams.set("next", currentPathWithSearch);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  let isGuestUser = false;
+  let hasMembership = false;
+  let hasAllowedStaffRole = false;
+
+  if (user && (isProtectedPath(pathname) || isClientProtectedPath(pathname) || isAuthRoute)) {
+    const loaded = await loadCurrentUserContext(supabase, user);
+
+    if (!loaded.context) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    hasMembership = Boolean(loaded.context.organizationMember);
+    const membershipRoleCode = getRoleCodeFromContext(loaded.context);
+    hasAllowedStaffRole = hasMembership && isStaffRoleCode(membershipRoleCode);
+    isGuestUser = !hasAllowedStaffRole;
+  }
+
+  if (user && isProtectedPath(pathname) && !hasAllowedStaffRole) {
+    if (!hasMembership) {
+      return NextResponse.redirect(new URL("/guest", request.url));
+    }
+
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  if (user && isClientProtectedPath(pathname) && !isGuestUser) {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
+  if (user && isAuthRoute) {
+    if (isGuestUser) {
+      const next = getGuestNextPath(request.nextUrl.searchParams.get("next"));
+      return NextResponse.redirect(new URL(next, request.url));
+    }
+
+    const next = getAdminNextPath(request.nextUrl.searchParams.get("next"));
+    return NextResponse.redirect(new URL(next, request.url));
+  }
+
+  return response;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+};
