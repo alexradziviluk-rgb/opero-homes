@@ -152,6 +152,9 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-cyan-950/30">
         <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Opero Homes</p>
         <h1 className="mt-3 text-3xl font-semibold text-white">Вход в систему управления</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          Для менеджеров, уборщиков и другого персонала. После принятия приглашения входите по email и созданному паролю.
+        </p>
 
         <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
           <label className="block">

@@ -12,6 +12,7 @@ export default function GuestNav() {
   const pathname = usePathname();
   const { currentUser, logout } = useCurrentUser();
   const isGuestUser = currentUser?.role === "Гость";
+  const isStaffUser = Boolean(currentUser && !isGuestUser);
 
   return (
     <header className="border-b border-white/10 bg-slate-950/80 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
@@ -29,13 +30,26 @@ export default function GuestNav() {
             >
               Профиль
             </Link>
+          ) : isStaffUser ? (
+            <Link
+              href="/admin"
+              className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/20"
+            >
+              Панель управления
+            </Link>
           ) : (
             <>
               <Link
                 href="/guest/login"
                 className="rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
               >
-                Войти
+                Вход для гостей
+              </Link>
+              <Link
+                href="/login"
+                className="rounded-xl px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
+              >
+                Вход для сотрудников
               </Link>
               <Link
                 href="/guest/register"
@@ -77,7 +91,16 @@ export default function GuestNav() {
           {isGuestUser ? (
             <button
               type="button"
-              onClick={logout}
+              onClick={() => void logout()}
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
+            >
+              Выйти
+            </button>
+          ) : null}
+          {isStaffUser ? (
+            <button
+              type="button"
+              onClick={() => void logout()}
               className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 hover:bg-white/10"
             >
               Выйти
