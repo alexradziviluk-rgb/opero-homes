@@ -6,20 +6,17 @@ export function normalizeRoleCode(value: string | null | undefined): string {
 
 export function isManagerRoleCode(value: string | null | undefined): boolean {
   const normalized = normalizeRoleCode(value);
-  return normalized === "owner" || normalized === "admin" || normalized === "manager";
+  return normalized === "owner" || normalized === "manager";
 }
 
 export function isStaffRoleCode(value: string | null | undefined): boolean {
   const normalized = normalizeRoleCode(value);
   return (
     normalized === "owner" ||
-    normalized === "admin" ||
     normalized === "manager" ||
     normalized === "employee" ||
-    normalized === "staff" ||
     normalized === "cleaner" ||
-    normalized === "maintenance" ||
-    normalized === "technician"
+    normalized === "maintenance"
   );
 }
 
@@ -33,7 +30,7 @@ export function getRoleCodeFromContext(context: CurrentUserContext): string {
 }
 
 export function hasStaffMembership(context: CurrentUserContext | null): boolean {
-  if (!context?.organizationMember) {
+  if (!context?.organizationMember || context.organizationMember.status !== "active") {
     return false;
   }
 

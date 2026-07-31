@@ -79,7 +79,6 @@ begin
 
   insert into public.profiles (
     id,
-    organization_id,
     first_name,
     last_name,
     email,
@@ -91,7 +90,6 @@ begin
   )
   values (
     current_uid,
-    invitation_row.organization_id,
     coalesce(nullif(trim(invitation_row.first_name), ''), 'Сотрудник'),
     coalesce(nullif(trim(invitation_row.last_name), ''), 'Opero Homes'),
     current_email,
@@ -103,7 +101,6 @@ begin
   )
   on conflict (id) do update
   set
-    organization_id = excluded.organization_id,
     first_name = coalesce(nullif(public.profiles.first_name, ''), excluded.first_name),
     last_name = coalesce(nullif(public.profiles.last_name, ''), excluded.last_name),
     email = excluded.email,

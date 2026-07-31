@@ -1,32 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { userRepository } from "@/lib/repositories/users";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions";
-import { canApproveUser } from "@/lib/permissions/access-control";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
-import type { User, UserRole, UserStatus } from "@/types/user";
+import type { OrganizationUser } from "@/types/organization-user";
 
-const roleOptions: UserRole[] = [
-  "Владелец",
-  "Администратор",
-  "Менеджер",
-  "Сотрудник",
-  "Уборщик",
-  "Технический специалист",
-  "Гость",
-];
+const roleLabels: Record<string, string> = {
+  owner: "Владелец",
+  manager: "Менеджер",
+  employee: "Сотрудник",
+  cleaner: "Уборщик",
+  maintenance: "Специалист по обслуживанию",
+};
 
-const statusOptions: UserStatus[] = [
-  "Приглашен",
-  "Ожидает подтверждения",
-  "Активен",
-  "Заблокирован",
-  "Приглашение истекло",
-];
+const statusLabels: Record<string, string> = {
+  active: "Активен",
+  paused: "Приостановлен",
+  blocked: "Заблокирован",
+  inactive: "Неактивен",
+  invited: "Приглашен",
+};
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("ru-RU");
@@ -36,17 +32,43 @@ export default function UsersPage() {
   const { currentUser, isAuthLoading } = useCurrentUser();
   const effectivePermissions = useMemo(() => (currentUser ? getEffectivePermissions(currentUser) : []), [currentUser]);
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
-  const [version, setVersion] = useState(0);
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [users, setUsers] = useState<OrganizationUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const users = useMemo(() => userRepository.getAll(), [version]);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsers() {
+      setIsLoading(true);
+      const response = await fetch("/api/users", { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; data?: OrganizationUser[]; error?: string } | null;
+
+      if (cancelled) return;
+      if (!response.ok || !payload?.ok) {
+        setError(payload?.error ?? "Не удалось загрузить пользователей");
+        setIsLoading(false);
+        return;
+      }
+
+      setUsers(payload.data ?? []);
+      setError("");
+      setIsLoading(false);
+    }
+
+    void loadUsers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredUsers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
     return users.filter((user) => {
-      const roleMatch = roleFilter === "all" || user.role === roleFilter;
+      const roleMatch = roleFilter === "all" || user.roleCode === roleFilter;
       const statusMatch = statusFilter === "all" || user.status === statusFilter;
 
       if (!normalized) return roleMatch && statusMatch;
@@ -61,42 +83,29 @@ export default function UsersPage() {
     });
   }, [users, query, roleFilter, statusFilter]);
 
-  function handleDelete(user: User) {
-    const baseConfirm = confirm("Удалить пользователя?");
-    if (!baseConfirm) return;
+  async function toggleStatus(user: OrganizationUser) {
+    if (user.roleCode === "owner") return;
 
-    if (user.role === "Владелец") {
-      const ownerConfirm = confirm("Вы удаляете владельца. Подтвердите удаление еще раз.");
-      if (!ownerConfirm) return;
-    }
+    const nextStatus = user.status === "active" ? "paused" : "active";
+    const response = await fetch("/api/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...user, status: nextStatus }),
+    });
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
 
-    userRepository.remove(user.id);
-    setVersion((current) => current + 1);
-  }
-
-  function handleApprove(user: User) {
-    if (!currentUser) {
+    if (!response.ok || !payload?.ok) {
+      setError(payload?.error ?? "Не удалось изменить статус пользователя");
       return;
     }
 
-    userRepository.approve(user.id, currentUser.id);
-    setVersion((current) => current + 1);
-  }
-
-  function handleBlock(user: User) {
-    if (!currentUser) {
-      return;
-    }
-
-    userRepository.block(user.id, currentUser.id);
-    setVersion((current) => current + 1);
+    setUsers((current) => current.map((item) => (item.userId === user.userId ? { ...item, status: nextStatus } : item)));
+    setError("");
   }
 
   const canViewUsers = hasPermissionInList(effectivePermissions, "users.view");
   const canManageUsers = hasPermissionInList(effectivePermissions, "users.manage");
   const canInviteUsers = hasPermissionInList(effectivePermissions, "users.invite");
-  const canApproveUsers = currentUser ? canApproveUser(currentUser) : false;
-  const canBlockUsers = hasPermissionInList(effectivePermissions, "users.block");
 
   if (isAuthLoading) {
     return <div className="p-6 text-slate-300">Загрузка...</div>;
@@ -138,21 +147,23 @@ export default function UsersPage() {
                   />
 
                   <div className="grid grid-cols-2 gap-3">
-                    <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as UserRole | "all")} className="rounded-2xl border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
+                    <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
                       <option value="all">Все роли</option>
-                      {roleOptions.map((role) => (
-                        <option key={role} value={role}>{role}</option>
+                      {Object.entries(roleLabels).map(([role, label]) => (
+                        <option key={role} value={role}>{label}</option>
                       ))}
                     </select>
 
-                    <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as UserStatus | "all")} className="rounded-2xl border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
+                    <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
                       <option value="all">Все статусы</option>
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>{status}</option>
+                      {Object.entries(statusLabels).map(([status, label]) => (
+                        <option key={status} value={status}>{label}</option>
                       ))}
                     </select>
                   </div>
                 </div>
+
+                {error ? <div className="mb-4 rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}
 
                 <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/80">
                   <table className="min-w-full text-sm">
@@ -169,26 +180,30 @@ export default function UsersPage() {
                     </thead>
                     <tbody>
                       {filteredUsers.map((user) => (
-                        <tr key={user.id} className="border-t border-white/5">
+                        <tr key={user.userId} className="border-t border-white/5">
                           <td className="px-4 py-3">
                             <div className="font-medium text-white">{user.firstName} {user.lastName}</div>
                           </td>
                           <td className="px-4 py-3 text-slate-300">{user.email}</td>
                           <td className="px-4 py-3 text-slate-300">{user.phone || "—"}</td>
-                          <td className="px-4 py-3 text-slate-300">{user.role}</td>
-                          <td className="px-4 py-3 text-slate-300">{user.status}</td>
+                          <td className="px-4 py-3 text-slate-300">{roleLabels[user.roleCode] ?? user.roleCode}</td>
+                          <td className="px-4 py-3 text-slate-300">{statusLabels[user.status] ?? user.status}</td>
                           <td className="px-4 py-3 text-slate-300">{formatDate(user.createdAt)}</td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-2">
-                              <Link href={`/users/${user.id}`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">Открыть</Link>
-                              {canManageUsers ? <Link href={`/users/${user.id}/edit`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">Редактировать</Link> : null}
-                              {canApproveUsers && user.status === "Ожидает подтверждения" ? <button type="button" onClick={() => handleApprove(user)} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-emerald-300">Подтвердить</button> : null}
-                              {canBlockUsers && user.status !== "Заблокирован" ? <button type="button" onClick={() => handleBlock(user)} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-amber-300">Блокировать</button> : null}
-                              {canManageUsers ? <button type="button" onClick={() => handleDelete(user)} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-rose-300">Удалить</button> : null}
+                              <Link href={`/users/${user.userId}`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">Открыть</Link>
+                              {canManageUsers && user.roleCode !== "owner" ? <Link href={`/users/${user.userId}/edit`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">Редактировать</Link> : null}
+                              {canManageUsers && user.roleCode !== "owner" ? <button type="button" onClick={() => void toggleStatus(user)} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-amber-300">{user.status === "active" ? "Приостановить" : "Активировать"}</button> : null}
                             </div>
                           </td>
                         </tr>
                       ))}
+                      {!isLoading && filteredUsers.length === 0 ? (
+                        <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Пользователи не найдены.</td></tr>
+                      ) : null}
+                      {isLoading ? (
+                        <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Загрузка...</td></tr>
+                      ) : null}
                     </tbody>
                   </table>
                 </div>

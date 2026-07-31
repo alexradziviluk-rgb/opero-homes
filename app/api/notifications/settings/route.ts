@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
-import { getRoleCodeFromContext, isManagerRoleCode } from "@/lib/supabase/role-code";
+import { getRoleCodeFromContext, normalizeRoleCode } from "@/lib/supabase/role-code";
 
 type SettingsUpdateRequest = {
   defaultBookingManagerUserId: string | null;
@@ -44,6 +44,10 @@ function isSettingsUpdateRequest(value: unknown): value is SettingsUpdateRequest
   );
 }
 
+function canManageOrganizationSettings(roleCode: string): boolean {
+  return normalizeRoleCode(roleCode) === "owner";
+}
+
 export async function GET() {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
@@ -53,6 +57,10 @@ export async function GET() {
   const auth = await requireStaffApiAuth();
   if (!auth.ok) {
     return auth.response;
+  }
+
+  if (!canManageOrganizationSettings(getRoleCodeFromContext(auth.context))) {
+    return NextResponse.json({ ok: false, error: "Insufficient permissions" }, { status: 403 });
   }
 
   const { data, error } = await supabase
@@ -97,7 +105,7 @@ export async function PUT(request: Request) {
     return auth.response;
   }
 
-  if (!isManagerRoleCode(getRoleCodeFromContext(auth.context))) {
+  if (!canManageOrganizationSettings(getRoleCodeFromContext(auth.context))) {
     return NextResponse.json({ ok: false, error: "Insufficient permissions" }, { status: 403 });
   }
 

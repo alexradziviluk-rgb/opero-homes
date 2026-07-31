@@ -12,6 +12,9 @@ import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation
 import { Booking } from "@/types/booking";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
 import BookingNotificationsPanel from "@/components/booking/BookingNotificationsPanel";
+import BookingControlChecklist from "@/components/booking/BookingControlChecklist";
+import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { hasEffectivePermission } from "@/lib/permissions";
 
 type BookingDetailsResponse =
   | {
@@ -38,6 +41,7 @@ type BookingDetailsResponse =
   | { ok: false; error: string };
 
 export default function BookingPage() {
+  const { currentUser } = useCurrentUser();
   const params = useParams();
   const bookingId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
@@ -124,6 +128,7 @@ export default function BookingPage() {
   const apartment = getApartmentById(booking.apartmentId);
   const client = booking.clientId ? getClientById(booking.clientId) : null;
   const statusPresentation = getBookingStatusPresentation(booking.status);
+  const canDeleteBooking = Boolean(currentUser && hasEffectivePermission(currentUser, "bookings.delete"));
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
@@ -140,7 +145,7 @@ export default function BookingPage() {
               <div className="flex gap-2">
                 <Link href="/bookings" className="rounded px-3 py-2 bg-white/5">Назад к бронированиям</Link>
                 <Link href={`/bookings/${booking.id}/edit`} className="rounded px-3 py-2 bg-white/5">Редактировать</Link>
-                <button type="button" onClick={() => void handleDelete()} className="rounded px-3 py-2 bg-rose-600/10">Удалить</button>
+                {canDeleteBooking ? <button type="button" onClick={() => void handleDelete()} className="rounded px-3 py-2 bg-rose-600/10">Удалить</button> : null}
               </div>
             </div>
 
@@ -199,6 +204,7 @@ export default function BookingPage() {
               </div>
             </div>
 
+            <BookingControlChecklist bookingId={booking.id} />
             <BookingNotificationsPanel bookingId={booking.id} />
           </main>
         </div>

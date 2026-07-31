@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { deleteClient, getClients } from "@/lib/clients/client-repository";
@@ -12,12 +12,8 @@ function formatDate(value: string) {
 }
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<Client[]>(() => getClients());
   const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    setClients(getClients());
-  }, []);
 
   const filteredClients = useMemo(() => {
     const normalized = query.trim().toLowerCase();

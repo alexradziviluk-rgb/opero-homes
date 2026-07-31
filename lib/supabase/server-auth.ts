@@ -2,7 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getServerCurrentUserContext } from "@/lib/supabase/server";
-import { getRoleCodeFromContext, isStaffRoleCode } from "@/lib/supabase/role-code";
+import { getRoleCodeFromContext, hasStaffMembership, isStaffRoleCode } from "@/lib/supabase/role-code";
 import type { CurrentUserContext } from "@/types/auth-context";
 
 type ServerAuthState = {
@@ -52,7 +52,7 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
     };
   }
 
-  const hasMembership = Boolean(context.organizationMember);
+  const hasMembership = hasStaffMembership(context);
   const roleCode = getRoleCodeFromContext(context);
   const isStaff = hasMembership && isStaffRoleCode(roleCode);
 
@@ -74,6 +74,24 @@ export async function requireServerStaffPage(): Promise<CurrentUserContext> {
 
   if (!authState.isStaff || !authState.context) {
     redirect("/guest");
+  }
+
+  return authState.context;
+}
+
+export async function requireServerRoleCodesPage(allowedRoleCodes: string[]): Promise<CurrentUserContext> {
+  const authState = await getServerAuthState();
+
+  if (!authState.isAuthenticated) {
+    redirect("/login");
+  }
+
+  if (!authState.isStaff || !authState.context) {
+    redirect("/guest");
+  }
+
+  if (!allowedRoleCodes.includes(authState.roleCode)) {
+    redirect("/admin");
   }
 
   return authState.context;

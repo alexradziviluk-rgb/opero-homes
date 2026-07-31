@@ -54,8 +54,8 @@ export async function POST(request: Request) {
   }
 
   const requesterRoleCode = normalizeRoleCode(auth.context.organizationMember.role_code);
-  if (requesterRoleCode !== "owner" && requesterRoleCode !== "admin") {
-    return jsonError(403, "INSUFFICIENT_PERMISSIONS", "Приглашать сотрудников могут только owner или admin.");
+  if (requesterRoleCode !== "owner") {
+    return jsonError(403, "INSUFFICIENT_PERMISSIONS", "Недостаточно прав для приглашения сотрудников.");
   }
 
   const body = (await request.json().catch(() => null)) as unknown;
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
   if (inviteTargetError) {
     console.error("Failed to lookup employee invite target:", inviteTargetError);
     if (inviteTargetError.message.includes("INVITER_NOT_ALLOWED")) {
-      return jsonError(403, "INSUFFICIENT_PERMISSIONS", "Приглашать сотрудников могут только owner или admin.");
+      return jsonError(403, "INSUFFICIENT_PERMISSIONS", "Недостаточно прав для приглашения сотрудников.");
     }
     return jsonError(500, "UNEXPECTED", inviteTargetError.message);
   }

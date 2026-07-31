@@ -11,13 +11,12 @@ create table if not exists organizations (
 
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  organization_id uuid not null references organizations(id) on delete cascade,
   first_name text not null,
   last_name text not null,
   email text not null,
   phone text,
   avatar_url text,
-  role text not null default 'viewer',
+  role text not null default 'employee',
   status text not null default 'invited',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -27,7 +26,8 @@ create table if not exists organization_members (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  role text not null default 'viewer',
+  role text not null default 'employee',
+  role_code text not null default 'employee',
   status text not null default 'invited',
   invited_by uuid references auth.users(id),
   created_at timestamptz default now(),
@@ -95,7 +95,6 @@ create table if not exists tasks (
 );
 
 create index if not exists idx_organizations_owner_id on organizations(owner_id);
-create index if not exists idx_profiles_organization_id on profiles(organization_id);
 create index if not exists idx_organization_members_organization_id on organization_members(organization_id);
 create index if not exists idx_organization_members_user_id on organization_members(user_id);
 create index if not exists idx_apartments_organization_id on apartments(organization_id);
@@ -119,7 +118,8 @@ alter table clients enable row level security;
 alter table bookings enable row level security;
 alter table tasks enable row level security;
 
-create policy if not exists organizations_select on organizations
+drop policy if exists organizations_select on organizations;
+create policy organizations_select on organizations
   for select using (
     exists (
       select 1 from organization_members om
@@ -127,41 +127,51 @@ create policy if not exists organizations_select on organizations
     )
   );
 
-create policy if not exists organizations_manage on organizations
+drop policy if exists organizations_manage on organizations;
+create policy organizations_manage on organizations
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = organizations.id and om.user_id = auth.uid() and om.role in ('owner', 'admin')
+      where om.organization_id = organizations.id and om.user_id = auth.uid() and om.role = 'owner'
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = organizations.id and om.user_id = auth.uid() and om.role in ('owner', 'admin')
+      where om.organization_id = organizations.id and om.user_id = auth.uid() and om.role = 'owner'
     )
   );
 
-create policy if not exists profiles_select on profiles
+drop policy if exists profiles_select on profiles;
+create policy profiles_select on profiles
   for select using (
     exists (
-      select 1 from organization_members om
-      where om.organization_id = profiles.organization_id and om.user_id = auth.uid()
+      select 1
+      from organization_members caller
+      join organization_members target on target.organization_id = caller.organization_id
+      where caller.user_id = auth.uid() and target.user_id = profiles.id
     )
   );
 
-create policy if not exists profiles_manage on profiles
+drop policy if exists profiles_manage on profiles;
+create policy profiles_manage on profiles
   for all using (
     exists (
-      select 1 from organization_members om
-      where om.organization_id = profiles.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      select 1
+      from organization_members caller
+      join organization_members target on target.organization_id = caller.organization_id
+      where caller.user_id = auth.uid() and target.user_id = profiles.id and caller.role in ('owner', 'manager')
     )
   ) with check (
     exists (
-      select 1 from organization_members om
-      where om.organization_id = profiles.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      select 1
+      from organization_members caller
+      join organization_members target on target.organization_id = caller.organization_id
+      where caller.user_id = auth.uid() and target.user_id = profiles.id and caller.role in ('owner', 'manager')
     )
   );
 
-create policy if not exists organization_members_select on organization_members
+drop policy if exists organization_members_select on organization_members;
+create policy organization_members_select on organization_members
   for select using (
     exists (
       select 1 from organization_members om
@@ -169,20 +179,22 @@ create policy if not exists organization_members_select on organization_members
     )
   );
 
-create policy if not exists organization_members_manage on organization_members
+drop policy if exists organization_members_manage on organization_members;
+create policy organization_members_manage on organization_members
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = organization_members.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin')
+      where om.organization_id = organization_members.organization_id and om.user_id = auth.uid() and om.role = 'owner'
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = organization_members.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin')
+      where om.organization_id = organization_members.organization_id and om.user_id = auth.uid() and om.role = 'owner'
     )
   );
 
-create policy if not exists apartments_select on apartments
+drop policy if exists apartments_select on apartments;
+create policy apartments_select on apartments
   for select using (
     exists (
       select 1 from organization_members om
@@ -190,20 +202,22 @@ create policy if not exists apartments_select on apartments
     )
   );
 
-create policy if not exists apartments_manage on apartments
+drop policy if exists apartments_manage on apartments;
+create policy apartments_manage on apartments
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = apartments.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = apartments.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = apartments.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = apartments.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   );
 
-create policy if not exists apartment_photos_select on apartment_photos
+drop policy if exists apartment_photos_select on apartment_photos;
+create policy apartment_photos_select on apartment_photos
   for select using (
     exists (
       select 1 from organization_members om
@@ -211,20 +225,22 @@ create policy if not exists apartment_photos_select on apartment_photos
     )
   );
 
-create policy if not exists apartment_photos_manage on apartment_photos
+drop policy if exists apartment_photos_manage on apartment_photos;
+create policy apartment_photos_manage on apartment_photos
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = apartment_photos.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = apartment_photos.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = apartment_photos.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = apartment_photos.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   );
 
-create policy if not exists clients_select on clients
+drop policy if exists clients_select on clients;
+create policy clients_select on clients
   for select using (
     exists (
       select 1 from organization_members om
@@ -232,20 +248,22 @@ create policy if not exists clients_select on clients
     )
   );
 
-create policy if not exists clients_manage on clients
+drop policy if exists clients_manage on clients;
+create policy clients_manage on clients
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = clients.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = clients.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = clients.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = clients.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   );
 
-create policy if not exists bookings_select on bookings
+drop policy if exists bookings_select on bookings;
+create policy bookings_select on bookings
   for select using (
     exists (
       select 1 from organization_members om
@@ -253,20 +271,22 @@ create policy if not exists bookings_select on bookings
     )
   );
 
-create policy if not exists bookings_manage on bookings
+drop policy if exists bookings_manage on bookings;
+create policy bookings_manage on bookings
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = bookings.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = bookings.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = bookings.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager')
+      where om.organization_id = bookings.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager')
     )
   );
 
-create policy if not exists tasks_select on tasks
+drop policy if exists tasks_select on tasks;
+create policy tasks_select on tasks
   for select using (
     exists (
       select 1 from organization_members om
@@ -274,15 +294,16 @@ create policy if not exists tasks_select on tasks
     )
   );
 
-create policy if not exists tasks_manage on tasks
+drop policy if exists tasks_manage on tasks;
+create policy tasks_manage on tasks
   for all using (
     exists (
       select 1 from organization_members om
-      where om.organization_id = tasks.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager', 'cleaner', 'maintenance')
+      where om.organization_id = tasks.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager', 'cleaner', 'maintenance')
     )
   ) with check (
     exists (
       select 1 from organization_members om
-      where om.organization_id = tasks.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'admin', 'manager', 'cleaner', 'maintenance')
+      where om.organization_id = tasks.organization_id and om.user_id = auth.uid() and om.role in ('owner', 'manager', 'cleaner', 'maintenance')
     )
   );

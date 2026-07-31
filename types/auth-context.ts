@@ -25,6 +25,7 @@ export type OrganizationMember = {
   organization_id: string;
   user_id: string;
   role_code: string;
+  status: string;
 };
 
 export type CurrentUserContext = {

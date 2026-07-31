@@ -367,7 +367,7 @@ export function confirmBooking(input: ConfirmBookingInput): ConfirmBookingResult
       dueAt: minusHours(booking.checkIn, 12),
       bookingId: booking.id,
       apartmentId: booking.apartmentId,
-      assignedRole: "Технический специалист",
+      assignedRole: "Специалист по обслуживанию",
       createdAt: now,
       updatedAt: now,
       sourceType: "booking_confirmation",

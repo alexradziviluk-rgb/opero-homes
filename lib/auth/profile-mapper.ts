@@ -20,12 +20,11 @@ function mapRole(role: string | null): UserRole {
   const normalized = (role ?? "").trim().toLowerCase();
 
   if (normalized === "owner" || normalized === "владелец") return "Владелец";
-  if (normalized === "admin" || normalized === "администратор") return "Администратор";
   if (normalized === "manager" || normalized === "менеджер") return "Менеджер";
-  if (normalized === "employee" || normalized === "staff" || normalized === "сотрудник") return "Сотрудник";
+  if (normalized === "employee" || normalized === "сотрудник") return "Сотрудник";
   if (normalized === "cleaner" || normalized === "уборщик") return "Уборщик";
-  if (normalized === "technician" || normalized === "maintenance" || normalized === "технический специалист") {
-    return "Технический специалист";
+  if (normalized === "maintenance" || normalized === "специалист по обслуживанию") {
+    return "Специалист по обслуживанию";
   }
   if (normalized === "guest" || normalized === "гость") return "Гость";
 

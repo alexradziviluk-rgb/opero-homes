@@ -85,21 +85,22 @@ function formatLoginError(
 export default function LoginPage() {
   const router = useRouter();
   const { currentUser, isAuthLoading } = useCurrentUser();
-  const [nextPath, setNextPath] = useState("/admin");
+  const [nextPath] = useState(() => {
+    if (typeof window === "undefined") return "/admin";
+    const params = new URLSearchParams(window.location.search);
+    return getAdminNextPath(params.get("next"));
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
     const params = new URLSearchParams(window.location.search);
-    setNextPath(getAdminNextPath(params.get("next")));
-
-    if (params.get("error") === "profile_missing") {
-      setError("Профиль пользователя не найден в public.profiles. Обратитесь к администратору системы.");
-    }
-  }, []);
+    return params.get("error") === "profile_missing"
+      ? "Профиль пользователя не найден в public.profiles. Обратитесь к администратору системы."
+      : null;
+  });
 
   useEffect(() => {
     if (!isAuthLoading && currentUser) {

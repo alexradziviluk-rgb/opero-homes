@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
@@ -13,25 +12,8 @@ type HeaderProps = {
 
 export default function Header({ showSearch = true, showNewListing = true, newListingLabel = "+ Добавить объект" }: HeaderProps) {
   const { currentUser, currentUserContext, logout } = useCurrentUser();
-  const [displayName, setDisplayName] = useState("Пользователь");
-
-  useEffect(() => {
-    if (currentUserContext?.authEmail) {
-      const fallbackName = currentUserContext.authEmail.split("@")[0] ?? "Пользователь";
-      setDisplayName(fallbackName);
-    }
-  }, [currentUserContext]);
-
-  useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
-    const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
-    if (fullName) {
-      setDisplayName(fullName);
-    }
-  }, [currentUser]);
+  const fullName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : "";
+  const displayName = fullName || currentUserContext?.authEmail?.split("@")[0] || "Пользователь";
 
   async function handleLogout() {
     await logout();

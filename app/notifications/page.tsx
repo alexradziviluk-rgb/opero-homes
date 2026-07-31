@@ -32,15 +32,19 @@ function normalizeReadFilter(value: string | null): ReadFilter {
 }
 
 export default function NotificationsPage() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState<NotificationCenterItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
-  const [readFilter, setReadFilter] = useState<ReadFilter>("all");
-  const [eventType, setEventType] = useState<string>("");
+  const [readFilter, setReadFilter] = useState<ReadFilter>(() =>
+    typeof window === "undefined" ? "all" : normalizeReadFilter(new URLSearchParams(window.location.search).get("read")),
+  );
+  const [eventType, setEventType] = useState<string>(() =>
+    typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("eventType") ?? "",
+  );
   const [offset, setOffset] = useState(0);
 
   async function load() {
@@ -76,14 +80,9 @@ export default function NotificationsPage() {
   }
 
   useEffect(() => {
-    void load();
+    const loadId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(loadId);
   }, [offset, readFilter, eventType]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setReadFilter(normalizeReadFilter(params.get("read")));
-    setEventType(params.get("eventType") ?? "");
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams();

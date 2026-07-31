@@ -22,7 +22,7 @@ begin
   last_name_value := nullif(trim(coalesce(target_meta ->> 'last_name', '')), '');
   phone_value := nullif(trim(coalesce(target_meta ->> 'phone', '')), '');
   avatar_url_value := nullif(trim(coalesce(target_meta ->> 'avatar_url', '')), '');
-  role_value := lower(trim(coalesce(target_meta ->> 'role', 'guest')));
+  role_value := lower(trim(coalesce(target_meta ->> 'role', 'employee')));
   status_value := lower(trim(coalesce(target_meta ->> 'status', 'active')));
 
   insert into public.profiles (

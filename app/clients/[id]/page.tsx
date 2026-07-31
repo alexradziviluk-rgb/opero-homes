@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { deleteClient, getClientById } from "@/lib/clients/client-repository";
@@ -19,14 +19,8 @@ export default function ClientDetailsPage() {
   const params = useParams();
   const clientId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const [client, setClient] = useState<Client | null>(null);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-
-  useEffect(() => {
-    if (!clientId) return;
-    setClient(getClientById(clientId));
-    setBookings(getBookings());
-  }, [clientId]);
+  const [client] = useState<Client | null>(() => (clientId ? getClientById(clientId) : null));
+  const [bookings] = useState<Booking[]>(() => getBookings());
 
   const relatedBookings = useMemo(() => {
     if (!client) return [];

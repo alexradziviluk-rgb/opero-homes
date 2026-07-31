@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -18,15 +18,15 @@ export default function EditBookingPage() {
   const bookingId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
 
-  const [booking, setBooking] = useState<Booking | null>(null);
-  const [form, setForm] = useState<Booking | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const [booking] = useState<Booking | null>(() => (bookingId ? getBookingById(bookingId) : null));
+  const [form, setForm] = useState<Booking | null>(() => booking);
+  const loading = false;
+  const notFound = !booking;
   const [errors, setErrors] = useState<Record<string,string>>({});
 
-  const bookings = useMemo(() => getBookings(), [booking?.updatedAt]);
+  const [bookings] = useState<Booking[]>(() => getBookings());
 
-  const occupiedRanges = useMemo(() => {
+  const occupiedRanges = (() => {
     if (!form?.apartmentId) return [];
 
     return bookings
@@ -37,9 +37,9 @@ export default function EditBookingPage() {
           isBlockingBooking(item),
       )
       .map((item) => ({ id: item.id, from: item.checkIn, to: item.checkOut }));
-  }, [bookings, form?.apartmentId, booking?.id]);
+  })();
 
-  const dateConflict = useMemo(() => {
+  const dateConflict = (() => {
     if (!form?.apartmentId || !form.checkIn || !form.checkOut || !booking) {
       return undefined;
     }
@@ -51,33 +51,13 @@ export default function EditBookingPage() {
       checkOut: form.checkOut,
       excludeBookingId: booking.id,
     });
-  }, [bookings, form?.apartmentId, form?.checkIn, form?.checkOut, booking]);
+  })();
 
   const conflictMessage =
     errors.dates ??
     (dateConflict
       ? `Объект уже забронирован с ${formatDate(dateConflict.checkIn)} по ${formatDate(dateConflict.checkOut)}`
       : "");
-
-  useEffect(() => {
-    if (!bookingId) {
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
-
-    const b = getBookingById(bookingId);
-    if (!b) {
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
-
-    setBooking(b);
-    setForm(b);
-    setNotFound(false);
-    setLoading(false);
-  }, [bookingId]);
 
   function update<K extends keyof Booking>(key: K, value: Booking[K]) {
     setForm((prev) => {

@@ -28,7 +28,9 @@ function normalizeTask(raw: Partial<Task>): Task {
     dueAt: raw.dueAt,
     bookingId: raw.bookingId,
     apartmentId: raw.apartmentId,
+    assignedUserId: raw.assignedUserId,
     assignedRole: raw.assignedRole,
+    priority: raw.priority ?? "normal",
     createdAt: raw.createdAt ?? now,
     updatedAt: raw.updatedAt ?? now,
     sourceType: raw.sourceType,
@@ -71,4 +73,21 @@ export function createTask(payload: Omit<Task, "id" | "createdAt" | "updatedAt">
 
 export function saveTasks(tasks: Task[]): void {
   writeStorage(tasks.map((task) => normalizeTask(task)));
+}
+
+export function updateTask(id: string, changes: Partial<Omit<Task, "id" | "createdAt">>): Task | null {
+  const tasks = readStorage();
+  const current = tasks.find((task) => task.id === id);
+  if (!current) return null;
+
+  const updated = normalizeTask({
+    ...current,
+    ...changes,
+    id: current.id,
+    createdAt: current.createdAt,
+    updatedAt: nowIso(),
+  });
+
+  writeStorage(tasks.map((task) => (task.id === id ? updated : task)));
+  return updated;
 }

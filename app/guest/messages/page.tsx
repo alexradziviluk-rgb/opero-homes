@@ -32,14 +32,14 @@ export default function GuestMessagesPage() {
   }
 
   useEffect(() => {
-    reloadMessages();
-
     function handleMessagesChanged() {
       reloadMessages();
     }
 
+    const initialLoadId = window.setTimeout(handleMessagesChanged, 0);
     window.addEventListener("opero-client-messages-changed", handleMessagesChanged);
     return () => {
+      window.clearTimeout(initialLoadId);
       window.removeEventListener("opero-client-messages-changed", handleMessagesChanged);
     };
   }, [clientId]);

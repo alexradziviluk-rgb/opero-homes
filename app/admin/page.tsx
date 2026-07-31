@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { getEffectivePermissions } from "@/lib/permissions";
+import ManagerDashboard from "@/components/dashboard/ManagerDashboard";
 import {
   DASHBOARD_WIDGET_COMPONENTS,
   getVisibleDashboardWidgets,
@@ -30,6 +31,10 @@ export default function AdminPage() {
 
   if (!currentUser) {
     return null;
+  }
+
+  if (currentUser.role === "Менеджер") {
+    return <ManagerDashboard />;
   }
 
   if (visibleWidgets.length === 0) {

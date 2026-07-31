@@ -42,7 +42,7 @@ returns boolean
 language sql
 stable
 as $$
-  select public.current_org_role_code(target_org_id) in ('owner', 'admin', 'manager');
+  select public.current_org_role_code(target_org_id) in ('owner', 'manager');
 $$;
 
 create or replace function public.validate_apartment_assignees()
@@ -56,7 +56,7 @@ begin
       from public.organization_members om
       where om.organization_id = new.organization_id
         and om.user_id = new.responsible_user_id
-        and lower(trim(coalesce(om.role_code, ''))) in ('owner', 'admin', 'manager', 'employee', 'staff', 'cleaner', 'maintenance', 'technician')
+        and lower(trim(coalesce(om.role_code, ''))) in ('owner', 'manager', 'employee', 'cleaner', 'maintenance')
     ) then
       raise exception 'Responsible user must be an active member of organization with allowed role_code';
     end if;
@@ -68,9 +68,9 @@ begin
       from public.organization_members om
       where om.organization_id = new.organization_id
         and om.user_id = new.backup_manager_user_id
-        and lower(trim(coalesce(om.role_code, ''))) in ('owner', 'admin', 'manager')
+        and lower(trim(coalesce(om.role_code, ''))) in ('owner', 'manager')
     ) then
-      raise exception 'Backup manager must be owner/admin/manager in the same organization';
+      raise exception 'Backup manager must be owner/manager in the same organization';
     end if;
   end if;
 

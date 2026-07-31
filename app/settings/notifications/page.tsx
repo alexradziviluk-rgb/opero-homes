@@ -57,7 +57,6 @@ export default function NotificationSettingsPage() {
   const [error, setError] = useState("");
 
   async function loadAll() {
-    setError("");
     const [prefsResponse, settingsResponse, assigneesResponse] = await Promise.all([
       fetch("/api/notifications/preferences", { cache: "no-store" }),
       fetch("/api/notifications/settings", { cache: "no-store" }),
@@ -83,7 +82,8 @@ export default function NotificationSettingsPage() {
   }
 
   useEffect(() => {
-    void loadAll();
+    const loadId = window.setTimeout(() => void loadAll(), 0);
+    return () => window.clearTimeout(loadId);
   }, []);
 
   async function savePreference(item: PreferenceItem) {

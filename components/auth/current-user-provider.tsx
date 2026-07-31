@@ -32,14 +32,11 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentUserContext, setCurrentUserContext] = useState<CurrentUserContext | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(() => Boolean(createSupabaseClient()));
 
   useEffect(() => {
     const supabase = createSupabaseClient();
     if (!supabase) {
-      setCurrentUser(null);
-      setCurrentUserContext(null);
-      setIsAuthLoading(false);
       return;
     }
 
@@ -102,7 +99,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   const logout = useCallback(async () => {
     const redirectPath = currentUser?.role === "Гость" ? "/guest/login" : "/login";
@@ -115,11 +112,20 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   }, [currentUser?.role, router]);
 
   useEffect(() => {
+    if (!currentUser || currentUser.role === "Гость") return;
+
+    const heartbeat = () => {
+      void fetch("/api/auth/heartbeat", { method: "POST" });
+    };
+    heartbeat();
+    const intervalId = window.setInterval(heartbeat, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [currentUser]);
+
+  useEffect(() => {
     if (isAuthLoading) {
       return;
     }
-
-    let cancelled = false;
 
     async function syncApartmentCache() {
       const supabase = createSupabaseClient();
@@ -129,13 +135,9 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
 
       try {
         const apartments = await loadApartmentsFromSupabase({ publicOnly: currentUser?.role === "Гость" || !currentUser });
-        if (!cancelled) {
-          saveLocalApartments(apartments);
-        }
+        saveLocalApartments(apartments);
       } catch {
-        if (!cancelled) {
-          saveLocalApartments([]);
-        }
+        saveLocalApartments([]);
       }
     }
 

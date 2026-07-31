@@ -12,7 +12,12 @@ type Props = {
 };
 
 export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, disabled }: Props) {
-  const [photos, setPhotos] = useState<ApartmentPhoto[]>(initialPhotos || []);
+  const [photoState, setPhotoState] = useState<{ source: ApartmentPhoto[]; value: ApartmentPhoto[] }>(() => ({
+    source: initialPhotos,
+    value: initialPhotos,
+  }));
+  const photos = photoState.source === initialPhotos ? photoState.value : initialPhotos;
+  const setPhotos = (nextPhotos: ApartmentPhoto[]) => setPhotoState({ source: initialPhotos, value: nextPhotos });
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ completed: 0, total: 0 });
@@ -20,11 +25,6 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const draggingIdx = useRef<number | null>(null);
-
-  // Sync incoming photos prop to internal state
-  useEffect(() => {
-    setPhotos(initialPhotos || []);
-  }, [initialPhotos]);
 
   // Load preview URLs for current photos. Do NOT call onChange here.
   useEffect(() => {
@@ -264,7 +264,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
 
       <div
         className="grid grid-cols-3 gap-3"
-        onDragOver={(e) => onDragOver(e as any)}
+        onDragOver={onDragOver}
         onDrop={(e) => {
           // drop to end
           const from = draggingIdx.current;

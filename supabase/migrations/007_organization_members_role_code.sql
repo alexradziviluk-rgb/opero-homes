@@ -2,18 +2,18 @@ alter table if exists public.organization_members
   add column if not exists role_code text;
 
 update public.organization_members
-set role_code = coalesce(nullif(trim(role_code), ''), nullif(trim(role), ''), 'viewer')
+set role_code = coalesce(nullif(trim(role_code), ''), nullif(trim(role), ''), 'employee')
 where role_code is null or trim(role_code) = '';
 
 alter table if exists public.organization_members
-  alter column role_code set default 'viewer';
+  alter column role_code set default 'employee';
 
 create or replace function public.sync_organization_member_role_code()
 returns trigger
 language plpgsql
 as $$
 begin
-  new.role_code := lower(trim(coalesce(new.role_code, new.role, 'viewer')));
+  new.role_code := lower(trim(coalesce(new.role_code, new.role, 'employee')));
   new.role := coalesce(new.role, new.role_code);
   if new.role is null or trim(new.role) = '' then
     new.role := new.role_code;

@@ -27,6 +27,7 @@ alter table if exists public.apartments
   add column if not exists owner_email text,
   add column if not exists responsible_user_id uuid references auth.users(id) on delete set null,
   add column if not exists backup_manager_user_id uuid references auth.users(id) on delete set null,
+  add column if not exists status text,
   add column if not exists availability text,
   add column if not exists publish_status text,
   add column if not exists publication_status text,

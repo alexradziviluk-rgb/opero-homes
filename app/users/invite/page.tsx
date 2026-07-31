@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -20,7 +19,6 @@ function isValidEmail(value: string): boolean {
 }
 
 export default function InviteUserPage() {
-  const router = useRouter();
   const { currentUser, isAuthLoading } = useCurrentUser();
   const effectivePermissions = currentUser ? getEffectivePermissions(currentUser) : [];
 
@@ -68,7 +66,7 @@ export default function InviteUserPage() {
       return;
     }
 
-    if (!["Менеджер", "Сотрудник", "Уборщик", "Технический специалист"].includes(role)) {
+    if (!["Менеджер", "Сотрудник", "Уборщик", "Специалист по обслуживанию"].includes(role)) {
       setSubmitError("Выберите рабочую роль для приглашения");
       return;
     }
@@ -81,10 +79,10 @@ export default function InviteUserPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-        firstName,
-        lastName,
-        email,
-        phone,
+          firstName,
+          lastName,
+          email,
+          phone,
           role,
         }),
       });
@@ -122,7 +120,7 @@ export default function InviteUserPage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-semibold">Приглашение сотрудника</h1>
-                <p className="text-sm text-slate-400">После принятия приглашения сотрудник перейдет в статус "Ожидает подтверждения".</p>
+                <p className="text-sm text-slate-400">После принятия приглашения сотрудник перейдет в статус «Ожидает подтверждения».</p>
                 <p className="mt-1 text-xs text-amber-300">SMS-приглашения сейчас недоступны. Приглашение отправляется только по email.</p>
               </div>
               <Link href="/users" className="text-sm text-cyan-300">К списку пользователей</Link>

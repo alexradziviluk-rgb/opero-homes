@@ -25,11 +25,11 @@ function normalizeRoleCode(value: string | null | undefined): string {
 }
 
 function isAllowedResponsibleRole(roleCode: string): boolean {
-  return ["owner", "admin", "manager", "employee", "staff", "cleaner", "maintenance", "technician"].includes(roleCode);
+  return ["owner", "manager", "employee", "cleaner", "maintenance"].includes(roleCode);
 }
 
 function isAllowedBackupRole(roleCode: string): boolean {
-  return ["owner", "admin", "manager"].includes(roleCode);
+  return ["owner", "manager"].includes(roleCode);
 }
 
 export async function PUT(

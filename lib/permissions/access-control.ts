@@ -37,7 +37,6 @@ export function canViewProperty(currentUser: User, apartment: Apartment): boolea
 
 export function canViewBooking(currentUser: User, booking: Booking): boolean {
   if (currentUser.role === "Владелец") return true;
-  if (currentUser.role === "Администратор") return true;
   if (currentUser.role === "Менеджер") return true;
 
   if (currentUser.role === "Гость") {
@@ -48,7 +47,7 @@ export function canViewBooking(currentUser: User, booking: Booking): boolean {
 }
 
 export function canManageBooking(currentUser: User, booking: Booking): boolean {
-  if (currentUser.role === "Владелец" || currentUser.role === "Администратор" || currentUser.role === "Менеджер") {
+  if (currentUser.role === "Владелец" || currentUser.role === "Менеджер") {
     return true;
   }
 

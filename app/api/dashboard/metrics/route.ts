@@ -28,6 +28,12 @@ type TaskRow = {
   status: string;
 };
 
+type OperationalTaskRow = {
+  task_type: string;
+  status: string;
+  due_at: string;
+};
+
 function normalize(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
@@ -64,6 +70,12 @@ function buildDefaultMetrics(): DashboardMetrics {
   return {
     propertiesTotal: 0,
     propertiesActive: null,
+    propertiesOccupied: 0,
+    propertiesAvailable: 0,
+    overdueCleaningCount: 0,
+    overdueMaintenanceCount: 0,
+    tasksDueTodayCount: 0,
+    unreadNotificationsCount: 0,
     bookingsTotal: 0,
     bookingsActiveFuture: 0,
     occupancyPercent: null,
@@ -157,6 +169,15 @@ export async function GET() {
   metrics.bookingsActiveFuture = nonCancelledBookings.filter((booking) => booking.check_out >= todayIso).length;
   metrics.pendingConfirmationsCount = bookings.filter((booking) => normalize(booking.status) === "pending").length;
 
+  const occupiedApartmentIds = new Set(
+    nonCancelledBookings
+      .filter((booking) => booking.check_in <= todayIso && booking.check_out > todayIso)
+      .map((booking) => booking.apartment_id)
+      .filter((apartmentId): apartmentId is string => Boolean(apartmentId)),
+  );
+  metrics.propertiesOccupied = occupiedApartmentIds.size;
+  metrics.propertiesAvailable = Math.max(0, metrics.propertiesTotal - metrics.propertiesOccupied);
+
   metrics.todayArrivals = nonCancelledBookings
     .filter((booking) => booking.check_in === todayIso)
     .slice(0, 5)
@@ -237,6 +258,30 @@ export async function GET() {
         taskType: task.task_type,
         status: task.status,
       }));
+  }
+
+  const { data: operationalTasksData, error: operationalTasksError } = await supabase
+    .from("operational_tasks")
+    .select("task_type,status,due_at")
+    .eq("organization_id", organizationId);
+
+  if (!operationalTasksError) {
+    const operationalTasks = (operationalTasksData ?? []) as unknown as OperationalTaskRow[];
+    const incompleteStatuses = new Set(["pending", "assigned", "in_progress"]);
+    metrics.overdueCleaningCount = operationalTasks.filter((task) => task.task_type === "cleaning" && task.due_at.slice(0, 10) < todayIso && incompleteStatuses.has(normalize(task.status))).length;
+    metrics.overdueMaintenanceCount = operationalTasks.filter((task) => task.task_type === "technical" && task.due_at.slice(0, 10) < todayIso && incompleteStatuses.has(normalize(task.status))).length;
+    metrics.tasksDueTodayCount = operationalTasks.filter((task) => task.due_at.slice(0, 10) === todayIso && incompleteStatuses.has(normalize(task.status))).length;
+  }
+
+  const { count: unreadNotificationsCount, error: unreadNotificationsError } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", organizationId)
+    .eq("recipient_user_id", auth.context.authUserId)
+    .is("read_at", null);
+
+  if (!unreadNotificationsError) {
+    metrics.unreadNotificationsCount = unreadNotificationsCount ?? 0;
   }
 
   const response: DashboardMetricsResponse = { ok: true, data: metrics };

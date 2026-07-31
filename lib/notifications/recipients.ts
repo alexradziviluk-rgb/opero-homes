@@ -46,7 +46,7 @@ function normalizeRoleCode(roleCode: string | null | undefined): string {
 
 function isManagerRoleCode(roleCode: string): boolean {
   const normalized = normalizeRoleCode(roleCode);
-  return normalized === "owner" || normalized === "admin" || normalized === "manager";
+  return normalized === "owner" || normalized === "manager";
 }
 
 async function loadOrganizationSettings(

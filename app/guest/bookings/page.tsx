@@ -36,16 +36,12 @@ export default function GuestBookingsPage() {
 
   useEffect(() => {
     if (!currentUser) {
-      setLoading(false);
       return;
     }
 
     const controller = new AbortController();
 
     async function loadBookings() {
-      setLoading(true);
-      setError(null);
-
       try {
         const response = await fetch("/api/guest/bookings", { signal: controller.signal });
         const payload = (await response.json()) as GuestBookingsResponse;

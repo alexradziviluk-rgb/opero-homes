@@ -33,10 +33,48 @@ type BookingListResponse =
   | { ok: true; data: BookingListRecord[] }
   | { ok: false; error?: string };
 
+async function fetchBookings(): Promise<Booking[]> {
+  const response = await fetch("/api/bookings");
+  const payload = (await response.json()) as BookingListResponse;
+
+  if (!response.ok || !payload.ok) {
+    return [];
+  }
+
+  return payload.data.map((booking) => ({
+    id: booking.id,
+    apartmentId: booking.apartmentId ?? "",
+    clientId: "",
+    guestName: booking.guestName,
+    guestPhone: "",
+    guestEmail: "",
+    checkIn: booking.checkIn,
+    checkOut: booking.checkOut,
+    guests: booking.guests,
+    rentalType: "daily",
+    pricePerPeriod: 0,
+    periodsCount: 0,
+    accommodationAmount: 0,
+    cleaningFee: 0,
+    deposit: 0,
+    discount: 0,
+    totalAmount: booking.totalAmount ?? 0,
+    paidAmount: 0,
+    status: (booking.status ?? "pending") as Booking["status"],
+    paymentStatus: (booking.paymentStatus ?? "unpaid") as Booking["paymentStatus"],
+    source: (booking.source ?? "website") as Booking["source"],
+    notes: booking.notes ?? "",
+    createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
+  }));
+}
+
 export default function BookingsPage() {
   const { currentUser } = useCurrentUser();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status"),
+  );
   const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
   const [isBulkConfirming, setIsBulkConfirming] = useState(false);
   const [isSingleConfirmingId, setIsSingleConfirmingId] = useState<string | null>(null);
@@ -48,62 +86,30 @@ export default function BookingsPage() {
 
   const canConfirmBookings = currentUser ? hasEffectivePermission(currentUser, "bookings.confirm") : false;
 
-  async function reloadBookings(cancelled = false) {
+  async function reloadBookings() {
     setLoading(true);
     try {
-      const response = await fetch("/api/bookings");
-      const payload = (await response.json()) as BookingListResponse;
-
-      if (!cancelled && response.ok && payload.ok) {
-        setBookings(
-          payload.data.map((booking) => ({
-            id: booking.id,
-            apartmentId: booking.apartmentId ?? "",
-            clientId: "",
-            guestName: booking.guestName,
-            guestPhone: "",
-            guestEmail: "",
-            checkIn: booking.checkIn,
-            checkOut: booking.checkOut,
-            guests: booking.guests,
-            rentalType: "daily",
-            pricePerPeriod: 0,
-            periodsCount: 0,
-            accommodationAmount: 0,
-            cleaningFee: 0,
-            deposit: 0,
-            discount: 0,
-            totalAmount: booking.totalAmount ?? 0,
-            paidAmount: 0,
-            status: (booking.status ?? "pending") as Booking["status"],
-            paymentStatus: (booking.paymentStatus ?? "unpaid") as Booking["paymentStatus"],
-            source: (booking.source ?? "website") as Booking["source"],
-            notes: booking.notes ?? "",
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-          })),
-        );
-      }
+      setBookings(await fetchBookings());
     } finally {
-      if (!cancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setStatusFilter(params.get("status"));
-
     let cancelled = false;
 
     function handleUpdate() {
-      void reloadBookings(cancelled);
+      void reloadBookings();
       const params = new URLSearchParams(window.location.search);
       setStatusFilter(params.get("status"));
     }
 
-    void reloadBookings(cancelled);
+    void fetchBookings().then((items) => {
+      if (!cancelled) {
+        setBookings(items);
+        setLoading(false);
+      }
+    });
 
     window.addEventListener("opero-bookings-changed", handleUpdate);
     window.addEventListener("storage", handleUpdate);

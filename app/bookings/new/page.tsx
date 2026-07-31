@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -26,6 +26,21 @@ function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("ru-RU");
 }
 
+function applyApartmentDefaults(form: Partial<Booking>, apartment: Apartment | undefined): Partial<Booking> {
+  if (!apartment) return form;
+
+  return {
+    ...form,
+    pricePerPeriod:
+      form.rentalType === "daily" && apartment.dailyPrice != null
+        ? apartment.dailyPrice
+        : form.pricePerPeriod,
+    cleaningFee: apartment.cleaningFee ?? form.cleaningFee,
+    deposit: apartment.deposit ?? form.deposit,
+    guests: Math.min(form.guests ?? 1, apartment.maxGuests ?? 999),
+  };
+}
+
 function NewBookingPageContent() {
   const router = useRouter();
   const { currentUser } = useCurrentUser();
@@ -34,20 +49,20 @@ function NewBookingPageContent() {
   const checkInFromUrl = searchParams.get("checkIn") ?? "";
   const checkOutFromUrl = searchParams.get("checkOut") ?? "";
 
-  const [apartments, setApartments] = useState<Apartment[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [apartments] = useState<Apartment[]>(() => getLocalApartments());
+  const [bookings] = useState<Booking[]>(() => getBookings());
+  const [clients, setClients] = useState<Client[]>(() => getClients());
   const [quickClient, setQuickClient] = useState<ClientDraft>(initialClientDraft);
   const [showQuickClientForm, setShowQuickClientForm] = useState(false);
 
-  const [form, setForm] = useState<Partial<Booking>>({
-    apartmentId: "",
+  const [form, setForm] = useState<Partial<Booking>>(() => applyApartmentDefaults({
+    apartmentId: apartmentIdFromUrl,
     clientId: "",
     guestName: "",
     guestPhone: "",
     guestEmail: "",
-    checkIn: "",
-    checkOut: "",
+    checkIn: checkInFromUrl,
+    checkOut: checkOutFromUrl,
     guests: 1,
     rentalType: "daily",
     pricePerPeriod: 0,
@@ -58,52 +73,14 @@ function NewBookingPageContent() {
     status: "pending",
     source: "direct",
     notes: "",
-  });
+  }, apartments.find((apartment) => apartment.id === apartmentIdFromUrl)));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const loadedApartments = getLocalApartments();
-    const loadedBookings = getBookings();
-    const loadedClients = getClients();
-    setApartments(loadedApartments);
-    setBookings(loadedBookings);
-    setClients(loadedClients);
-  }, []);
 
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === form.clientId) ?? null,
     [clients, form.clientId],
   );
-
-  useEffect(() => {
-    if (!apartmentIdFromUrl) return;
-
-    setForm((previous) => {
-      if (previous.apartmentId === apartmentIdFromUrl) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        apartmentId: apartmentIdFromUrl,
-      };
-    });
-  }, [apartmentIdFromUrl]);
-
-  useEffect(() => {
-    if (!checkInFromUrl && !checkOutFromUrl) {
-      return;
-    }
-
-    setForm((previous) => ({
-      ...previous,
-      checkIn: checkInFromUrl || previous.checkIn,
-      checkOut: checkOutFromUrl || previous.checkOut,
-    }));
-  }, [checkInFromUrl, checkOutFromUrl]);
-
-  const selectedApartment = useMemo(() => apartments.find((a) => a.id === form.apartmentId), [apartments, form.apartmentId]);
 
   const occupiedRanges = useMemo(
     () =>
@@ -136,46 +113,12 @@ function NewBookingPageContent() {
       ? `Объект уже забронирован с ${formatDate(dateConflict.checkIn)} по ${formatDate(dateConflict.checkOut)}`
       : "");
 
-  useEffect(() => {
-    if (!selectedApartment) return;
-    setForm((previous) => {
-      const nextPricePerPeriod =
-        previous.rentalType === "daily" && selectedApartment.dailyPrice != null
-          ? selectedApartment.dailyPrice
-          : previous.pricePerPeriod;
-      const nextCleaningFee = selectedApartment.cleaningFee ?? previous.cleaningFee;
-      const nextDeposit = selectedApartment.deposit ?? previous.deposit;
-      const maxGuests = selectedApartment.maxGuests ?? 999;
-      const nextGuests = Math.min(previous.guests ?? 1, maxGuests);
-
-      if (
-        previous.pricePerPeriod === nextPricePerPeriod &&
-        previous.cleaningFee === nextCleaningFee &&
-        previous.deposit === nextDeposit &&
-        previous.guests === nextGuests
-      ) {
-        return previous;
-      }
-
-      return {
-        ...previous,
-        pricePerPeriod: nextPricePerPeriod,
-        cleaningFee: nextCleaningFee,
-        deposit: nextDeposit,
-        guests: nextGuests,
-      };
-    });
-  }, [
-    selectedApartment?.id,
-    selectedApartment?.dailyPrice,
-    selectedApartment?.cleaningFee,
-    selectedApartment?.deposit,
-    selectedApartment?.maxGuests,
-    form.rentalType,
-  ]);
-
   function update<K extends keyof Booking>(key: K, value: Booking[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((previous) => {
+      const next = { ...previous, [key]: value };
+      if (key !== "apartmentId" && key !== "rentalType") return next;
+      return applyApartmentDefaults(next, apartments.find((apartment) => apartment.id === next.apartmentId));
+    });
     setErrors((prev) => {
       const next = { ...prev };
       delete next[key as string];

@@ -43,15 +43,12 @@ function statusLabel(status: string): string {
 }
 
 export default function BookingNotificationsPanel({ bookingId }: BookingNotificationsPanelProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
   const [error, setError] = useState("");
 
   async function load() {
-    setLoading(true);
-    setError("");
-
     try {
       const response = await fetch(`/api/notifications/bookings/${bookingId}`, { cache: "no-store" });
       const payload = (await response.json()) as ApiPayload;
@@ -70,7 +67,8 @@ export default function BookingNotificationsPanel({ bookingId }: BookingNotifica
   }
 
   useEffect(() => {
-    void load();
+    const loadId = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(loadId);
   }, [bookingId]);
 
   const deliveriesByEvent = useMemo(() => {

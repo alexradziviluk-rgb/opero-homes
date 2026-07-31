@@ -116,8 +116,6 @@ export default function GuestBookingNewPage() {
 
   useEffect(() => {
     if (!apartmentId || !checkIn || !checkOut) {
-      setQuote(null);
-      setQuoteError(null);
       return;
     }
 

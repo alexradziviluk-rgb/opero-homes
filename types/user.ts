@@ -1,10 +1,9 @@
 export type UserRole =
   | "Владелец"
-  | "Администратор"
   | "Менеджер"
   | "Сотрудник"
   | "Уборщик"
-  | "Технический специалист"
+  | "Специалист по обслуживанию"
   | "Гость";
 
 export type Permission =
@@ -29,7 +28,12 @@ export type Permission =
   | "tasks.view"
   | "tasks.manage"
   | "cleaning.view"
+  | "cleaning.manage"
   | "maintenance.view"
+  | "maintenance.manage"
+  | "employees.assign"
+  | "checkins.view"
+  | "checkins.manage"
   | "users.view"
   | "users.manage"
   | "users.invite"

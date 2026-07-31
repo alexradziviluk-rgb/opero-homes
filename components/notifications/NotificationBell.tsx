@@ -14,12 +14,11 @@ type NotificationApiResponse = {
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<InAppNotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
   async function load() {
-    setLoading(true);
     try {
       const response = await fetch("/api/notifications?limit=8", { cache: "no-store" });
       const payload = (await response.json()) as NotificationApiResponse;

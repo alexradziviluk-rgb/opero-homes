@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import ClientForm from "@/app/clients/client-form";
@@ -14,28 +14,24 @@ export default function EditClientPage() {
   const clientId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
 
-  const [client, setClient] = useState<Client | null>(null);
-  const [form, setForm] = useState<ClientDraft>(initialClientDraft);
+  const [client] = useState<Client | null>(() => (clientId ? getClientById(clientId) : null));
+  const [form, setForm] = useState<ClientDraft>(() =>
+    client
+      ? {
+          firstName: client.firstName,
+          lastName: client.lastName,
+          phone: client.phone,
+          email: client.email,
+          nationality: client.nationality,
+          documentType: client.documentType,
+          documentNumber: client.documentNumber,
+          dateOfBirth: client.dateOfBirth,
+          language: client.language,
+          notes: client.notes,
+        }
+      : initialClientDraft,
+  );
   const [errors, setErrors] = useState<Partial<Record<keyof ClientDraft, string>>>({});
-
-  useEffect(() => {
-    if (!clientId) return;
-    const found = getClientById(clientId);
-    if (!found) return;
-    setClient(found);
-    setForm({
-      firstName: found.firstName,
-      lastName: found.lastName,
-      phone: found.phone,
-      email: found.email,
-      nationality: found.nationality,
-      documentType: found.documentType,
-      documentNumber: found.documentNumber,
-      dateOfBirth: found.dateOfBirth,
-      language: found.language,
-      notes: found.notes,
-    });
-  }, [clientId]);
 
   function update<K extends keyof ClientDraft>(key: K, value: ClientDraft[K]) {
     setForm((previous) => ({ ...previous, [key]: value }));

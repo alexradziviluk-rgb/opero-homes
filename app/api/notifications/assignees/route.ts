@@ -4,12 +4,12 @@ import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 
 function canBeResponsible(roleCode: string): boolean {
   const role = roleCode.trim().toLowerCase();
-  return ["owner", "admin", "manager", "employee", "staff", "cleaner", "maintenance", "technician"].includes(role);
+  return ["owner", "manager", "employee", "cleaner", "maintenance"].includes(role);
 }
 
 function canBeBackupManager(roleCode: string): boolean {
   const role = roleCode.trim().toLowerCase();
-  return ["owner", "admin", "manager"].includes(role);
+  return ["owner", "manager"].includes(role);
 }
 
 export async function GET() {
@@ -39,17 +39,31 @@ export async function GET() {
     return NextResponse.json({ ok: true, data: { responsible: [], backupManagers: [] } });
   }
 
-  const { data: profiles, error: profilesError } = await supabase
+  type ProfileRow = { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null; status: string | null; last_seen_at?: string | null };
+
+  const extendedProfiles = await supabase
     .from("profiles")
-    .select("id,first_name,last_name,email,phone,status")
+    .select("id,first_name,last_name,email,phone,status,last_seen_at")
     .in("id", userIds);
+
+  let profiles = extendedProfiles.data as ProfileRow[] | null;
+  let profilesError = extendedProfiles.error;
+
+  if (profilesError?.code === "42703") {
+    const fallback = await supabase
+      .from("profiles")
+      .select("id,first_name,last_name,email,phone,status")
+      .in("id", userIds);
+    profiles = fallback.data as ProfileRow[] | null;
+    profilesError = fallback.error;
+  }
 
   if (profilesError) {
     return NextResponse.json({ ok: false, error: profilesError.message }, { status: 422 });
   }
 
   const profileMap = new Map(
-    ((profiles ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null; status: string | null }>).map((profile) => [profile.id, profile]),
+    (profiles ?? []).map((profile) => [profile.id, profile]),
   );
 
   const mapped = memberRows
@@ -63,6 +77,7 @@ export async function GET() {
         email: profile?.email ?? "",
         phone: profile?.phone ?? "",
         status: profile?.status ?? "",
+        lastSeenAt: profile?.last_seen_at ?? null,
       };
     })
     .filter((item) => Boolean(item.userId));

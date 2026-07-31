@@ -12,12 +12,38 @@ import type { Apartment } from "@/types/apartment";
 import { getRentalCostText } from "@/app/apartments/apartment-utils";
 import { deleteApartmentFromSupabase, loadApartmentsFromSupabase, saveApartmentToSupabase } from "@/lib/apartments/supabase-apartments";
 
+type Assignee = {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  roleCode: string;
+};
+
+type BookingSummary = {
+  apartmentId: string | null;
+  guestName: string;
+  checkIn: string;
+  checkOut: string;
+  status: string;
+};
+
+type TaskSummary = {
+  apartment_id: string;
+  task_type: string;
+  status: string;
+};
+
 export default function ApartmentsPage() {
   const router = useRouter();
   const { currentUser } = useCurrentUser();
   const [localApartments, setLocalApartments] = useState<Apartment[]>([]);
   const canManagePublication = currentUser ? hasEffectivePermission(currentUser, "properties.manage") : false;
+  const canManagePropertyDefinition = currentUser ? hasEffectivePermission(currentUser, "apartments.manage") : false;
+  const canDeleteProperty = currentUser ? hasEffectivePermission(currentUser, "apartments.manage") : false;
   const [isLoading, setIsLoading] = useState(true);
+  const [bookings, setBookings] = useState<BookingSummary[]>([]);
+  const [tasks, setTasks] = useState<TaskSummary[]>([]);
+  const [assignees, setAssignees] = useState<Assignee[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +62,20 @@ export default function ApartmentsPage() {
     }
 
     void load();
+
+    void Promise.all([
+      fetch("/api/notifications/assignees", { cache: "no-store" }),
+      fetch("/api/bookings", { cache: "no-store" }),
+      fetch("/api/operations/tasks", { cache: "no-store" }),
+    ]).then(async ([assigneesResponse, bookingsResponse, tasksResponse]) => {
+      const assigneesPayload = (await assigneesResponse.json()) as { ok: boolean; data?: { responsible?: Assignee[] } };
+      const bookingsPayload = (await bookingsResponse.json()) as { ok: boolean; data?: BookingSummary[] };
+      const tasksPayload = (await tasksResponse.json()) as { ok: boolean; data?: TaskSummary[] };
+      if (cancelled) return;
+      if (assigneesPayload.ok) setAssignees(assigneesPayload.data?.responsible ?? []);
+      if (bookingsPayload.ok) setBookings(bookingsPayload.data ?? []);
+      if (tasksPayload.ok) setTasks(tasksPayload.data ?? []);
+    });
 
     return () => {
       cancelled = true;
@@ -65,6 +105,20 @@ export default function ApartmentsPage() {
     setLocalApartments((items) => items.map((item) => (item.id === id ? updated : item)));
   }
 
+  async function handleResponsibleUser(apartment: Apartment, responsibleUserId: string) {
+    const response = await fetch(`/api/notifications/apartments/${apartment.id}/assignees`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        responsibleUserId: responsibleUserId || null,
+        backupManagerUserId: apartment.backupManagerUserId ?? null,
+      }),
+    });
+
+    if (!response.ok) return;
+    setLocalApartments((items) => items.map((item) => item.id === apartment.id ? { ...item, responsibleUserId: responsibleUserId || null } : item));
+  }
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col lg:flex-row">
@@ -89,9 +143,11 @@ export default function ApartmentsPage() {
                   <input placeholder="Поиск объектов..." className="w-48 bg-transparent text-sm outline-none placeholder:text-slate-500" />
                 </label>
 
-                <Link href="/apartments/new" className="cursor-pointer rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 inline-flex items-center justify-center">
-                  ➕ Новый объект
-                </Link>
+                {canManagePropertyDefinition ? (
+                  <Link href="/apartments/new" className="cursor-pointer rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 inline-flex items-center justify-center">
+                    + Новый объект
+                  </Link>
+                ) : null}
               </div>
             </div>
 
@@ -114,7 +170,10 @@ export default function ApartmentsPage() {
                     <th className="px-4 py-3 text-left">Стоимость аренды</th>
                     <th className="px-4 py-3 text-left">Статус</th>
                     <th className="px-4 py-3 text-left">Доступность</th>
-                    <th className="px-4 py-3 text-left">Бронирования</th>
+                    <th className="px-4 py-3 text-left">Текущий гость</th>
+                    <th className="px-4 py-3 text-left">Следующий заезд / выезд</th>
+                    <th className="px-4 py-3 text-left">Работы</th>
+                    <th className="px-4 py-3 text-left">Ответственный</th>
                     <th className="px-4 py-3 text-left">Статус публикации</th>
                     <th className="px-4 py-3 text-left">Действия</th>
                   </tr>
@@ -123,11 +182,11 @@ export default function ApartmentsPage() {
                   <tbody className="divide-y divide-white/5">
                     {isLoading ? (
                       <tr>
-                        <td className="px-4 py-6 text-slate-400" colSpan={10}>Загрузка...</td>
+                        <td className="px-4 py-6 text-slate-400" colSpan={13}>Загрузка...</td>
                       </tr>
                     ) : apartments.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-6 text-slate-400" colSpan={10}>Пока нет объектов. Создайте первый объект.</td>
+                        <td className="px-4 py-6 text-slate-400" colSpan={13}>Пока нет объектов. Создайте первый объект.</td>
                       </tr>
                     ) : apartments.map((a) => (
                       <tr key={a.id} onClick={() => router.push(`/apartments/${a.id}`)} className="hover:bg-white/2 cursor-pointer">
@@ -182,13 +241,30 @@ export default function ApartmentsPage() {
                         </td>
 
                         <td className="px-4 py-3 text-slate-300">{a.availability}</td>
-                        <td className="px-4 py-3 text-slate-300">{a.bookings}</td>
+                        <td className="px-4 py-3 text-slate-300">{bookings.find((booking) => booking.apartmentId === a.id && booking.status === "checked_in")?.guestName ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-300">{(() => {
+                          const now = new Date().toISOString();
+                          const next = bookings.filter((booking) => booking.apartmentId === a.id && booking.checkOut >= now && booking.status !== "cancelled").sort((left, right) => left.checkIn.localeCompare(right.checkIn))[0];
+                          return next ? `${new Date(next.checkIn).toLocaleDateString("ru-RU")} / ${new Date(next.checkOut).toLocaleDateString("ru-RU")}` : "—";
+                        })()}</td>
+                        <td className="px-4 py-3 text-xs text-slate-300">{(() => {
+                          const open = tasks.filter((task) => task.apartment_id === a.id && !["completed", "verified", "done", "cancelled"].includes(task.status));
+                          const cleaning = open.some((task) => task.task_type === "cleaning");
+                          const repair = open.some((task) => task.task_type === "technical");
+                          return `${cleaning ? "Уборка требуется" : "Уборка: нет"} · ${repair ? "Ремонт требуется" : "Ремонт: нет"}`;
+                        })()}</td>
+                        <td className="px-4 py-3 text-slate-300">
+                          <select value={a.responsibleUserId ?? ""} onClick={(event) => event.stopPropagation()} onChange={(event) => { event.stopPropagation(); void handleResponsibleUser(a, event.target.value); }} className="max-w-44 rounded-lg border border-white/10 bg-slate-950 px-2 py-1 text-xs">
+                            <option value="">Не назначен</option>
+                            {assignees.map((user) => <option key={user.userId} value={user.userId}>{user.firstName} {user.lastName}</option>)}
+                          </select>
+                        </td>
                         <td className="px-4 py-3 text-slate-300">{a.publicationStatus ?? "draft"}</td>
 
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                                         <button onClick={(e) => { e.stopPropagation(); router.push(`/apartments/${a.id}`); }} className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-slate-300 hover:bg-white/5">Открыть</button>
-                            <button onClick={(e) => { e.stopPropagation(); router.push(`/apartments/${a.id}/edit`); }} className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-slate-300 hover:bg-white/5">Редактировать</button>
+                            {canManagePropertyDefinition ? <button onClick={(e) => { e.stopPropagation(); router.push(`/apartments/${a.id}/edit`); }} className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-slate-300 hover:bg-white/5">Редактировать</button> : null}
                             {canManagePublication && (a.publicationStatus ?? "draft") !== "published" ? (
                               <button
                                 onClick={(e) => {
@@ -211,7 +287,8 @@ export default function ApartmentsPage() {
                                 Скрыть с сайта
                               </button>
                             ) : null}
-                            <button onClick={(e) => { e.stopPropagation(); void handleDelete(a.id); }} className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-rose-300 hover:bg-white/5">Удалить</button>
+                            <Link href={`/tasks?apartment=${encodeURIComponent(a.id)}`} onClick={(e) => e.stopPropagation()} className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-cyan-300 hover:bg-white/5">Создать задачу</Link>
+                            {canDeleteProperty ? <button onClick={(e) => { e.stopPropagation(); void handleDelete(a.id); }} className="rounded-2xl border border-white/10 px-3 py-1 text-sm text-rose-300 hover:bg-white/5">Удалить</button> : null}
                           </div>
                         </td>
                       </tr>

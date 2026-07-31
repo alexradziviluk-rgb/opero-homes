@@ -28,15 +28,12 @@ export default function ApartmentImage({
   const directUrl = useMemo(() => getApartmentPhotoUrl(photo), [photo]);
   const storagePath = useMemo(() => getApartmentPhotoStoragePath(photo), [photo]);
 
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [imageFailed, setImageFailed] = useState(false);
+  const [storedImage, setStoredImage] = useState<{ storagePath: string; url: string } | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
     let createdUrl: string | null = null;
-
-    setImageFailed(false);
-    setBlobUrl(null);
 
     async function loadStorageImage() {
       if (!storagePath) {
@@ -51,7 +48,7 @@ export default function ApartmentImage({
 
         createdUrl = URL.createObjectURL(blob);
         if (!isCancelled) {
-          setBlobUrl(createdUrl);
+          setStoredImage({ storagePath, url: createdUrl });
         }
       } catch {
         // Keep placeholder for storage entries that cannot be restored.
@@ -75,6 +72,8 @@ export default function ApartmentImage({
     };
   }, [directUrl, storagePath]);
 
+  const blobUrl = storedImage?.storagePath === storagePath ? storedImage.url : null;
+  const imageFailed = Boolean(directUrl && failedUrl === directUrl);
   const src = !imageFailed ? directUrl ?? blobUrl : blobUrl;
 
   if (!src) {
@@ -92,7 +91,7 @@ export default function ApartmentImage({
       className={className}
       onError={() => {
         // Blob URLs from previous sessions cannot be restored; show neutral placeholder.
-        setImageFailed(true);
+        setFailedUrl(src);
       }}
     />
   );

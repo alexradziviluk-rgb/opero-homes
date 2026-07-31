@@ -38,6 +38,8 @@ export default function ApartmentDetailsPage() {
         return;
       }
       setApartment(found);
+      const cover = (found.photos ?? []).find((photo) => photo.isCover) ?? (found.photos ?? [])[0] ?? null;
+      setActiveId(cover?.id ?? null);
     }
 
     void load();
@@ -46,13 +48,6 @@ export default function ApartmentDetailsPage() {
       cancelled = true;
     };
   }, [apartmentId]);
-
-  // When apartment changes, ensure activeId is initialized to cover or first photo
-  useEffect(() => {
-    if (!apartment) return;
-    const cover = (apartment.photos ?? []).find((photo) => photo.isCover) ?? (apartment.photos ?? [])[0] ?? null;
-    setActiveId((current) => current ?? cover?.id ?? null);
-  }, [apartment]);
 
   useEffect(() => {
     if (!apartment) return;

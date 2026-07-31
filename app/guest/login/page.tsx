@@ -69,7 +69,11 @@ function normalizeEmail(value: string): string {
 export default function GuestLoginPage() {
   const router = useRouter();
   const { currentUser, isAuthLoading } = useCurrentUser();
-  const [nextPath, setNextPath] = useState("/guest");
+  const [nextPath] = useState(() => {
+    if (typeof window === "undefined") return "/guest";
+    const params = new URLSearchParams(window.location.search);
+    return getGuestNextPath(params.get("next"));
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -78,17 +82,15 @@ export default function GuestLoginPage() {
   const [isOtpSending, setIsOtpSending] = useState(false);
   const [isOtpVerifying, setIsOtpVerifying] = useState(false);
   const [otpCooldownUntil, setOtpCooldownUntil] = useState<number | null>(null);
-  const [otpNow, setOtpNow] = useState(Date.now());
+  const [otpNow, setOtpNow] = useState(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    return normalizeCallbackError(params.get("error"));
+  });
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpMessage, setOtpMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setNextPath(getGuestNextPath(params.get("next")));
-    setError(normalizeCallbackError(params.get("error")));
-  }, []);
 
   useEffect(() => {
     if (!otpCooldownUntil) {

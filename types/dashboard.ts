@@ -20,6 +20,12 @@ export type DashboardRevenueByCurrency = {
 export type DashboardMetrics = {
   propertiesTotal: number;
   propertiesActive: number | null;
+  propertiesOccupied: number;
+  propertiesAvailable: number;
+  overdueCleaningCount: number;
+  overdueMaintenanceCount: number;
+  tasksDueTodayCount: number;
+  unreadNotificationsCount: number;
   bookingsTotal: number;
   bookingsActiveFuture: number;
   occupancyPercent: number | null;

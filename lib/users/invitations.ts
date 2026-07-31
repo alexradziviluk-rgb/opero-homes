@@ -1,4 +1,4 @@
-export const EMPLOYEE_INVITE_ROLE_CODES = ["manager", "employee", "cleaner", "technician"] as const;
+export const EMPLOYEE_INVITE_ROLE_CODES = ["manager", "employee", "cleaner", "maintenance"] as const;
 
 export type EmployeeInviteRoleCode = (typeof EMPLOYEE_INVITE_ROLE_CODES)[number];
 
@@ -6,7 +6,7 @@ export const EMPLOYEE_INVITE_ROLE_LABELS: Record<EmployeeInviteRoleCode, string>
   manager: "Менеджер",
   employee: "Сотрудник",
   cleaner: "Уборщик",
-  technician: "Технический специалист",
+  maintenance: "Специалист по обслуживанию",
 };
 
 export function mapUserRoleToInviteRoleCode(role: string): EmployeeInviteRoleCode | null {
@@ -15,7 +15,7 @@ export function mapUserRoleToInviteRoleCode(role: string): EmployeeInviteRoleCod
   if (normalized === "менеджер") return "manager";
   if (normalized === "сотрудник") return "employee";
   if (normalized === "уборщик") return "cleaner";
-  if (normalized === "технический специалист") return "technician";
+  if (normalized === "специалист по обслуживанию") return "maintenance";
 
   return null;
 }
@@ -25,7 +25,7 @@ export function mapInviteRoleCodeToUserRoleLabel(roleCode: string): string {
   if (normalized === "manager") return EMPLOYEE_INVITE_ROLE_LABELS.manager;
   if (normalized === "employee") return EMPLOYEE_INVITE_ROLE_LABELS.employee;
   if (normalized === "cleaner") return EMPLOYEE_INVITE_ROLE_LABELS.cleaner;
-  if (normalized === "technician") return EMPLOYEE_INVITE_ROLE_LABELS.technician;
+  if (normalized === "maintenance") return EMPLOYEE_INVITE_ROLE_LABELS.maintenance;
   return roleCode;
 }
 

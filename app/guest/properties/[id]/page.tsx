@@ -69,9 +69,9 @@ export default function GuestPropertyDetailsPage() {
   const apartmentId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const bookingPanelRef = useRef<HTMLElement | null>(null);
 
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [guests, setGuests] = useState("1");
+  const [checkIn, setCheckIn] = useState(() => searchParams.get("checkIn") ?? "");
+  const [checkOut, setCheckOut] = useState(() => searchParams.get("checkOut") ?? "");
+  const [guests, setGuests] = useState(() => searchParams.get("guests") ?? "1");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -82,7 +82,7 @@ export default function GuestPropertyDetailsPage() {
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedStatuses, setSelectedStatuses] = useState<PublicAvailabilityStatus[]>([]);
-  const [isBookingPanelOpen, setIsBookingPanelOpen] = useState(false);
+  const [isBookingPanelOpen, setIsBookingPanelOpen] = useState(() => searchParams.get("openBooking") === "1");
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
   const [apartments, setApartments] = useState<Apartment[]>([]);
@@ -110,6 +110,7 @@ export default function GuestPropertyDetailsPage() {
     window.addEventListener("storage", reloadBookings);
 
     return () => {
+      cancelled = true;
       window.removeEventListener("opero-bookings-changed", reloadBookings);
       window.removeEventListener("storage", reloadBookings);
     };
@@ -120,42 +121,30 @@ export default function GuestPropertyDetailsPage() {
   useEffect(() => {
     if (!currentUser) return;
 
-    const fullName = `${currentUser.firstName} ${currentUser.lastName}`.trim();
-    if (!firstName && currentUser.firstName) setFirstName(currentUser.firstName);
-    if (!lastName && currentUser.lastName) setLastName(currentUser.lastName);
-    if (!phone && currentUser.phone) setPhone(currentUser.phone);
-    if (!email && currentUser.email) setEmail(currentUser.email);
-    if (!firstName && !lastName && fullName && !currentUser.firstName && !currentUser.lastName) {
-      setFirstName(fullName);
-    }
+    const profileLoadId = window.setTimeout(() => {
+      const client = currentUser.clientId ? getClientById(currentUser.clientId) : null;
+      if (!firstName) setFirstName(client?.firstName || currentUser.firstName || "");
+      if (!lastName) setLastName(client?.lastName || currentUser.lastName || "");
+      if (!phone) setPhone(client?.phone || currentUser.phone || "");
+      if (!email) setEmail(client?.email || currentUser.email || "");
+    }, 0);
 
-    if (currentUser.clientId) {
-      const client = getClientById(currentUser.clientId);
-      if (client) {
-        if (!firstName && client.firstName) setFirstName(client.firstName);
-        if (!lastName && client.lastName) setLastName(client.lastName);
-        if (!phone && client.phone) setPhone(client.phone);
-        if (!email && client.email) setEmail(client.email);
-      }
-    }
+    return () => {
+      window.clearTimeout(profileLoadId);
+    };
   }, [currentUser, email, firstName, lastName, phone]);
 
   useEffect(() => {
-    const queryCheckIn = searchParams.get("checkIn") ?? "";
-    const queryCheckOut = searchParams.get("checkOut") ?? "";
-    const queryGuests = searchParams.get("guests") ?? "";
-    const openBooking = searchParams.get("openBooking") === "1";
-
-    if (queryCheckIn) setCheckIn(queryCheckIn);
-    if (queryCheckOut) setCheckOut(queryCheckOut);
-    if (queryGuests) setGuests(queryGuests);
-
-    if (openBooking) {
-      setIsBookingPanelOpen(true);
-      setTimeout(() => {
+    if (searchParams.get("openBooking") === "1") {
+      const scrollId = window.setTimeout(() => {
         bookingPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 50);
+      return () => {
+        window.clearTimeout(scrollId);
+      };
     }
+
+    return undefined;
   }, [searchParams]);
 
   if (!apartment || !isApartmentPublic(apartment)) {

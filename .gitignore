@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/.playwright-mcp/
+/playwright-report/
+/test-results/
+/blob-report/
 
 # next.js
 /.next/
@@ -38,6 +42,11 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# local tooling
+/.vscode/mcp.json
+/supabase/.branches/
+/supabase/.temp/
 
 # typescript
 *.tsbuildinfo

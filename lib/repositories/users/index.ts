@@ -11,7 +11,7 @@ type InviteUserInput = {
   lastName: string;
   email: string;
   phone: string;
-  role: "Менеджер" | "Сотрудник" | "Уборщик" | "Технический специалист";
+  role: "Менеджер" | "Сотрудник" | "Уборщик" | "Специалист по обслуживанию";
   language?: string;
   notes?: string;
   invitedByUserId: string;

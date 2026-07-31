@@ -19,7 +19,7 @@ create table if not exists public.employee_invitations (
   delivery_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint employee_invitations_role_code_check check (role_code in ('manager', 'employee', 'cleaner', 'technician')),
+  constraint employee_invitations_role_code_check check (role_code in ('manager', 'employee', 'cleaner', 'maintenance')),
   constraint employee_invitations_delivery_channel_check check (delivery_channel in ('email')),
   constraint employee_invitations_delivery_status_check check (delivery_status in ('pending', 'sent', 'failed', 'accepted', 'revoked'))
 );
@@ -42,7 +42,7 @@ create policy employee_invitations_select_org_admin on public.employee_invitatio
       from public.organization_members member
       where member.organization_id = employee_invitations.organization_id
         and member.user_id = auth.uid()
-        and member.role_code in ('owner', 'admin')
+        and member.role_code = 'owner'
         and member.status = 'active'
     )
   );
@@ -56,7 +56,7 @@ create policy employee_invitations_insert_org_admin on public.employee_invitatio
       from public.organization_members member
       where member.organization_id = employee_invitations.organization_id
         and member.user_id = auth.uid()
-        and member.role_code in ('owner', 'admin')
+        and member.role_code = 'owner'
         and member.status = 'active'
     )
   );
@@ -70,7 +70,7 @@ create policy employee_invitations_update_org_admin on public.employee_invitatio
       from public.organization_members member
       where member.organization_id = employee_invitations.organization_id
         and member.user_id = auth.uid()
-        and member.role_code in ('owner', 'admin')
+        and member.role_code = 'owner'
         and member.status = 'active'
     )
   )
@@ -80,7 +80,7 @@ create policy employee_invitations_update_org_admin on public.employee_invitatio
       from public.organization_members member
       where member.organization_id = employee_invitations.organization_id
         and member.user_id = auth.uid()
-        and member.role_code in ('owner', 'admin')
+        and member.role_code = 'owner'
         and member.status = 'active'
     )
   );
@@ -271,7 +271,7 @@ begin
     from public.organization_members member
     where member.organization_id = target_org_id
       and member.user_id = auth.uid()
-      and member.role_code in ('owner', 'admin')
+      and member.role_code = 'owner'
       and member.status = 'active'
   ) then
     raise exception 'INVITER_NOT_ALLOWED';

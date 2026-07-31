@@ -13,11 +13,12 @@ type NavItem = {
   href: string;
   icon: ReactNode;
   requiredPermission?: Permission;
+  hiddenForManager?: boolean;
 };
 
 const navItems: NavItem[] = [
   {
-    label: "Главная",
+    label: "Dashboard",
     href: "/admin",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -48,6 +49,70 @@ const navItems: NavItem[] = [
     requiredPermission: "bookings.view",
   },
   {
+    label: "Уборки",
+    href: "/cleaning",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="m5 20 3-8 5 2-3 7M9 12l2-6 4 1-2 7M15 4l3-1" />
+      </svg>
+    ),
+    requiredPermission: "cleaning.view",
+  },
+  {
+    label: "Ремонты",
+    href: "/maintenance",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="m14 6 4-4 4 4-4 4M3 21l9-9M6 12l6 6M4 10l10 10" />
+      </svg>
+    ),
+    requiredPermission: "maintenance.view",
+  },
+  {
+    label: "Сотрудники",
+    href: "/employees",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="8" r="3" />
+        <path d="M5 19a5 5 0 0 1 10 0M14 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+      </svg>
+    ),
+    requiredPermission: "users.view",
+  },
+  {
+    label: "Управление пользователями",
+    href: "/users",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 19a6 6 0 0 1 12 0M17 8h4M19 6v4" />
+      </svg>
+    ),
+    requiredPermission: "users.manage",
+    hiddenForManager: true,
+  },
+  {
+    label: "Задачи",
+    href: "/tasks",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="5" y="3" width="14" height="18" rx="2" />
+        <path d="m8 9 1.5 1.5L12 8M8 15h8" />
+      </svg>
+    ),
+    requiredPermission: "tasks.view",
+  },
+  {
+    label: "Заезд / Выезд",
+    href: "/check-in-out",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 12h12M12 8l4 4-4 4M20 5v14" />
+      </svg>
+    ),
+    requiredPermission: "checkins.view",
+  },
+  {
     label: "Календарь",
     href: "/calendar",
     icon: (
@@ -57,6 +122,7 @@ const navItems: NavItem[] = [
       </svg>
     ),
     requiredPermission: "calendar.view",
+    hiddenForManager: true,
   },
   {
     label: "Клиенты",
@@ -67,17 +133,7 @@ const navItems: NavItem[] = [
       </svg>
     ),
     requiredPermission: "clients.view",
-  },
-  {
-    label: "Пользователи",
-    href: "/users",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="8" r="3" />
-        <path d="M5 19a5 5 0 0 1 10 0M14 10.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-      </svg>
-    ),
-    requiredPermission: "users.view",
+    hiddenForManager: true,
   },
   {
     label: "Уведомления",
@@ -100,6 +156,7 @@ const navItems: NavItem[] = [
       </svg>
     ),
     requiredPermission: "settings.manage",
+    hiddenForManager: true,
   },
 ];
 
@@ -146,8 +203,12 @@ export default function Sidebar() {
   }, [dashboardData, isDashboardLoading]);
 
   const visibleItems = navItems.filter((item) => {
+    if (currentUser?.role === "Менеджер" && item.hiddenForManager) {
+      return false;
+    }
+
     if (!item.requiredPermission) {
-      return true;
+      return currentUser?.role !== "Уборщик" && currentUser?.role !== "Специалист по обслуживанию";
     }
 
     return hasPermissionInList(permissions, item.requiredPermission);
