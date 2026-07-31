@@ -38,7 +38,8 @@ export async function createRemoteBookingTasks(booking: Booking): Promise<string
     }
 
     const responsible = assigneesPayload.data?.responsible ?? [];
-    const manager = (assigneesPayload.data?.backupManagers ?? [])[0] ?? responsible[0];
+    const backupManagers = assigneesPayload.data?.backupManagers ?? [];
+    const manager = backupManagers.find((item) => item.roleCode.trim().toLowerCase() === "manager") ?? backupManagers[0] ?? responsible[0];
     const cleaner = responsible.find((item) => item.roleCode.trim().toLowerCase() === "cleaner") ?? manager;
     if (!manager || !cleaner) return "Нет активного сотрудника для назначения задач";
 
