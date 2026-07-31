@@ -30,9 +30,10 @@ export function getRoleCodeFromContext(context: CurrentUserContext): string {
 }
 
 export function hasStaffMembership(context: CurrentUserContext | null): boolean {
-  if (!context?.organizationMember || context.organizationMember.status !== "active") {
+  if (!context?.organizationMember) {
     return false;
   }
 
-  return isStaffRoleCode(context.organizationMember.role_code);
+  const roleCode = normalizeRoleCode(context.organizationMember.role_code);
+  return roleCode === "owner" || (context.organizationMember.status === "active" && isStaffRoleCode(roleCode));
 }
