@@ -160,6 +160,7 @@ export async function POST(request: Request) {
   const bookingRow: Record<string, string | number> = usesLegacyDates
     ? {
         id,
+        booking_number: `MAN-${id.slice(0, 8).toUpperCase()}`,
         organization_id: organizationId,
         apartment_id: apartmentId,
         check_in_date: checkIn,
