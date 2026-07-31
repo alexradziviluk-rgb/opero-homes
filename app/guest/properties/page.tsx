@@ -18,7 +18,6 @@ import {
   isApartmentAvailableForDates,
   isApartmentPublic,
   matchesApartmentLocation,
-  normalizeSearchValue,
 } from "@/lib/apartments/public-catalog";
 import type { Apartment } from "@/types/apartment";
 
@@ -47,7 +46,6 @@ function ApartmentCard({
   checkIn = "",
   checkOut = "",
   guests = "",
-  onShowMap,
   compact = false,
 }: {
   apartment: Apartment;
@@ -55,14 +53,12 @@ function ApartmentCard({
   checkIn?: string;
   checkOut?: string;
   guests?: string;
-  onShowMap?: () => void;
   compact?: boolean;
 }) {
   const photoCount = countRenderableApartmentPhotos(apartment);
   const availableForDates = checkIn && checkOut
     ? isApartmentAvailableForDates({ apartment, bookings, checkIn, checkOut })
     : true;
-  const hasCoordinates = getApartmentCoordinates(apartment) !== null;
   const bookingQuery = `${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`;
 
   return (
@@ -118,16 +114,6 @@ function ApartmentCard({
           >
             Забронировать
           </Link>
-          {onShowMap ? (
-            <button
-              type="button"
-              disabled={!hasCoordinates}
-              onClick={onShowMap}
-              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              На карте
-            </button>
-          ) : null}
         </div>
       </div>
     </article>
@@ -148,7 +134,6 @@ export default function GuestPropertiesPage() {
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("recommended");
   const [viewMode, setViewMode] = useState<CatalogViewMode>("list");
-  const [focusedApartmentId, setFocusedApartmentId] = useState<string | null>(null);
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<ReturnType<typeof getBookings>>([]);
@@ -303,25 +288,6 @@ export default function GuestPropertiesPage() {
     [publicApartments],
   );
 
-  const hasActiveFilters = useMemo(
-    () =>
-      Boolean(
-        normalizeSearchValue(query) ||
-          selectedCity ||
-          selectedDistrict ||
-          checkIn ||
-          checkOut ||
-          guests ||
-          minPrice ||
-          maxPrice ||
-          pricePeriod ||
-          bedrooms ||
-          onlyAvailable ||
-          sortMode !== "recommended",
-      ),
-    [bedrooms, checkIn, checkOut, guests, maxPrice, minPrice, onlyAvailable, pricePeriod, query, selectedCity, selectedDistrict, sortMode],
-  );
-
   function resetFilters() {
     setQuery("");
     setSelectedCity("");
@@ -335,7 +301,6 @@ export default function GuestPropertiesPage() {
     setBedrooms("");
     setOnlyAvailable(false);
     setSortMode("recommended");
-    setFocusedApartmentId(null);
   }
 
   return (
@@ -351,9 +316,17 @@ export default function GuestPropertiesPage() {
           <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Загружаем объекты...</div>
         ) : publicApartments.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div>
+        ) : visibleApartments.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+            <p className="text-slate-100">По вашему запросу ничего не найдено</p>
+            <p className="mt-2 text-sm text-slate-400">Попробуйте изменить город, район, даты или количество гостей.</p>
+            <button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
+              Сбросить фильтры
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {publicApartments.map((apartment) => (
+            {visibleApartments.map((apartment) => (
               <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact />
             ))}
           </div>
@@ -482,62 +455,24 @@ export default function GuestPropertiesPage() {
         <div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1">
           <button
             type="button"
-            onClick={() => setViewMode("list")}
-            className={`rounded-lg px-3 py-1 text-sm ${viewMode === "list" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}
-          >
-            Список
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("map")}
+            onClick={() => setViewMode((current) => current === "map" ? "list" : "map")}
             className={`rounded-lg px-3 py-1 text-sm ${viewMode === "map" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}
           >
-            Карта
+            {viewMode === "map" ? "Скрыть карту" : "Показать на карте"}
           </button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Загружаем объекты...</div>
-      ) : publicApartments.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет доступных объектов.</div>
-      ) : visibleApartments.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-          <p className="text-slate-100">По вашему запросу ничего не найдено</p>
-          <p className="mt-2 text-sm text-slate-400">Попробуйте изменить город, район, даты или количество гостей.</p>
-          {hasActiveFilters ? (
-            <button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
-              Сбросить фильтры
-            </button>
-          ) : null}
-        </div>
-      ) : viewMode === "map" ? (
+      {viewMode === "map" && !isLoading && visibleApartments.length > 0 ? (
         mapApartments.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">
             <p>{hasAnyPublicCoordinates ? "Объекты доступны в списке, но пока не отображаются на карте." : "Для объектов пока не указаны координаты."}</p>
             <p className="mt-2 text-sm text-slate-400">Добавьте координаты в карточке объекта.</p>
           </div>
         ) : (
-          <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={focusedApartmentId} checkIn={checkIn} checkOut={checkOut} guests={guests} />
+          <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} />
         )
-      ) : (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {visibleApartments.map((apartment) => (
-            <ApartmentCard
-              key={apartment.id}
-              apartment={apartment}
-              bookings={bookings}
-              checkIn={checkIn}
-              checkOut={checkOut}
-              guests={guests}
-              onShowMap={() => {
-                setViewMode("map");
-                setFocusedApartmentId(apartment.id);
-              }}
-            />
-          ))}
-        </div>
-      )}
+      ) : null}
       </section>
     </section>
   );
