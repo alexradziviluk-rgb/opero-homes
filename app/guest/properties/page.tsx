@@ -48,6 +48,7 @@ function ApartmentCard({
   checkOut = "",
   guests = "",
   onShowMap,
+  compact = false,
 }: {
   apartment: Apartment;
   bookings: ReturnType<typeof getBookings>;
@@ -55,6 +56,7 @@ function ApartmentCard({
   checkOut?: string;
   guests?: string;
   onShowMap?: () => void;
+  compact?: boolean;
 }) {
   const photoCount = countRenderableApartmentPhotos(apartment);
   const availableForDates = checkIn && checkOut
@@ -64,9 +66,9 @@ function ApartmentCard({
   const bookingQuery = `${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`;
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80">
+    <article className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/80">
       <Link href={`/stay/${apartment.id}`} className="block">
-        <div className="relative h-48 w-full bg-slate-800">
+        <div className={`relative w-full bg-slate-800 ${compact ? "h-36" : "h-48"}`}>
           <ApartmentImage
             photo={apartment.photos?.[0] ?? apartment.coverPhotoUrl ?? undefined}
             alt={apartment.title}
@@ -82,12 +84,12 @@ function ApartmentCard({
         </div>
       </Link>
 
-      <div className="p-4">
-        <h2 className="text-lg font-semibold text-white">
+      <div className={compact ? "p-3" : "p-4"}>
+        <h2 className={`${compact ? "text-base" : "text-lg"} font-semibold text-white`}>
           <Link href={`/stay/${apartment.id}`} className="hover:text-cyan-200">{apartment.title}</Link>
         </h2>
         <p className="mt-1 text-sm text-slate-400">{getApartmentPublicLocation(apartment)}</p>
-        <p className="mt-1 text-sm text-slate-300">{apartment.address || "Адрес уточняется"}</p>
+        {!compact ? <p className="mt-1 text-sm text-slate-300">{apartment.address || "Адрес уточняется"}</p> : null}
 
         <div className="mt-2 flex items-center justify-between gap-3">
           <p className="text-cyan-300">{formatApartmentPrice(apartment)}</p>
@@ -96,8 +98,8 @@ function ApartmentCard({
 
         <p className="mt-2 text-sm text-slate-300">До {apartment.maxGuests} гостей · {apartment.bedrooms} спальни · {apartment.rooms} кровати</p>
 
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          {getAmenities(apartment).map((amenity) => (
+        <div className={`${compact ? "mt-2" : "mt-3"} flex flex-wrap gap-2 text-xs`}>
+          {getAmenities(apartment).slice(0, compact ? 2 : 5).map((amenity) => (
             <span key={amenity} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">{amenity}</span>
           ))}
         </div>
@@ -106,9 +108,9 @@ function ApartmentCard({
           <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">Занят на выбранные даты</p>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className={`${compact ? "mt-3" : "mt-4"} flex flex-wrap gap-2`}>
           <Link href={`/stay/${apartment.id}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
-            Посмотреть объект
+            Открыть
           </Link>
           <Link
             href={`/stay/${apartment.id}?openBooking=1${bookingQuery}`}
@@ -350,9 +352,9 @@ export default function GuestPropertiesPage() {
         ) : publicApartments.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {publicApartments.map((apartment) => (
-              <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} />
+              <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact />
             ))}
           </div>
         )}

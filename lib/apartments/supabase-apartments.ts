@@ -206,7 +206,9 @@ export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolea
   photoRows.forEach((row) => {
     const apartmentId = safeString(row.apartment_id);
     const list = photoMap.get(apartmentId) ?? [];
-    list.push(mapApartmentPhoto(row));
+    const photo = mapApartmentPhoto(row);
+    const { data: publicUrlData } = supabase.storage.from("apartment-photos").getPublicUrl(photo.storagePath);
+    list.push({ ...photo, url: publicUrlData.publicUrl });
     photoMap.set(apartmentId, list);
   });
 
