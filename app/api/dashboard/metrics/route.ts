@@ -13,7 +13,8 @@ type ApartmentRow = {
 type BookingRow = {
   id: string;
   apartment_id: string | null;
-  guest_name: string | null;
+  guest_name?: string | null;
+  customer_name?: string | null;
   check_in: string;
   check_out: string;
   status: string | null;
@@ -151,7 +152,7 @@ export async function GET() {
 
   const { data: bookingsData, error: bookingsError } = await supabase
     .from("bookings")
-    .select("id,apartment_id,guest_name,check_in,check_out,status,payment_status,total_amount")
+    .select("*")
     .eq("organization_id", organizationId);
 
   if (bookingsError) {
@@ -183,7 +184,7 @@ export async function GET() {
     .slice(0, 5)
     .map((booking) => ({
       bookingId: booking.id,
-      guestName: booking.guest_name ?? "Гость",
+      guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
       dateLabel: formatDateLabel(booking.check_in),
     }));
@@ -193,7 +194,7 @@ export async function GET() {
     .slice(0, 5)
     .map((booking) => ({
       bookingId: booking.id,
-      guestName: booking.guest_name ?? "Гость",
+      guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
       dateLabel: formatDateLabel(booking.check_out),
     }));
@@ -235,7 +236,7 @@ export async function GET() {
     metrics.checkoutPayments = upcomingBookings.map((booking) => ({
       bookingId: booking.id,
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
-      guestName: booking.guest_name ?? "Гость",
+      guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       checkoutDate: formatDateLabel(booking.check_out),
     }));
   }

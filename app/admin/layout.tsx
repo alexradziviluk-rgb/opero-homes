@@ -21,7 +21,7 @@ export default async function AdminLayout({
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
         <div className="mx-auto flex min-h-screen max-w-7xl flex-col lg:flex-row">
           <Sidebar />
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <Header />
             <main className="p-4 sm:p-6 lg:p-8">{children}</main>
           </div>

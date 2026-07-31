@@ -21,7 +21,7 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
 
   return (
     <header className="border-b border-white/10 bg-slate-950/70 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.28em] text-cyan-300">Обзор операций</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
@@ -29,7 +29,7 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
           </h1>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
           {showSearch ? (
             <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">

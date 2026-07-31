@@ -22,6 +22,22 @@ type TaskSummary = {
   status: string;
 };
 
+const roleLabels: Record<string, string> = {
+  owner: "Владелец",
+  manager: "Менеджер",
+  employee: "Сотрудник",
+  cleaner: "Уборщик",
+  maintenance: "Специалист по обслуживанию",
+};
+
+const statusLabels: Record<string, string> = {
+  active: "Активен",
+  suspended: "Приостановлен",
+  blocked: "Заблокирован",
+  inactive: "Неактивен",
+  invited: "Приглашен",
+};
+
 export default function EmployeesPage() {
   const { currentUser } = useCurrentUser();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -61,7 +77,7 @@ export default function EmployeesPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="font-semibold text-white">{employee.firstName} {employee.lastName}</h2>
-                  <p className="mt-1 text-sm text-cyan-300">{employee.roleCode}</p>
+                  <p className="mt-1 text-sm text-cyan-300">{roleLabels[employee.roleCode] ?? employee.roleCode}</p>
                 </div>
                 <span className={`rounded-full px-2 py-1 text-xs ${isOnline ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700/60 text-slate-300"}`}>
                   {isOnline ? "Онлайн" : "Офлайн"}
@@ -72,7 +88,7 @@ export default function EmployeesPage() {
                 <div><dt className="text-slate-500">Назначенные объекты</dt><dd className="mt-1 text-white">{apartmentIds.length}</dd></div>
                 <div><dt className="text-slate-500">Активные задачи</dt><dd className="mt-1 text-white">{assignedTasks.length - completedTasks.length}</dd></div>
                 <div><dt className="text-slate-500">Выполнено</dt><dd className="mt-1 text-white">{completedTasks.length}</dd></div>
-                <div><dt className="text-slate-500">Статус</dt><dd className="mt-1 text-white">{employee.status}</dd></div>
+                <div><dt className="text-slate-500">Статус</dt><dd className="mt-1 text-white">{statusLabels[employee.status] ?? employee.status}</dd></div>
               </dl>
 
               <div className="mt-4 space-y-1 text-sm text-slate-300">

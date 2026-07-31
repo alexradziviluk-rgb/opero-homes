@@ -78,6 +78,13 @@ export async function GET(request: Request) {
   const { data, error } = await baseQuery.range(offset, offset + limit);
 
   if (error) {
+    if (error.code === "42703") {
+      return NextResponse.json({
+        ok: true,
+        data: { items: [], unreadCount: 0, totalCount: 0, hasMore: false, nextOffset: null },
+      });
+    }
+
     return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
   }
 

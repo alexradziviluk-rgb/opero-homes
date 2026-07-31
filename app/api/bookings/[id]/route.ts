@@ -2,28 +2,14 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 
-const EXTENDED_BOOKING_SELECT = "id,organization_id,apartment_id,client_id,guest_name,guest_phone,guest_email,check_in,check_out,guests,total_amount,status,payment_status,source,notes,created_at,updated_at";
-const BASE_BOOKING_SELECT = "id,organization_id,apartment_id,client_id,guest_name,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at";
-
 async function loadBookingById(
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   organizationId: string,
   id: string,
 ) {
-  const extended = await supabase
-    .from("bookings")
-    .select(EXTENDED_BOOKING_SELECT)
-    .eq("organization_id", organizationId)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!extended.error || extended.error.code !== "42703") {
-    return extended;
-  }
-
   return supabase
     .from("bookings")
-    .select(BASE_BOOKING_SELECT)
+    .select("*")
     .eq("organization_id", organizationId)
     .eq("id", id)
     .maybeSingle();
@@ -68,8 +54,8 @@ export async function GET(
       id: booking.id,
       apartmentId: booking.apartment_id,
       apartmentTitle: apartment?.title ?? "Объект",
-      clientId: booking.client_id,
-      guestName: booking.guest_name,
+      clientId: booking.client_id ?? null,
+      guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       guestPhone: "guest_phone" in booking ? booking.guest_phone : null,
       guestEmail: "guest_email" in booking ? booking.guest_email : null,
       checkIn: booking.check_in,
