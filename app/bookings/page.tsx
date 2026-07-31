@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { deleteBooking } from "@/lib/bookings/booking-repository";
+import { deleteBooking, getBookings } from "@/lib/bookings/booking-repository";
 import { confirmBooking } from "@/lib/bookings/confirm-booking";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import { hasEffectivePermission } from "@/lib/permissions";
@@ -41,7 +41,7 @@ async function fetchBookings(): Promise<Booking[]> {
     return [];
   }
 
-  return payload.data.map((booking) => ({
+  const remoteBookings: Booking[] = payload.data.map((booking) => ({
     id: booking.id,
     apartmentId: booking.apartmentId ?? "",
     clientId: "",
@@ -67,6 +67,9 @@ async function fetchBookings(): Promise<Booking[]> {
     createdAt: booking.createdAt,
     updatedAt: booking.updatedAt,
   }));
+
+  const remoteIds = new Set(remoteBookings.map((booking) => booking.id));
+  return [...getBookings().filter((booking) => !remoteIds.has(booking.id)), ...remoteBookings];
 }
 
 export default function BookingsPage() {

@@ -156,7 +156,10 @@ export default function CalendarPage() {
   const selectedBooking = selectedBookingId ? getBookingById(selectedBookingId) : null;
 
   function statusColor(booking: Booking): string {
-    return getBookingStatusPresentation(booking.status).dotClassName;
+    const status = getBookingStatusPresentation(booking.status).status;
+    if (status === "pending") return "bg-amber-400 text-slate-900";
+    if (status === "confirmed" || status === "checked_in") return "bg-rose-400 text-slate-900";
+    return "bg-slate-400 text-slate-900";
   }
 
   function beginQuickRangeFromDay(day: Date) {
@@ -359,18 +362,25 @@ export default function CalendarPage() {
             ) : null}
 
             <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-              <div className="mb-4">
-                <label className="text-sm text-slate-300">Фильтр по объекту</label>
-                <select
-                  value={filterApartment}
-                  onChange={(event) => setFilterApartment(event.target.value)}
-                  className="mt-1 rounded-xl bg-white/3 px-3 py-2 text-sm text-white"
-                >
-                  <option value="">Все объекты</option>
-                  {apartments.map((apartment) => (
-                    <option key={apartment.id} value={apartment.id}>{apartment.title} - {apartment.city}</option>
-                  ))}
-                </select>
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <label className="text-sm text-slate-300">Фильтр по объекту</label>
+                  <select
+                    value={filterApartment}
+                    onChange={(event) => setFilterApartment(event.target.value)}
+                    className="mt-1 block rounded-xl bg-white/3 px-3 py-2 text-sm text-white"
+                  >
+                    <option value="">Все объекты</option>
+                    {apartments.map((apartment) => (
+                      <option key={apartment.id} value={apartment.id}>{apartment.title} - {apartment.city}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+                  <span className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-white/20" />Свободно</span>
+                  <span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-amber-400" />Ожидает подтверждения</span>
+                  <span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-rose-400" />Занято</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-7 gap-2">

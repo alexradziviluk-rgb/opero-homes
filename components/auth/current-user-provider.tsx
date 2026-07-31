@@ -6,6 +6,7 @@ import { createSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentUser as getCurrentUserAuth, logout as logoutAuth } from "@/lib/supabase/auth";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import { saveLocalApartments } from "@/app/apartments/apartment-utils";
+import { userRepository } from "@/lib/repositories/users";
 import type { CurrentUserContext } from "@/types/auth-context";
 import type { User } from "@/types/user";
 
@@ -59,6 +60,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
         return;
       }
 
+      userRepository.upsert(resolved.currentUser);
       setCurrentUser(resolved.currentUser);
       setCurrentUserContext(resolved.currentUserContext);
       setIsAuthLoading(false);
@@ -90,6 +92,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
           return;
         }
 
+        userRepository.upsert(resolved.currentUser);
         setCurrentUser(resolved.currentUser);
         setCurrentUserContext(resolved.currentUserContext);
       });
