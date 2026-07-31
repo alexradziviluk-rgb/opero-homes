@@ -70,8 +70,15 @@ async function fetchBookings(): Promise<Booking[]> {
     updatedAt: booking.updatedAt,
   }));
 
+  const localBookings = getBookings();
+  const localById = new Map(localBookings.map((booking) => [booking.id, booking]));
+  const mergedRemote = remoteBookings.map((booking) => {
+    const local = localById.get(booking.id);
+    if (!local) return booking;
+    return { ...booking, ...local, status: booking.status, updatedAt: booking.updatedAt };
+  });
   const remoteIds = new Set(remoteBookings.map((booking) => booking.id));
-  return [...getBookings().filter((booking) => !remoteIds.has(booking.id)), ...remoteBookings];
+  return [...localBookings.filter((booking) => !remoteIds.has(booking.id)), ...mergedRemote];
 }
 
 export default function BookingsPage() {

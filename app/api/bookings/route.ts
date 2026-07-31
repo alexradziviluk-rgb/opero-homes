@@ -74,8 +74,8 @@ export async function GET() {
       guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       guestPhone: "guest_phone" in booking ? booking.guest_phone : null,
       guestEmail: "guest_email" in booking ? booking.guest_email : null,
-      checkIn: booking.check_in,
-      checkOut: booking.check_out,
+      checkIn: booking.check_in ?? booking.check_in_date,
+      checkOut: booking.check_out ?? booking.check_out_date,
       guests: "guests" in booking && typeof booking.guests === "number" ? booking.guests : 1,
       totalAmount: booking.total_amount,
       status: booking.status,
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   }
 
   const organizationId = auth.context.organization.id;
-  const { data: conflict, error: conflictError } = await supabase
+  const modernConflict = await supabase
     .from("bookings")
     .select("id,check_in,check_out")
     .eq("organization_id", organizationId)
@@ -127,34 +127,68 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
 
+  const usesLegacyDates = modernConflict.error?.code === "42703";
+  const legacyConflict = usesLegacyDates
+    ? await supabase
+        .from("bookings")
+        .select("id,check_in_date,check_out_date")
+        .eq("organization_id", organizationId)
+        .eq("apartment_id", apartmentId)
+        .neq("status", "cancelled")
+        .lt("check_in_date", checkOut)
+        .gt("check_out_date", checkIn)
+        .limit(1)
+        .maybeSingle()
+    : null;
+  const conflict = usesLegacyDates ? legacyConflict?.data : modernConflict.data;
+  const conflictError = usesLegacyDates ? legacyConflict?.error : modernConflict.error;
+
   if (conflictError) return error(422, conflictError.message, conflictError.code);
   if (conflict) {
+    const conflictCheckIn = "check_in" in conflict ? conflict.check_in : conflict.check_in_date;
+    const conflictCheckOut = "check_out" in conflict ? conflict.check_out : conflict.check_out_date;
     return NextResponse.json({
       ok: false,
       error: "Booking dates overlap an existing booking",
       code: "booking_conflict",
-      conflict: { id: conflict.id, checkIn: conflict.check_in, checkOut: conflict.check_out },
+      conflict: { id: conflict.id, checkIn: conflictCheckIn, checkOut: conflictCheckOut },
     }, { status: 409 });
   }
 
   const now = new Date().toISOString();
+  const totalAmount = typeof body?.totalAmount === "number" && Number.isFinite(body.totalAmount) ? body.totalAmount : 0;
+  const bookingRow: Record<string, string | number> = usesLegacyDates
+    ? {
+        id,
+        organization_id: organizationId,
+        apartment_id: apartmentId,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        total_amount: totalAmount,
+        status,
+        payment_status: paymentStatus,
+        source,
+        created_at: now,
+        updated_at: now,
+      }
+    : {
+        id,
+        organization_id: organizationId,
+        apartment_id: apartmentId,
+        guest_name: guestName,
+        check_in: checkIn,
+        check_out: checkOut,
+        total_amount: totalAmount,
+        status,
+        payment_status: paymentStatus,
+        source,
+        created_at: now,
+        updated_at: now,
+      };
   const { data, error: insertError } = await supabase
     .from("bookings")
-    .insert({
-      id,
-      organization_id: organizationId,
-      apartment_id: apartmentId,
-      guest_name: guestName,
-      check_in: checkIn,
-      check_out: checkOut,
-      total_amount: Number.isFinite(body?.totalAmount) ? body?.totalAmount : 0,
-      status,
-      payment_status: paymentStatus,
-      source,
-      created_at: now,
-      updated_at: now,
-    })
-    .select("id,apartment_id,guest_name,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at")
+    .insert(bookingRow)
+    .select("*")
     .single();
 
   if (insertError) return error(422, insertError.message, insertError.code);
