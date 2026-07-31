@@ -8,9 +8,8 @@ import ApartmentImage from "@/components/apartments/ApartmentImage";
 import PublicAvailabilityCalendar from "@/components/booking/PublicAvailabilityCalendar";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
-import { getBookings } from "@/lib/bookings/booking-repository";
 import { getClientById } from "@/lib/clients/client-repository";
-import { getRangeAvailability, getRequestedBookingOutcome, type PublicAvailabilityStatus } from "@/lib/bookings/availability";
+import { getRangeAvailability, getRequestedBookingOutcome, type AvailabilityBooking, type PublicAvailabilityStatus } from "@/lib/bookings/availability";
 import {
   formatApartmentPrice,
   getApartmentPhotoUrl,
@@ -18,11 +17,8 @@ import {
   getApartmentPriceInfo,
   getApartmentCoordinates,
   getApartmentPublicLocation,
-  isApartmentAvailableForDates,
   isApartmentPublic,
 } from "@/lib/apartments/public-catalog";
-import { isBlockingBooking } from "@/lib/bookings/booking-conflicts";
-import type { Booking } from "@/types/booking";
 import type { ApartmentPhoto } from "@/types/apartment";
 import type { Apartment } from "@/types/apartment";
 
@@ -86,7 +82,7 @@ export default function GuestPropertyDetailsPage() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
   const [apartments, setApartments] = useState<Apartment[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<AvailabilityBooking[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,21 +96,22 @@ export default function GuestPropertyDetailsPage() {
 
     void loadApartments();
 
-    function reloadBookings() {
-      setBookings(getBookings());
+    async function loadAvailability() {
+      if (!apartmentId) return;
+
+      const response = await fetch(`/api/guest/availability?apartmentId=${encodeURIComponent(apartmentId)}`, { cache: "no-store" });
+      const payload = (await response.json()) as { ok: boolean; data?: AvailabilityBooking[] };
+      if (!cancelled && response.ok && payload.ok) {
+        setBookings(payload.data ?? []);
+      }
     }
 
-    reloadBookings();
-
-    window.addEventListener("opero-bookings-changed", reloadBookings);
-    window.addEventListener("storage", reloadBookings);
+    void loadAvailability();
 
     return () => {
       cancelled = true;
-      window.removeEventListener("opero-bookings-changed", reloadBookings);
-      window.removeEventListener("storage", reloadBookings);
     };
-  }, []);
+  }, [apartmentId]);
 
   const apartment = useMemo(() => apartments.find((item) => item.id === apartmentId), [apartments, apartmentId]);
 
@@ -185,7 +182,9 @@ export default function GuestPropertyDetailsPage() {
   const safeIndex = Math.min(activePhotoIndex, Math.max(0, renderableGallery.length - 1));
   const activePhoto = renderableGallery[safeIndex];
   const priceInfo = getApartmentPriceInfo(apartment);
-  const occupiedRanges = bookings.filter((booking) => booking.apartmentId === apartment.id && isBlockingBooking(booking));
+  const occupiedRanges = bookings.filter(
+    (booking) => booking.apartmentId === apartment.id && (booking.status === "confirmed" || booking.status === "checked_in"),
+  );
   const selectedRangeStatuses = checkIn && checkOut
     ? selectedStatuses.length > 0
       ? selectedStatuses

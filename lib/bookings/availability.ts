@@ -2,6 +2,7 @@ import type { Booking } from "@/types/booking";
 import { normalizeBookingStatus } from "@/lib/bookings/status-presentation";
 
 export type PublicAvailabilityStatus = "available" | "pending" | "occupied";
+export type AvailabilityBooking = Pick<Booking, "id" | "apartmentId" | "checkIn" | "checkOut" | "status">;
 
 function toIsoDate(value: Date): string {
   const year = value.getFullYear();
@@ -34,7 +35,7 @@ export function hasBookingOverlap(
   return requestedStart < existingEnd && requestedEnd > existingStart;
 }
 
-function getBookingImpact(booking: Booking): PublicAvailabilityStatus {
+function getBookingImpact(booking: AvailabilityBooking): PublicAvailabilityStatus {
   const status = normalizeBookingStatus(booking.status);
 
   if (status === "confirmed" || status === "checked_in") {
@@ -51,7 +52,7 @@ function getBookingImpact(booking: Booking): PublicAvailabilityStatus {
 export function getApartmentDateAvailability(
   apartmentId: string,
   date: Date,
-  bookings: Booking[],
+  bookings: AvailabilityBooking[],
 ): PublicAvailabilityStatus {
   const dayStart = toIsoDate(date);
   const dayEnd = toIsoDate(addDays(date, 1));
@@ -85,7 +86,7 @@ export function getRangeAvailability(
   apartmentId: string,
   checkIn: string,
   checkOut: string,
-  bookings: Booking[],
+  bookings: AvailabilityBooking[],
 ): PublicAvailabilityStatus[] {
   const start = fromIsoDate(checkIn);
   const end = fromIsoDate(checkOut);

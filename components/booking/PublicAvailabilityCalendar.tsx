@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import {
   getApartmentDateAvailability,
   getRangeAvailability,
+  type AvailabilityBooking,
   type PublicAvailabilityStatus,
 } from "@/lib/bookings/availability";
-import type { Booking } from "@/types/booking";
 
 type CalendarChange = {
   checkIn: string;
@@ -16,7 +16,7 @@ type CalendarChange = {
 
 type Props = {
   apartmentId: string;
-  bookings: Booking[];
+  bookings: AvailabilityBooking[];
   checkIn: string;
   checkOut: string;
   onChange: (next: CalendarChange) => void;
@@ -30,10 +30,6 @@ function toIsoDate(value: Date): string {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function fromIsoDate(value: string): Date {
-  return new Date(`${value}T00:00:00`);
 }
 
 function addDays(value: Date, days: number): Date {
