@@ -162,7 +162,7 @@ const navItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { currentUser, isAuthLoading } = useCurrentUser();
+  const { currentUser, isAuthLoading, logout } = useCurrentUser();
   const { data: dashboardData, isLoading: isDashboardLoading } = useDashboardMetrics();
   const permissions = useMemo(() => (currentUser ? getEffectivePermissions(currentUser) : []), [currentUser]);
   const canViewWeeklyRevenue = hasPermissionInList(permissions, "finance.view");
@@ -259,6 +259,22 @@ export default function Sidebar() {
           <p className="mt-1 text-sm text-slate-400">{weeklyRevenueDescription}</p>
         </div>
       ) : null}
+
+      <button
+        type="button"
+        onClick={() => void logout()}
+        className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-white/10 px-3 py-3 text-left text-sm font-medium text-slate-300 transition hover:border-rose-400/30 hover:bg-rose-500/10 hover:text-white"
+      >
+        <span className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-200">
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M10 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h5M14 8l4 4-4 4M8 12h10" />
+          </svg>
+        </span>
+        <span className="min-w-0">
+          <span className="block">Выйти</span>
+          <span className="block truncate text-xs font-normal text-slate-500">{currentUser?.role ?? "Пользователь"}</span>
+        </span>
+      </button>
     </aside>
   );
 }
