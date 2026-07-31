@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getGuestNextPath } from "@/lib/auth/next-route";
 import { createSupabaseClient } from "@/lib/supabase/client";
@@ -12,7 +12,7 @@ function normalizeSignUpError(message: string | undefined): string {
   }
 
   if (message.toLowerCase().includes("already registered")) {
-    return "Пользователь с таким email уже зарегистрирован.";
+    return "Аккаунт с этим email уже существует. Войдите в систему.";
   }
 
   return message;
@@ -20,25 +20,30 @@ function normalizeSignUpError(message: string | undefined): string {
 
 export default function GuestRegisterPage() {
   const router = useRouter();
-  const [nextPath, setNextPath] = useState("/guest");
+  const [nextPath] = useState(() => {
+    if (typeof window === "undefined") {
+      return "/guest";
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    return getGuestNextPath(params.get("next"));
+  });
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    return params.get("email") ?? "";
+  });
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setNextPath(getGuestNextPath(params.get("next")));
-    const invitedEmail = params.get("email");
-    if (invitedEmail) {
-      setEmail(invitedEmail);
-    }
-  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,7 +88,7 @@ export default function GuestRegisterPage() {
         return;
       }
 
-      setSuccess("Аккаунт создан. Подтвердите email по ссылке из письма и затем войдите.");
+      setSuccess("Аккаунт создан. Если вход не выполнился автоматически, войдите с указанным email и паролем.");
     } finally {
       setIsSubmitting(false);
     }
