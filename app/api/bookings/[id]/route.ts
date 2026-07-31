@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
+import { normalizeRoleCode } from "@/lib/supabase/role-code";
+
+const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
+const MANAGER_ROLES = new Set(["owner", "manager"]);
+
+function error(status: number, message: string, code?: string) {
+  return NextResponse.json({ ok: false, error: message, code }, { status });
+}
 
 async function loadBookingById(
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
@@ -70,4 +78,62 @@ export async function GET(
       updatedAt: booking.updated_at,
     },
   });
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return error(500, "Supabase is not configured");
+
+  const auth = await requireStaffApiAuth();
+  if (!auth.ok) return auth.response;
+  if (!MANAGER_ROLES.has(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+    return error(403, "Insufficient permissions");
+  }
+
+  const body = (await request.json().catch(() => null)) as { status?: string } | null;
+  const status = body?.status?.trim() ?? "";
+  if (!BOOKING_STATUSES.has(status)) return error(400, "Invalid booking status");
+
+  const { id } = await context.params;
+  const { data, error: updateError } = await supabase
+    .from("bookings")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("organization_id", auth.context.organization.id)
+    .eq("id", id)
+    .select("id,status,updated_at")
+    .maybeSingle();
+
+  if (updateError) return error(422, updateError.message, updateError.code);
+  if (!data) return error(404, "Booking not found");
+  return NextResponse.json({ ok: true, data });
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return error(500, "Supabase is not configured");
+
+  const auth = await requireStaffApiAuth();
+  if (!auth.ok) return auth.response;
+  if (!MANAGER_ROLES.has(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+    return error(403, "Insufficient permissions");
+  }
+
+  const { id } = await context.params;
+  const { data, error: deleteError } = await supabase
+    .from("bookings")
+    .delete()
+    .eq("organization_id", auth.context.organization.id)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (deleteError) return error(422, deleteError.message, deleteError.code);
+  if (!data) return error(404, "Booking not found");
+  return NextResponse.json({ ok: true });
 }

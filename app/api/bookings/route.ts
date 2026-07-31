@@ -1,6 +1,27 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
+import { normalizeRoleCode } from "@/lib/supabase/role-code";
+
+type CreateBookingPayload = {
+  id?: string;
+  apartmentId?: string;
+  guestName?: string;
+  checkIn?: string;
+  checkOut?: string;
+  totalAmount?: number;
+  status?: string;
+  paymentStatus?: string;
+  source?: string;
+};
+
+const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in"]);
+const PAYMENT_STATUSES = new Set(["unpaid", "partially_paid", "paid", "refunded"]);
+const MANAGER_ROLES = new Set(["owner", "manager"]);
+
+function error(status: number, message: string, code?: string) {
+  return NextResponse.json({ ok: false, error: message, code }, { status });
+}
 
 async function loadBookingsForOrganization(supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, organizationId: string) {
   return supabase
@@ -65,4 +86,77 @@ export async function GET() {
       updatedAt: booking.updated_at,
     })),
   });
+}
+
+export async function POST(request: Request) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return error(500, "Supabase is not configured");
+
+  const auth = await requireStaffApiAuth();
+  if (!auth.ok) return auth.response;
+  if (!MANAGER_ROLES.has(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+    return error(403, "Insufficient permissions");
+  }
+
+  const body = (await request.json().catch(() => null)) as CreateBookingPayload | null;
+  const id = body?.id?.trim() ?? "";
+  const apartmentId = body?.apartmentId?.trim() ?? "";
+  const guestName = body?.guestName?.trim() ?? "";
+  const checkIn = body?.checkIn?.trim() ?? "";
+  const checkOut = body?.checkOut?.trim() ?? "";
+  const status = body?.status?.trim() ?? "pending";
+  const paymentStatus = body?.paymentStatus?.trim() ?? "unpaid";
+  const source = body?.source?.trim() ?? "direct";
+
+  if (!id || !apartmentId || !guestName || !checkIn || !checkOut || checkOut <= checkIn) {
+    return error(400, "Invalid booking payload");
+  }
+  if (!BOOKING_STATUSES.has(status) || !PAYMENT_STATUSES.has(paymentStatus)) {
+    return error(400, "Invalid booking status");
+  }
+
+  const organizationId = auth.context.organization.id;
+  const { data: conflict, error: conflictError } = await supabase
+    .from("bookings")
+    .select("id,check_in,check_out")
+    .eq("organization_id", organizationId)
+    .eq("apartment_id", apartmentId)
+    .neq("status", "cancelled")
+    .lt("check_in", checkOut)
+    .gt("check_out", checkIn)
+    .limit(1)
+    .maybeSingle();
+
+  if (conflictError) return error(422, conflictError.message, conflictError.code);
+  if (conflict) {
+    return NextResponse.json({
+      ok: false,
+      error: "Booking dates overlap an existing booking",
+      code: "booking_conflict",
+      conflict: { id: conflict.id, checkIn: conflict.check_in, checkOut: conflict.check_out },
+    }, { status: 409 });
+  }
+
+  const now = new Date().toISOString();
+  const { data, error: insertError } = await supabase
+    .from("bookings")
+    .insert({
+      id,
+      organization_id: organizationId,
+      apartment_id: apartmentId,
+      guest_name: guestName,
+      check_in: checkIn,
+      check_out: checkOut,
+      total_amount: Number.isFinite(body?.totalAmount) ? body?.totalAmount : 0,
+      status,
+      payment_status: paymentStatus,
+      source,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id,apartment_id,guest_name,check_in,check_out,total_amount,status,payment_status,source,created_at,updated_at")
+    .single();
+
+  if (insertError) return error(422, insertError.message, insertError.code);
+  return NextResponse.json({ ok: true, data }, { status: 201 });
 }

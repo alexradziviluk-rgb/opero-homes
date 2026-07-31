@@ -11,6 +11,8 @@ import { hasEffectivePermission } from "@/lib/permissions";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { Booking } from "@/types/booking";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
+import { deleteRemoteBooking, persistBookingStatus } from "@/lib/bookings/remote-bookings";
+import { createRemoteBookingTasks } from "@/lib/bookings/remote-booking-tasks";
 
 type BookingListRecord = {
   id: string;
@@ -126,12 +128,17 @@ export default function BookingsPage() {
 
   async function handleDelete(booking: Booking) {
     if (!confirm("Удалить бронирование?")) return;
-    deleteBooking(booking.id);
-    await emitBookingNotificationEvent("booking_cancelled", booking, {
-      idempotencySeed: `deleted:${new Date().toISOString()}`,
-      actionUrl: "/bookings",
-    });
-    reloadBookings();
+    try {
+      await deleteRemoteBooking(booking.id);
+      deleteBooking(booking.id);
+      await emitBookingNotificationEvent("booking_cancelled", booking, {
+        idempotencySeed: `deleted:${new Date().toISOString()}`,
+        actionUrl: "/bookings",
+      });
+      reloadBookings();
+    } catch {
+      setActionError("Не удалось удалить бронирование");
+    }
   }
 
   async function handleConfirmOne(booking: Booking) {
@@ -145,14 +152,17 @@ export default function BookingsPage() {
     setIsSingleConfirmingId(booking.id);
 
     try {
+      await persistBookingStatus(booking, "confirmed");
       const result = confirmBooking({
         bookingId: booking.id,
         confirmedByUserId: currentUser.id,
       });
+      const taskWarning = await createRemoteBookingTasks(result.booking);
       await emitBookingNotificationEvent("booking_confirmed", result.booking, {
         actionUrl: `/bookings/${booking.id}`,
       });
-      const warning = result.warnings.length > 0 ? ` (${result.warnings.join("; ")})` : "";
+      const warnings = [...result.warnings, ...(taskWarning ? [taskWarning] : [])];
+      const warning = warnings.length > 0 ? ` (${warnings.join("; ")})` : "";
       setActionMessage(`Бронирование подтверждено${warning}`);
       reloadBookings();
     } catch {
@@ -185,10 +195,12 @@ export default function BookingsPage() {
 
     for (const booking of targets) {
       try {
+        await persistBookingStatus(booking, "confirmed");
         const result = confirmBooking({
           bookingId: booking.id,
           confirmedByUserId: currentUser.id,
         });
+        await createRemoteBookingTasks(result.booking);
         await emitBookingNotificationEvent("booking_confirmed", result.booking, {
           actionUrl: `/bookings/${booking.id}`,
         });

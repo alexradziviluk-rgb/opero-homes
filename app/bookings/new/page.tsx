@@ -76,6 +76,7 @@ function NewBookingPageContent() {
   }, apartments.find((apartment) => apartment.id === apartmentIdFromUrl)));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === form.clientId) ?? null,
@@ -284,6 +285,35 @@ function NewBookingPageContent() {
         bookingId: booking.id,
       });
       booking.guestUserId = guestUser.id;
+    }
+
+    setIsSaving(true);
+    const response = await fetch("/api/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(booking),
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+      code?: string;
+      conflict?: { checkIn: string; checkOut: string };
+    } | null;
+
+    if (!response.ok || !payload?.ok) {
+      setIsSaving(false);
+      if (payload?.code === "booking_conflict" && payload.conflict) {
+        setErrors((previous) => ({
+          ...previous,
+          dates: `Объект уже забронирован с ${formatDate(payload.conflict!.checkIn)} по ${formatDate(payload.conflict!.checkOut)}`,
+        }));
+      } else {
+        setErrors((previous) => ({
+          ...previous,
+          save: payload?.error ?? "Не удалось сохранить бронирование",
+        }));
+      }
+      return;
     }
 
     saveBooking(booking);
@@ -503,8 +533,9 @@ function NewBookingPageContent() {
                   <div className="flex justify-between text-sm text-slate-400"><span>Остаток</span><span>{Math.max(0, amounts.totalAmount - Number(form.paidAmount || 0))} €</span></div>
                 </div>
 
+                {errors.save ? <p className="mt-4 text-sm text-rose-400">{errors.save}</p> : null}
                 <div className="mt-6 flex gap-2">
-                    <button type="button" onClick={() => void handleSave()} className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200">Сохранить</button>
+                    <button type="button" onClick={() => void handleSave()} disabled={isSaving} className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50">{isSaving ? "Сохранение..." : "Сохранить"}</button>
                   <button type="button" onClick={() => router.push('/bookings')} className="rounded-2xl bg-white/5 px-4 py-2">Отмена</button>
                 </div>
               </div>

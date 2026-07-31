@@ -17,6 +17,8 @@ import { confirmBooking } from "@/lib/bookings/confirm-booking";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import { hasEffectivePermission } from "@/lib/permissions";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
+import { deleteRemoteBooking, persistBookingStatus } from "@/lib/bookings/remote-bookings";
+import { createRemoteBookingTasks } from "@/lib/bookings/remote-booking-tasks";
 import type { Apartment } from "@/types/apartment";
 import type { Booking } from "@/types/booking";
 
@@ -229,12 +231,17 @@ export default function CalendarPage() {
       updatedAt: new Date().toISOString(),
     };
 
-    updateBooking(cancelledBooking);
-    await emitBookingNotificationEvent("booking_cancelled", cancelledBooking, {
-      actionUrl: `/bookings/${booking.id}`,
-    });
-    setSelectedBookingId(null);
-    setVersion((v) => v + 1);
+    try {
+      await persistBookingStatus(booking, "cancelled");
+      updateBooking(cancelledBooking);
+      await emitBookingNotificationEvent("booking_cancelled", cancelledBooking, {
+        actionUrl: `/bookings/${booking.id}`,
+      });
+      setSelectedBookingId(null);
+      setVersion((v) => v + 1);
+    } catch {
+      setActionError("Не удалось отменить бронирование");
+    }
   }
 
   async function handleDeleteBooking(booking: Booking) {
@@ -247,13 +254,18 @@ export default function CalendarPage() {
       return;
     }
 
-    deleteBooking(booking.id);
-    await emitBookingNotificationEvent("booking_cancelled", booking, {
-      idempotencySeed: `deleted:${new Date().toISOString()}`,
-      actionUrl: "/bookings",
-    });
-    setSelectedBookingId(null);
-    setVersion((v) => v + 1);
+    try {
+      await deleteRemoteBooking(booking.id);
+      deleteBooking(booking.id);
+      await emitBookingNotificationEvent("booking_cancelled", booking, {
+        idempotencySeed: `deleted:${new Date().toISOString()}`,
+        actionUrl: "/bookings",
+      });
+      setSelectedBookingId(null);
+      setVersion((v) => v + 1);
+    } catch {
+      setActionError("Не удалось удалить бронирование");
+    }
   }
 
   async function handleConfirmBooking(booking: Booking) {
@@ -267,14 +279,17 @@ export default function CalendarPage() {
     setIsConfirming(true);
 
     try {
+      await persistBookingStatus(booking, "confirmed");
       const result = confirmBooking({
         bookingId: booking.id,
         confirmedByUserId: currentUser.id,
       });
+      const taskWarning = await createRemoteBookingTasks(result.booking);
       await emitBookingNotificationEvent("booking_confirmed", result.booking, {
         actionUrl: `/bookings/${booking.id}`,
       });
-      const warning = result.warnings.length > 0 ? ` (${result.warnings.join("; ")})` : "";
+      const warnings = [...result.warnings, ...(taskWarning ? [taskWarning] : [])];
+      const warning = warnings.length > 0 ? ` (${warnings.join("; ")})` : "";
       setActionSuccess(`Бронирование подтверждено${warning}`);
       setVersion((v) => v + 1);
     } catch {
