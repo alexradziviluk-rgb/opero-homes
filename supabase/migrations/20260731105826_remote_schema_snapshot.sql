@@ -1,0 +1,3 @@
+-- Historical marker for a remote-only schema snapshot already recorded in
+-- supabase_migrations.schema_migrations. Its original SQL is not available
+-- through the CLI, so this file intentionally contains no executable changes.

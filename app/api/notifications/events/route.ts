@@ -21,10 +21,6 @@ function isCreateBookingNotificationInput(value: unknown): value is CreateBookin
   );
 }
 
-function isMissingNotificationSchema(message: string): boolean {
-  return /Could not find the table 'public\.notification_(events|deliveries)' in the schema cache/i.test(message);
-}
-
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
@@ -63,14 +59,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create notifications";
-    if (isMissingNotificationSchema(message)) {
-      return NextResponse.json({
-        ok: true,
-        data: null,
-        degraded: true,
-        warning: "Notification delivery is unavailable until the notification schema is installed",
-      });
-    }
     return NextResponse.json({ ok: false, error: message }, { status: 422 });
   }
 }
