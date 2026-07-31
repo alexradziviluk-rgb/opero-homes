@@ -304,11 +304,11 @@ export function confirmBooking(input: ConfirmBookingInput): ConfirmBookingResult
 
   maybeCreateTask({
     id: generateId("tsk"),
-    title: "Проверить оплату по бронированию",
-    description: `Проверить поступление оплаты по бронированию ${booking.id}.`,
+    title: "Получить остаток оплаты при выезде",
+    description: `Проверить и получить остаток оплаты по бронированию ${booking.id}.`,
     status: "pending",
     taskType: "payment",
-    dueAt: new Date(`${booking.checkIn}T10:00:00`).toISOString(),
+    dueAt: new Date(`${booking.checkOut}T10:00:00`).toISOString(),
     bookingId: booking.id,
     apartmentId: booking.apartmentId,
     assignedRole: "Менеджер",
@@ -338,11 +338,11 @@ export function confirmBooking(input: ConfirmBookingInput): ConfirmBookingResult
 
   maybeCreateTask({
     id: generateId("tsk"),
-    title: "Подготовить объект к заезду",
-    description: `Подготовить объект ${apartment.title} к заезду по бронированию ${booking.id}.`,
+    title: "Уборка после выезда",
+    description: `Принять объект ${apartment.title} и выполнить уборку после выезда.`,
     status: "pending",
     taskType: "cleaning",
-    dueAt: new Date(`${booking.checkIn}T12:00:00`).toISOString(),
+    dueAt: new Date(`${booking.checkOut}T11:00:00`).toISOString(),
     bookingId: booking.id,
     apartmentId: booking.apartmentId,
     assignedRole: "Уборщик",

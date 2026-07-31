@@ -6,14 +6,16 @@ type Assignee = {
 };
 
 type ExistingTask = {
+  id: string;
   booking_id: string | null;
   title: string;
+  due_at: string;
 };
 
 type TaskDefinition = {
   title: string;
   description: string;
-  taskType: "cleaning" | "keys" | "payment" | "instructions";
+  taskType: "inspection" | "cleaning" | "keys" | "payment" | "instructions";
   dueAt: string;
   assignedUserId: string;
 };
@@ -45,11 +47,11 @@ export async function createRemoteBookingTasks(booking: Booking): Promise<string
 
     const definitions: TaskDefinition[] = [
       {
-        title: "Подготовить объект к заезду",
-        description: `Проверить уборку и готовность объекта для ${booking.guestName}.`,
-        taskType: "cleaning",
+        title: "Проверить готовность объекта к заезду",
+        description: `Проверить готовность объекта и отметить возможность заселения для ${booking.guestName}.`,
+        taskType: "inspection",
         dueAt: atTime(booking.checkIn, 10),
-        assignedUserId: cleaner.userId,
+        assignedUserId: manager.userId,
       },
       {
         title: "Передать ключи гостю",
@@ -59,10 +61,10 @@ export async function createRemoteBookingTasks(booking: Booking): Promise<string
         assignedUserId: manager.userId,
       },
       {
-        title: "Проверить оплату по бронированию",
-        description: `Проверить оплату ${booking.totalAmount} EUR по бронированию ${booking.id}.`,
+        title: "Получить остаток оплаты при выезде",
+        description: `Проверить и получить остаток оплаты по бронированию ${booking.id}.`,
         taskType: "payment",
-        dueAt: atTime(booking.checkIn, 10),
+        dueAt: atTime(booking.checkOut, 10),
         assignedUserId: manager.userId,
       },
       {
@@ -93,6 +95,17 @@ export async function createRemoteBookingTasks(booking: Booking): Promise<string
         .filter((task) => task.booking_id === booking.id)
         .map((task) => task.title),
     );
+
+    const obsoleteTasks = (tasksPayload.data ?? []).filter(
+      (task) => task.booking_id === booking.id && ["Подготовить объект к заезду", "Проверить оплату по бронированию"].includes(task.title),
+    );
+    for (const task of obsoleteTasks) {
+      await fetch("/api/operations/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: task.id, status: "cancelled" }),
+      });
+    }
 
     for (const task of definitions.filter((item) => !existingTitles.has(item.title))) {
       const response = await fetch("/api/operations/tasks", {

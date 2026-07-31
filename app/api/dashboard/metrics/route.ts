@@ -15,11 +15,17 @@ type BookingRow = {
   apartment_id: string | null;
   guest_name?: string | null;
   customer_name?: string | null;
-  check_in: string;
-  check_out: string;
+  check_in?: string | null;
+  check_out?: string | null;
+  check_in_date?: string | null;
+  check_out_date?: string | null;
   status: string | null;
   payment_status: string | null;
   total_amount: number | null;
+  amount_paid?: number | null;
+  currency?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type TaskRow = {
@@ -37,6 +43,24 @@ type OperationalTaskRow = {
 
 function normalize(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
+}
+
+function bookingCheckIn(booking: BookingRow): string {
+  return booking.check_in ?? booking.check_in_date ?? "";
+}
+
+function bookingCheckOut(booking: BookingRow): string {
+  return booking.check_out ?? booking.check_out_date ?? "";
+}
+
+function addRevenue(target: Map<string, number>, currency: string, amount: number) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const normalizedCurrency = currency.trim().toUpperCase() || "EUR";
+  target.set(normalizedCurrency, (target.get(normalizedCurrency) ?? 0) + amount);
+}
+
+function revenueArray(values: Map<string, number>) {
+  return Array.from(values, ([currency, amount]) => ({ currency, amount: Math.round(amount * 100) / 100 }));
 }
 
 function isCancelledStatus(value: string | null | undefined): boolean {
@@ -167,12 +191,12 @@ export async function GET() {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   const nonCancelledBookings = bookings.filter((booking) => !isCancelledStatus(booking.status));
-  metrics.bookingsActiveFuture = nonCancelledBookings.filter((booking) => booking.check_out >= todayIso).length;
+  metrics.bookingsActiveFuture = nonCancelledBookings.filter((booking) => bookingCheckOut(booking) >= todayIso).length;
   metrics.pendingConfirmationsCount = bookings.filter((booking) => normalize(booking.status) === "pending").length;
 
   const occupiedApartmentIds = new Set(
     nonCancelledBookings
-      .filter((booking) => booking.check_in <= todayIso && booking.check_out > todayIso)
+      .filter((booking) => bookingCheckIn(booking) <= todayIso && bookingCheckOut(booking) > todayIso)
       .map((booking) => booking.apartment_id)
       .filter((apartmentId): apartmentId is string => Boolean(apartmentId)),
   );
@@ -180,23 +204,23 @@ export async function GET() {
   metrics.propertiesAvailable = Math.max(0, metrics.propertiesTotal - metrics.propertiesOccupied);
 
   metrics.todayArrivals = nonCancelledBookings
-    .filter((booking) => booking.check_in === todayIso)
+    .filter((booking) => bookingCheckIn(booking) === todayIso)
     .slice(0, 5)
     .map((booking) => ({
       bookingId: booking.id,
       guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
-      dateLabel: formatDateLabel(booking.check_in),
+      dateLabel: formatDateLabel(bookingCheckIn(booking)),
     }));
 
   metrics.todayDepartures = nonCancelledBookings
-    .filter((booking) => booking.check_out === todayIso)
+    .filter((booking) => bookingCheckOut(booking) === todayIso)
     .slice(0, 5)
     .map((booking) => ({
       bookingId: booking.id,
       guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
-      dateLabel: formatDateLabel(booking.check_out),
+      dateLabel: formatDateLabel(bookingCheckOut(booking)),
     }));
 
   const now = new Date();
@@ -206,7 +230,7 @@ export async function GET() {
 
   if (metrics.propertiesTotal > 0 && nonCancelledBookings.length > 0) {
     const bookedNights = nonCancelledBookings.reduce((sum, booking) => {
-      return sum + countOverlapNights(booking.check_in, booking.check_out, monthStart, monthEndExclusive);
+      return sum + countOverlapNights(bookingCheckIn(booking), bookingCheckOut(booking), monthStart, monthEndExclusive);
     }, 0);
 
     const totalCapacityNights = metrics.propertiesTotal * daysInMonth;
@@ -215,21 +239,47 @@ export async function GET() {
     }
   }
 
-  const { count: paymentsCount, error: paymentsProbeError } = await supabase
+  const { data: paymentsData, error: paymentsProbeError } = await supabase
     .from("payments")
-    .select("organization_id", { head: true, count: "exact" })
+    .select("*")
     .eq("organization_id", organizationId);
 
-  if (!paymentsProbeError) {
-    if ((paymentsCount ?? 0) === 0) {
-      metrics.revenueDataStatus = "no_payments";
-      metrics.checkoutPaymentsStatus = "no_payments";
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(weekStart.getUTCDate() - 7);
+  const monthlyRevenue = new Map<string, number>();
+  const weeklyRevenue = new Map<string, number>();
+
+  if (!paymentsProbeError && (paymentsData ?? []).length > 0) {
+    for (const rawPayment of paymentsData ?? []) {
+      const payment = rawPayment as Record<string, unknown>;
+      const status = normalize(typeof payment.status === "string" ? payment.status : "");
+      if (["failed", "cancelled", "canceled", "refunded"].includes(status)) continue;
+      const amount = Number(payment.amount ?? payment.paid_amount ?? 0);
+      const currency = typeof payment.currency === "string" ? payment.currency : "EUR";
+      const occurredAt = String(payment.paid_at ?? payment.created_at ?? payment.updated_at ?? "");
+      const occurredDate = new Date(occurredAt);
+      if (occurredDate >= monthStart && occurredDate < monthEndExclusive) addRevenue(monthlyRevenue, currency, amount);
+      if (occurredDate >= weekStart && occurredDate <= now) addRevenue(weeklyRevenue, currency, amount);
+    }
+  } else {
+    for (const booking of nonCancelledBookings) {
+      const occurredAt = booking.updated_at ?? booking.created_at ?? `${bookingCheckIn(booking)}T00:00:00.000Z`;
+      const occurredDate = new Date(occurredAt);
+      const amount = Number(booking.amount_paid ?? 0);
+      const currency = booking.currency ?? "EUR";
+      if (occurredDate >= monthStart && occurredDate < monthEndExclusive) addRevenue(monthlyRevenue, currency, amount);
+      if (occurredDate >= weekStart && occurredDate <= now) addRevenue(weeklyRevenue, currency, amount);
     }
   }
 
+  metrics.revenueByCurrency = revenueArray(monthlyRevenue);
+  metrics.weeklyRevenueByCurrency = revenueArray(weeklyRevenue);
+  metrics.revenueDataStatus = metrics.revenueByCurrency.length > 0 ? "ok" : "no_payments";
+  metrics.checkoutPaymentsStatus = "ok";
+
   const upcomingBookings = nonCancelledBookings
-    .filter((booking) => booking.check_out >= todayIso)
-    .sort((left, right) => left.check_out.localeCompare(right.check_out))
+    .filter((booking) => bookingCheckOut(booking) >= todayIso)
+    .sort((left, right) => bookingCheckOut(left).localeCompare(bookingCheckOut(right)))
     .slice(0, 5);
 
   if (metrics.checkoutPaymentsStatus === "ok") {
@@ -237,7 +287,7 @@ export async function GET() {
       bookingId: booking.id,
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
       guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
-      checkoutDate: formatDateLabel(booking.check_out),
+      checkoutDate: formatDateLabel(bookingCheckOut(booking)),
     }));
   }
 

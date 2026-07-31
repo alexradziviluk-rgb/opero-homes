@@ -43,7 +43,11 @@ export function isProtectedPath(pathname: string) {
 }
 
 export function isClientProtectedPath(pathname: string) {
-  return ["/guest", "/guest/book/new", "/guest/bookings", "/guest/messages"].some((route) =>
+  if (pathname === "/guest") {
+    return true;
+  }
+
+  return ["/guest/book/new", "/guest/bookings", "/guest/messages"].some((route) =>
     pathname === route || pathname.startsWith(`${route}/`),
   );
 }

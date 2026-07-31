@@ -14,6 +14,7 @@ export const NOTIFICATION_EVENT_TYPES: NotificationEventType[] = [
   "maintenance_created",
   "maintenance_completed",
   "booking_changed",
+  "booking_ready_for_checkin",
   "booking_checkin_upcoming",
   "booking_checkout_upcoming",
   "booking_unassigned",

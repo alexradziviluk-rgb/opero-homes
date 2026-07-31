@@ -41,6 +41,97 @@ function getAmenities(apartment: Apartment): string[] {
   return amenities.slice(0, 5);
 }
 
+function ApartmentCard({
+  apartment,
+  bookings,
+  checkIn = "",
+  checkOut = "",
+  guests = "",
+  onShowMap,
+}: {
+  apartment: Apartment;
+  bookings: ReturnType<typeof getBookings>;
+  checkIn?: string;
+  checkOut?: string;
+  guests?: string;
+  onShowMap?: () => void;
+}) {
+  const photoCount = countRenderableApartmentPhotos(apartment);
+  const availableForDates = checkIn && checkOut
+    ? isApartmentAvailableForDates({ apartment, bookings, checkIn, checkOut })
+    : true;
+  const hasCoordinates = getApartmentCoordinates(apartment) !== null;
+  const bookingQuery = `${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`;
+
+  return (
+    <article className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80">
+      <Link href={`/stay/${apartment.id}`} className="block">
+        <div className="relative h-48 w-full bg-slate-800">
+          <ApartmentImage
+            photo={apartment.photos?.[0] ?? apartment.coverPhotoUrl ?? undefined}
+            alt={apartment.title}
+            className="h-full w-full object-cover"
+            placeholderClassName="h-full w-full"
+            placeholderText="Фото недоступно"
+          />
+          {photoCount > 0 ? (
+            <div className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-xs text-slate-200">
+              {`1 / ${photoCount}`}
+            </div>
+          ) : null}
+        </div>
+      </Link>
+
+      <div className="p-4">
+        <h2 className="text-lg font-semibold text-white">
+          <Link href={`/stay/${apartment.id}`} className="hover:text-cyan-200">{apartment.title}</Link>
+        </h2>
+        <p className="mt-1 text-sm text-slate-400">{getApartmentPublicLocation(apartment)}</p>
+        <p className="mt-1 text-sm text-slate-300">{apartment.address || "Адрес уточняется"}</p>
+
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-cyan-300">{formatApartmentPrice(apartment)}</p>
+          <p className="text-xs text-slate-300">{availableForDates ? "Доступно" : "Занято"}</p>
+        </div>
+
+        <p className="mt-2 text-sm text-slate-300">До {apartment.maxGuests} гостей · {apartment.bedrooms} спальни · {apartment.rooms} кровати</p>
+
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          {getAmenities(apartment).map((amenity) => (
+            <span key={amenity} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">{amenity}</span>
+          ))}
+        </div>
+
+        {!availableForDates && checkIn && checkOut ? (
+          <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">Занят на выбранные даты</p>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href={`/stay/${apartment.id}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
+            Посмотреть объект
+          </Link>
+          <Link
+            href={`/stay/${apartment.id}?openBooking=1${bookingQuery}`}
+            className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/20"
+          >
+            Забронировать
+          </Link>
+          {onShowMap ? (
+            <button
+              type="button"
+              disabled={!hasCoordinates}
+              onClick={onShowMap}
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              На карте
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function GuestPropertiesPage() {
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
@@ -246,10 +337,35 @@ export default function GuestPropertiesPage() {
   }
 
   return (
-    <section>
+    <section className="space-y-12">
+      <section aria-labelledby="catalog-heading">
+        <div className="mb-6">
+          <p className="text-sm font-medium text-cyan-300">Курортная недвижимость</p>
+          <h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">Все доступные объекты</h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-300">Откройте любой объект, чтобы посмотреть фотографии, расположение, условия и свободные даты.</p>
+        </div>
+
+        {isLoading ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Загружаем объекты...</div>
+        ) : publicApartments.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {publicApartments.map((apartment) => (
+              <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section id="find-another-property" aria-labelledby="search-heading">
+        <div className="mb-6">
+          <p className="text-sm font-medium text-cyan-300">Другой район или даты</p>
+          <h2 id="search-heading" className="mt-1 text-2xl font-semibold text-white">Не нашли подходящий вариант?</h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-300">Найдите другой объект по району, датам, вместимости и бюджету.</p>
+        </div>
+
       <div className="mb-6 rounded-3xl border border-white/10 bg-slate-900/80 p-6">
-        <h1 className="text-2xl font-semibold text-white">Найти жилье</h1>
-        <p className="mt-2 text-sm text-slate-300">Публичный каталог объектов Opero Homes</p>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-4">
           <label className="lg:col-span-2">
@@ -404,81 +520,23 @@ export default function GuestPropertiesPage() {
         )
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {visibleApartments.map((apartment) => {
-            const photoCount = countRenderableApartmentPhotos(apartment);
-            const availableForDates =
-              checkIn && checkOut
-                ? isApartmentAvailableForDates({ apartment, bookings, checkIn, checkOut })
-                : true;
-            const hasCoordinates = getApartmentCoordinates(apartment) !== null;
-
-            return (
-              <article key={apartment.id} className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80">
-                <div className="relative h-48 w-full bg-slate-800">
-                  <ApartmentImage
-                    photo={apartment.photos?.[0] ?? apartment.coverPhotoUrl ?? undefined}
-                    alt={apartment.title}
-                    className="h-full w-full object-cover"
-                    placeholderClassName="h-full w-full"
-                    placeholderText="Фото недоступно"
-                  />
-                  {photoCount > 0 ? (
-                    <div className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-xs text-slate-200">
-                      {`1 / ${photoCount}`}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="p-4">
-                  <h2 className="text-lg font-semibold text-white">{apartment.title}</h2>
-                  <p className="mt-1 text-sm text-slate-400">{getApartmentPublicLocation(apartment)}</p>
-                  <p className="mt-1 text-sm text-slate-300">{apartment.address || "Адрес уточняется"}</p>
-
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="text-cyan-300">{formatApartmentPrice(apartment)}</p>
-                    <p className="text-xs text-slate-300">{availableForDates ? "Доступно" : "Занято"}</p>
-                  </div>
-
-                  <p className="mt-2 text-sm text-slate-300">До {apartment.maxGuests} гостей · {apartment.bedrooms} спальни · {apartment.rooms} кровати</p>
-
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    {getAmenities(apartment).map((amenity) => (
-                      <span key={amenity} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">{amenity}</span>
-                    ))}
-                  </div>
-
-                  {!availableForDates && checkIn && checkOut ? (
-                    <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">Занят на выбранные даты</p>
-                  ) : null}
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Link href={`/stay/${apartment.id}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
-                      Подробнее
-                    </Link>
-                    <Link
-                      href={`/stay/${apartment.id}?openBooking=1${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`}
-                      className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/20"
-                    >
-                      Забронировать
-                    </Link>
-                    <button
-                      type="button"
-                      disabled={!hasCoordinates}
-                      onClick={() => {
-                        setViewMode("map");
-                        setFocusedApartmentId(apartment.id);
-                      }}
-                      className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Показать на карте
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+          {visibleApartments.map((apartment) => (
+            <ApartmentCard
+              key={apartment.id}
+              apartment={apartment}
+              bookings={bookings}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              guests={guests}
+              onShowMap={() => {
+                setViewMode("map");
+                setFocusedApartmentId(apartment.id);
+              }}
+            />
+          ))}
         </div>
       )}
+      </section>
     </section>
   );
 }

@@ -20,6 +20,7 @@ function eventLabel(eventType: BookingNotificationEventType): string {
   if (eventType === "booking_payment_succeeded") return "Оплата по бронированию успешна";
   if (eventType === "booking_payment_failed") return "Ошибка оплаты бронирования";
   if (eventType === "booking_changed") return "Бронирование изменено";
+  if (eventType === "booking_ready_for_checkin") return "Апартаменты готовы к заселению";
   if (eventType === "new_guest_message") return "Новое сообщение гостя";
   if (eventType === "owner_invitation_accepted") return "Приглашение владельца принято";
   if (eventType === "apartment_published") return "Объект опубликован";
@@ -73,6 +74,10 @@ function formatClientMessage(payload: NotificationQueuePayload, eventType: Booki
 
   if (eventType === "booking_changed") {
     return ["Параметры бронирования обновлены.", ...base].join("\n");
+  }
+
+  if (eventType === "booking_ready_for_checkin") {
+    return ["Ваши апартаменты готовы. Вы можете заселиться.", ...base].join("\n");
   }
 
   return ["Бронирование подтверждено.", ...base].join("\n");

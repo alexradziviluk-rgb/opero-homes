@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import OperationalShell from "@/components/operations/OperationalShell";
 
 const CHECK_IN_ITEMS = [
+  ["apartment_ready", "Апартаменты готовы — уведомить гостя"],
   ["guest_registered", "Гость зарегистрирован"],
   ["documents_verified", "Документы проверены"],
   ["key_handed_over", "Ключ передан"],
