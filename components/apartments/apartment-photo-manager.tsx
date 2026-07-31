@@ -127,7 +127,8 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
         uploaded.push({ ...p, sortOrder: nextOrder } as ApartmentPhoto);
       } catch (e) {
         console.error("Upload failed", file.name, e);
-        validationErrors.push(`${file.name}: не удалось загрузить`);
+        const message = e instanceof Error ? e.message : "неизвестная ошибка";
+        validationErrors.push(`${file.name}: не удалось загрузить (${message})`);
       } finally {
         setUploadProgress((prev) => ({ ...prev, completed: prev.completed + 1 }));
       }
