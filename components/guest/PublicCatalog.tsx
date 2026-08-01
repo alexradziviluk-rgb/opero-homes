@@ -164,7 +164,15 @@ export default function PublicCatalog() {
     }
 
     void load();
-    return () => { cancelled = true; };
+
+    const refreshInterval = window.setInterval(() => {
+      void load();
+    }, 30_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
+    };
   }, []);
 
   const publicApartments = useMemo(() => apartments.filter(isApartmentPublic), [apartments]);
