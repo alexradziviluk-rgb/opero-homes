@@ -44,10 +44,27 @@ const defaultSettings: SettingsDto = {
 };
 
 function eventLabel(eventType: string): string {
-  return eventType
-    .replace("booking_", "")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const labels: Record<string, string> = {
+    booking_created: "Создано",
+    booking_confirmed: "Подтверждено",
+    booking_cancelled: "Отменено",
+    booking_payment_succeeded: "Платёж выполнен",
+    booking_payment_failed: "Ошибка платежа",
+    booking_new_guest_message: "Новое сообщение гостя",
+    booking_owner_invitation_accepted: "Приглашение владельца принято",
+    booking_apartment_published: "Объект опубликован",
+    booking_apartment_unpublished: "Публикация объекта отменена",
+    booking_calendar_conflict: "Конфликт календаря",
+    booking_maintenance_created: "Ремонт создан",
+    booking_maintenance_completed: "Ремонт завершён",
+    booking_changed: "Изменено",
+    booking_ready_for_checkin: "Готово к заезду",
+    booking_checkin_upcoming: "Приближается заезд",
+    booking_checkout_upcoming: "Приближается выезд",
+    booking_unassigned: "Не назначено",
+  };
+
+  return labels[eventType] ?? eventType.replace("booking_", "").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export default function NotificationSettingsPage() {
@@ -269,7 +286,7 @@ export default function NotificationSettingsPage() {
                   <tbody>
                     {filledPrefs.map((item) => (
                       <tr key={item.eventType} className="border-t border-white/5">
-                        <td className="px-3 py-2 text-slate-200">{eventLabel(item.eventType)}</td>
+                        <td className="px-3 py-2 text-slate-200">{translate(eventLabel(item.eventType))}</td>
                         <td className="px-3 py-2">
                           <input
                             type="checkbox"

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import LanguageSwitcher, { useLanguage } from "@/components/LanguageSwitcher";
+import { useAdminText } from "@/lib/i18n/admin";
 
 type HeaderProps = {
   showSearch?: boolean;
@@ -14,6 +15,7 @@ type HeaderProps = {
 export default function Header({ showSearch = true, showNewListing = true, newListingLabel = "+ Добавить объект" }: HeaderProps) {
   const { currentUser, currentUserContext, logout } = useCurrentUser();
   const [language, setLanguage] = useLanguage();
+  const translate = useAdminText();
   const text = {
     ru: { eyebrow: "Обзор операций", welcome: "Добро пожаловать в Opero Homes", search: "Поиск", searchPlaceholder: "Поиск объектов...", logout: "Выйти", guest: "Гость" },
     en: { eyebrow: "Operations overview", welcome: "Welcome to Opero Homes", search: "Search", searchPlaceholder: "Search properties...", logout: "Log out", guest: "Guest" },
@@ -70,7 +72,7 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-white">{displayName}</p>
-              <p className="text-xs text-slate-400">{currentUser?.role ?? text.guest}</p>
+              <p className="text-xs text-slate-400">{currentUser ? translate(currentUser.role) : text.guest}</p>
             </div>
             <button type="button" onClick={handleLogout} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/10">
               {text.logout}
