@@ -5,15 +5,9 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useCurrentUser, getHomeRouteForUser } from "@/components/auth/current-user-provider";
-import {
-  deleteBooking,
-  getBookingById,
-  getBookings,
-  updateBooking,
-} from "@/lib/bookings/booking-repository";
-import { getLocalApartments } from "@/app/apartments/apartment-utils";
+import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
+import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import { bookingsOverlap, findBookingConflict, isBlockingBooking } from "@/lib/bookings/booking-conflicts";
-import { confirmBooking } from "@/lib/bookings/confirm-booking";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import { hasEffectivePermission } from "@/lib/permissions";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
@@ -101,9 +95,8 @@ export default function CalendarPage() {
   const [actionSuccess, setActionSuccess] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [version, setVersion] = useState(0);
-
-  const bookings = useMemo(() => getBookings(), [version]);
-  const apartments = useMemo(() => getLocalApartments(), []);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [apartments, setApartments] = useState<Apartment[]>([]);
 
   const canViewCalendar = currentUser ? hasEffectivePermission(currentUser, "calendar.view") : false;
   const canViewBookings = currentUser ? hasEffectivePermission(currentUser, "bookings.view") : false;
@@ -128,6 +121,18 @@ export default function CalendarPage() {
       router.replace(getHomeRouteForUser(currentUser));
     }
   }, [canViewCalendar, currentUser, isAuthLoading, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([fetchStaffBookings(), loadApartmentsFromSupabase()]).then(([nextBookings, nextApartments]) => {
+      if (cancelled) return;
+      setBookings(nextBookings);
+      setApartments(nextApartments);
+    }).catch(() => {
+      if (!cancelled) setActionError("Не удалось загрузить календарь");
+    });
+    return () => { cancelled = true; };
+  }, [version]);
 
   const days = useMemo(() => {
     const year = cursor.getFullYear();
@@ -155,7 +160,7 @@ export default function CalendarPage() {
     return true;
   });
 
-  const selectedBooking = selectedBookingId ? getBookingById(selectedBookingId) : null;
+  const selectedBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
   function statusColor(booking: Booking): string {
     const status = getBookingStatusPresentation(booking.status).status;
@@ -233,7 +238,6 @@ export default function CalendarPage() {
 
     try {
       await persistBookingStatus(booking, "cancelled");
-      updateBooking(cancelledBooking);
       await emitBookingNotificationEvent("booking_cancelled", cancelledBooking, {
         actionUrl: `/bookings/${booking.id}`,
       });
@@ -256,7 +260,6 @@ export default function CalendarPage() {
 
     try {
       await deleteRemoteBooking(booking.id);
-      deleteBooking(booking.id);
       await emitBookingNotificationEvent("booking_cancelled", booking, {
         idempotencySeed: `deleted:${new Date().toISOString()}`,
         actionUrl: "/bookings",
@@ -280,15 +283,12 @@ export default function CalendarPage() {
 
     try {
       await persistBookingStatus(booking, "confirmed");
-      const result = confirmBooking({
-        bookingId: booking.id,
-        confirmedByUserId: currentUser.id,
-      });
-      const taskWarning = await createRemoteBookingTasks(result.booking);
-      await emitBookingNotificationEvent("booking_confirmed", result.booking, {
+      const confirmedBooking = { ...booking, status: "confirmed" as const, confirmedByUserId: currentUser.id };
+      const taskWarning = await createRemoteBookingTasks(confirmedBooking);
+      await emitBookingNotificationEvent("booking_confirmed", confirmedBooking, {
         actionUrl: `/bookings/${booking.id}`,
       });
-      const warnings = [...result.warnings, ...(taskWarning ? [taskWarning] : [])];
+      const warnings = taskWarning ? [taskWarning] : [];
       const warning = warnings.length > 0 ? ` (${warnings.join("; ")})` : "";
       setActionSuccess(`Бронирование подтверждено${warning}`);
       setVersion((v) => v + 1);

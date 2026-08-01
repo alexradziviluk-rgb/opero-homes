@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -22,6 +22,32 @@ type NotificationApiResponse = {
 type ReadFilter = "all" | "unread" | "read";
 
 const PAGE_SIZE = 10;
+const EVENT_LABELS: Record<string, string> = {
+  booking_created: "Бронирование создано",
+  booking_confirmed: "Бронирование подтверждено",
+  booking_cancelled: "Бронирование отменено",
+  booking_changed: "Бронирование изменено",
+  booking_payment_succeeded: "Оплата получена",
+  booking_payment_failed: "Ошибка оплаты",
+  new_guest_message: "Новое сообщение гостя",
+  owner_invitation_accepted: "Приглашение принято",
+  apartment_published: "Объект опубликован",
+  apartment_unpublished: "Объект снят с публикации",
+  calendar_conflict: "Конфликт календаря",
+  maintenance_created: "Создана заявка на ремонт",
+  maintenance_completed: "Ремонт завершен",
+  booking_ready_for_checkin: "Объект готов к заезду",
+  booking_checkin_upcoming: "Скоро заезд",
+  booking_checkout_upcoming: "Скоро выезд",
+  booking_unassigned: "Бронирование без ответственного",
+};
+
+function readableNotificationMessage(message: string): string {
+  return message
+    .split("\n")
+    .filter((line) => !/^Бронирование:\s*[0-9a-f-]{36}\s*$/i.test(line.trim()))
+    .join("\n");
+}
 
 function normalizeReadFilter(value: string | null): ReadFilter {
   if (value === "unread" || value === "read") {
@@ -47,7 +73,7 @@ export default function NotificationsPage() {
   );
   const [offset, setOffset] = useState(0);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
 
@@ -77,12 +103,12 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [eventType, offset, readFilter]);
 
   useEffect(() => {
     const loadId = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(loadId);
-  }, [offset, readFilter, eventType]);
+  }, [load]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -200,7 +226,7 @@ export default function NotificationsPage() {
                 >
                   <option value="">Все события</option>
                   {NOTIFICATION_EVENT_TYPES.map((item) => (
-                    <option key={item} value={item}>{item}</option>
+                    <option key={item} value={item}>{EVENT_LABELS[item] ?? item}</option>
                   ))}
                 </select>
               </label>
@@ -216,8 +242,8 @@ export default function NotificationsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h2 className="text-base font-semibold text-white">{item.title}</h2>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.25em] text-slate-500">{item.event_type}</p>
-                      <p className="mt-1 whitespace-pre-line text-sm text-slate-300">{item.message}</p>
+                      <p className="mt-1 text-xs text-slate-500">{EVENT_LABELS[item.event_type] ?? "Системное событие"}</p>
+                      <p className="mt-1 whitespace-pre-line text-sm text-slate-300">{readableNotificationMessage(item.message)}</p>
                       <p className="mt-2 text-xs text-slate-500">{new Date(item.created_at).toLocaleString("ru-RU")}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">

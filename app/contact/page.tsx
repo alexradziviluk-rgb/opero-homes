@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function ContactPage() { return <main className="min-h-screen bg-[#f5f3ee] px-5 py-12 text-[#17251f]"><div className="mx-auto max-w-3xl"><Link href="/" className="font-bold">opero.</Link><h1 className="mt-20 text-5xl font-semibold">Contact</h1><p className="mt-6 leading-8 text-[#68766d]">Рабочий шаблон контактной страницы. Добавьте адрес поддержки и юридические реквизиты перед публичным запуском.</p><p className="mt-10 text-sm text-[#b27827]">Содержимое требует проверки владельцем продукта.</p></div></main>; }

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { getBookingById, getBookings, updateBooking } from "@/lib/bookings/booking-repository";
 import { Booking } from "@/types/booking";
 import { findBookingConflict, isBlockingBooking } from "@/lib/bookings/booking-conflicts";
+import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
 
 function formatDate(value: string): string {
@@ -18,13 +18,73 @@ export default function EditBookingPage() {
   const bookingId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
 
-  const [booking] = useState<Booking | null>(() => (bookingId ? getBookingById(bookingId) : null));
-  const [form, setForm] = useState<Booking | null>(() => booking);
-  const loading = false;
-  const notFound = !booking;
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [form, setForm] = useState<Booking | null>(null);
+  const [loading, setLoading] = useState(Boolean(bookingId));
+  const [loadFailed, setLoadFailed] = useState(false);
+  const notFound = !bookingId || loadFailed;
   const [errors, setErrors] = useState<Record<string,string>>({});
+  const [bookings, setBookings] = useState<Booking[]>([]);
 
-  const [bookings] = useState<Booking[]>(() => getBookings());
+  useEffect(() => {
+    if (!bookingId) {
+      return;
+    }
+
+    let cancelled = false;
+    void Promise.all([
+      fetch(`/api/bookings/${bookingId}`, { cache: "no-store" }),
+      fetchStaffBookings(),
+    ]).then(async ([response, allBookings]) => {
+      const payload = (await response.json()) as { ok: boolean; data?: Record<string, unknown> };
+      if (cancelled) return;
+      if (!response.ok || !payload.ok || !payload.data) {
+        setLoadFailed(true);
+        return;
+      }
+
+      const data = payload.data;
+      const loaded: Booking = {
+        id: String(data.id),
+        apartmentId: String(data.apartmentId ?? ""),
+        clientId: String(data.clientId ?? ""),
+        guestName: String(data.guestName ?? ""),
+        guestPhone: String(data.guestPhone ?? ""),
+        guestEmail: String(data.guestEmail ?? ""),
+        checkIn: String(data.checkIn ?? ""),
+        checkOut: String(data.checkOut ?? ""),
+        checkInTime: String(data.checkInTime ?? "15:00"),
+        checkOutTime: String(data.checkOutTime ?? "11:00"),
+        guests: Number(data.guests ?? 1),
+        rentalType: (data.rentalType ?? "daily") as Booking["rentalType"],
+        pricePerPeriod: Number(data.pricePerPeriod ?? 0),
+        periodsCount: 1,
+        accommodationAmount: Number(data.accommodationAmount ?? 0),
+        cleaningFee: Number(data.cleaningFee ?? 0),
+        deposit: Number(data.deposit ?? 0),
+        discount: Number(data.discount ?? 0),
+        totalAmount: Number(data.totalAmount ?? 0),
+        paidAmount: Number(data.paidAmount ?? 0),
+        status: (data.status ?? "pending") as Booking["status"],
+        paymentStatus: (data.paymentStatus ?? "unpaid") as Booking["paymentStatus"],
+        source: (data.source ?? "direct") as Booking["source"],
+        notes: String(data.notes ?? ""),
+        createdAt: String(data.createdAt ?? ""),
+        updatedAt: String(data.updatedAt ?? ""),
+      };
+      setBooking(loaded);
+      setForm(loaded);
+      setBookings(allBookings);
+    }).catch(() => {
+      if (!cancelled) setLoadFailed(true);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId]);
 
   const occupiedRanges = (() => {
     if (!form?.apartmentId) return [];
@@ -108,7 +168,7 @@ export default function EditBookingPage() {
       }
 
       const conflict = findBookingConflict({
-        bookings: getBookings(),
+        bookings,
         apartmentId: form.apartmentId,
         checkIn: form.checkIn,
         checkOut: form.checkOut,
@@ -132,7 +192,7 @@ export default function EditBookingPage() {
     if (!validate()) return;
 
     const conflict = findBookingConflict({
-      bookings: getBookings(),
+      bookings,
       apartmentId: form.apartmentId,
       checkIn: form.checkIn,
       checkOut: form.checkOut,
@@ -147,7 +207,26 @@ export default function EditBookingPage() {
       return;
     }
 
-    updateBooking(form);
+    const response = await fetch(`/api/bookings/${booking.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: form.status,
+        guestName: form.guestName,
+        guestPhone: form.guestPhone,
+        guestEmail: form.guestEmail,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        checkInTime: form.checkInTime,
+        checkOutTime: form.checkOutTime,
+        notes: form.notes,
+      }),
+    });
+    const payload = (await response.json()) as { ok: boolean; error?: string };
+    if (!response.ok || !payload.ok) {
+      setErrors({ form: payload.error ?? "Не удалось сохранить бронирование" });
+      return;
+    }
     await emitBookingNotificationEvent("booking_changed", form, {
       actionUrl: `/bookings/${booking.id}`,
     });
@@ -218,6 +297,14 @@ export default function EditBookingPage() {
                 <label>
                   <div className="text-sm text-slate-300">Выезд</div>
                   <input type="date" value={form.checkOut} onChange={(e) => update("checkOut", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                </label>
+                <label>
+                  <div className="text-sm text-slate-300">Время заезда</div>
+                  <input type="time" value={form.checkInTime ?? "15:00"} onChange={(e) => update("checkInTime", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                </label>
+                <label>
+                  <div className="text-sm text-slate-300">Время выезда</div>
+                  <input type="time" value={form.checkOutTime ?? "11:00"} onChange={(e) => update("checkOutTime", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
                 </label>
                 <label className="sm:col-span-2">
                   <div className="text-sm text-slate-300">Примечания</div>

@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { deleteBooking, getBookings } from "@/lib/bookings/booking-repository";
-import { confirmBooking } from "@/lib/bookings/confirm-booking";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import { hasEffectivePermission } from "@/lib/permissions";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
@@ -13,77 +11,11 @@ import { Booking } from "@/types/booking";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
 import { deleteRemoteBooking, persistBookingStatus } from "@/lib/bookings/remote-bookings";
 import { createRemoteBookingTasks } from "@/lib/bookings/remote-booking-tasks";
-
-type BookingListRecord = {
-  id: string;
-  apartmentId: string | null;
-  apartmentTitle: string;
-  guestName: string;
-  checkIn: string;
-  checkOut: string;
-  guests: number;
-  totalAmount: number | null;
-  status: string | null;
-  paymentStatus: string | null;
-  source: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type BookingListResponse =
-  | { ok: true; data: BookingListRecord[] }
-  | { ok: false; error?: string };
-
-async function fetchBookings(): Promise<Booking[]> {
-  const response = await fetch("/api/bookings");
-  const payload = (await response.json()) as BookingListResponse;
-
-  if (!response.ok || !payload.ok) {
-    return [];
-  }
-
-  const remoteBookings: Booking[] = payload.data.map((booking) => ({
-    id: booking.id,
-    apartmentId: booking.apartmentId ?? "",
-    clientId: "",
-    guestName: booking.guestName,
-    guestPhone: "",
-    guestEmail: "",
-    checkIn: booking.checkIn,
-    checkOut: booking.checkOut,
-    guests: booking.guests,
-    rentalType: "daily",
-    pricePerPeriod: 0,
-    periodsCount: 0,
-    accommodationAmount: 0,
-    cleaningFee: 0,
-    deposit: 0,
-    discount: 0,
-    totalAmount: booking.totalAmount ?? 0,
-    paidAmount: 0,
-    status: (booking.status ?? "pending") as Booking["status"],
-    paymentStatus: (booking.paymentStatus ?? "unpaid") as Booking["paymentStatus"],
-    source: (booking.source ?? "website") as Booking["source"],
-    notes: booking.notes ?? "",
-    createdAt: booking.createdAt,
-    updatedAt: booking.updatedAt,
-  }));
-
-  const localBookings = getBookings();
-  const localById = new Map(localBookings.map((booking) => [booking.id, booking]));
-  const mergedRemote = remoteBookings.map((booking) => {
-    const local = localById.get(booking.id);
-    if (!local) return booking;
-    return { ...booking, ...local, status: booking.status, updatedAt: booking.updatedAt };
-  });
-  const remoteIds = new Set(remoteBookings.map((booking) => booking.id));
-  return [...localBookings.filter((booking) => !remoteIds.has(booking.id)), ...mergedRemote];
-}
+import { fetchStaffBookings, type StaffBooking } from "@/lib/bookings/staff-bookings";
 
 export default function BookingsPage() {
   const { currentUser } = useCurrentUser();
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<StaffBooking[]>([]);
   const [statusFilter, setStatusFilter] = useState<string | null>(() =>
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status"),
   );
@@ -101,7 +33,7 @@ export default function BookingsPage() {
   async function reloadBookings() {
     setLoading(true);
     try {
-      setBookings(await fetchBookings());
+      setBookings(await fetchStaffBookings());
     } finally {
       setLoading(false);
     }
@@ -116,19 +48,17 @@ export default function BookingsPage() {
       setStatusFilter(params.get("status"));
     }
 
-    void fetchBookings().then((items) => {
+    void fetchStaffBookings().then((items) => {
       if (!cancelled) {
         setBookings(items);
         setLoading(false);
       }
     });
 
-    window.addEventListener("opero-bookings-changed", handleUpdate);
     window.addEventListener("storage", handleUpdate);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("opero-bookings-changed", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };
   }, []);
@@ -137,7 +67,6 @@ export default function BookingsPage() {
     if (!confirm("Удалить бронирование?")) return;
     try {
       await deleteRemoteBooking(booking.id);
-      deleteBooking(booking.id);
       await emitBookingNotificationEvent("booking_cancelled", booking, {
         idempotencySeed: `deleted:${new Date().toISOString()}`,
         actionUrl: "/bookings",
@@ -160,16 +89,12 @@ export default function BookingsPage() {
 
     try {
       await persistBookingStatus(booking, "confirmed");
-      const result = confirmBooking({
-        bookingId: booking.id,
-        confirmedByUserId: currentUser.id,
-      });
-      const taskWarning = await createRemoteBookingTasks(result.booking);
-      await emitBookingNotificationEvent("booking_confirmed", result.booking, {
+      const confirmedBooking: Booking = { ...booking, status: "confirmed", confirmedByUserId: currentUser.id };
+      const taskWarning = await createRemoteBookingTasks(confirmedBooking);
+      await emitBookingNotificationEvent("booking_confirmed", confirmedBooking, {
         actionUrl: `/bookings/${booking.id}`,
       });
-      const warnings = [...result.warnings, ...(taskWarning ? [taskWarning] : [])];
-      const warning = warnings.length > 0 ? ` (${warnings.join("; ")})` : "";
+      const warning = taskWarning ? ` (${taskWarning})` : "";
       setActionMessage(`Бронирование подтверждено${warning}`);
       reloadBookings();
     } catch {
@@ -203,12 +128,9 @@ export default function BookingsPage() {
     for (const booking of targets) {
       try {
         await persistBookingStatus(booking, "confirmed");
-        const result = confirmBooking({
-          bookingId: booking.id,
-          confirmedByUserId: currentUser.id,
-        });
-        await createRemoteBookingTasks(result.booking);
-        await emitBookingNotificationEvent("booking_confirmed", result.booking, {
+        const confirmedBooking: Booking = { ...booking, status: "confirmed", confirmedByUserId: currentUser.id };
+        await createRemoteBookingTasks(confirmedBooking);
+        await emitBookingNotificationEvent("booking_confirmed", confirmedBooking, {
           actionUrl: `/bookings/${booking.id}`,
         });
         confirmedCount += 1;
@@ -222,8 +144,6 @@ export default function BookingsPage() {
     setActionMessage(`Подтверждено: ${confirmedCount}. Ошибок: ${failedCount}.`);
     reloadBookings();
   }
-
-  const findApartment = (id: string) => id;
 
   const visibleBookings = useMemo(() => {
     if (!pendingOnly) {
@@ -337,7 +257,7 @@ export default function BookingsPage() {
                           </td>
                         ) : null}
                         <td className="px-3 py-2">{b.guestName}</td>
-                        <td className="px-3 py-2">{findApartment(b.apartmentId)}</td>
+                        <td className="px-3 py-2">{b.apartmentTitle}</td>
                         <td className="px-3 py-2">{new Date(b.checkIn).toLocaleDateString()}</td>
                         <td className="px-3 py-2">{new Date(b.checkOut).toLocaleDateString()}</td>
                         <td className="px-3 py-2">{b.guests}</td>

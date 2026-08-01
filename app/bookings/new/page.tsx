@@ -1,14 +1,14 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
-import { getLocalApartments } from "@/app/apartments/apartment-utils";
 import { Booking } from "@/types/booking";
 import type { Apartment } from "@/types/apartment";
-import { getBookings, saveBooking } from "@/lib/bookings/booking-repository";
+import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
+import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import { findBookingConflict, isBlockingBooking } from "@/lib/bookings/booking-conflicts";
 import { createClient, getClients } from "@/lib/clients/client-repository";
 import { userRepository } from "@/lib/repositories/users";
@@ -29,12 +29,18 @@ function formatDate(value: string): string {
 function applyApartmentDefaults(form: Partial<Booking>, apartment: Apartment | undefined): Partial<Booking> {
   if (!apartment) return form;
 
+  const allowedTypes = (["daily", "weekly", "monthly"] as const).filter((type) => apartment.rentalTypes[type]);
+  const rentalType = form.rentalType && allowedTypes.includes(form.rentalType) ? form.rentalType : allowedTypes[0];
+  const priceByType = {
+    daily: apartment.dailyPrice,
+    weekly: apartment.weeklyPrice,
+    monthly: apartment.monthlyPrice,
+  };
+
   return {
     ...form,
-    pricePerPeriod:
-      form.rentalType === "daily" && apartment.dailyPrice != null
-        ? apartment.dailyPrice
-        : form.pricePerPeriod,
+    rentalType,
+    pricePerPeriod: rentalType ? priceByType[rentalType] ?? 0 : 0,
     cleaningFee: apartment.cleaningFee ?? form.cleaningFee,
     deposit: apartment.deposit ?? form.deposit,
     guests: Math.min(form.guests ?? 1, apartment.maxGuests ?? 999),
@@ -49,8 +55,8 @@ function NewBookingPageContent() {
   const checkInFromUrl = searchParams.get("checkIn") ?? "";
   const checkOutFromUrl = searchParams.get("checkOut") ?? "";
 
-  const [apartments] = useState<Apartment[]>(() => getLocalApartments());
-  const [bookings] = useState<Booking[]>(() => getBookings());
+  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [clients, setClients] = useState<Client[]>(() => getClients());
   const [quickClient, setQuickClient] = useState<ClientDraft>(initialClientDraft);
   const [showQuickClientForm, setShowQuickClientForm] = useState(false);
@@ -63,6 +69,8 @@ function NewBookingPageContent() {
     guestEmail: "",
     checkIn: checkInFromUrl,
     checkOut: checkOutFromUrl,
+    checkInTime: "15:00",
+    checkOutTime: "11:00",
     guests: 1,
     rentalType: "daily",
     pricePerPeriod: 0,
@@ -73,10 +81,27 @@ function NewBookingPageContent() {
     status: "pending",
     source: "direct",
     notes: "",
-  }, apartments.find((apartment) => apartment.id === apartmentIdFromUrl)));
+  }, undefined));
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isComplimentary, setIsComplimentary] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([loadApartmentsFromSupabase(), fetchStaffBookings()]).then(([nextApartments, nextBookings]) => {
+      if (cancelled) return;
+      setApartments(nextApartments);
+      setBookings(nextBookings);
+      setForm((current) => applyApartmentDefaults(current, nextApartments.find((apartment) => apartment.id === current.apartmentId)));
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const selectedApartment = apartments.find((apartment) => apartment.id === form.apartmentId);
+  const allowedRentalTypes = selectedApartment
+    ? (["daily", "weekly", "monthly"] as const).filter((type) => selectedApartment.rentalTypes[type])
+    : [];
 
   const selectedClient = useMemo(
     () => clients.find((client) => client.id === form.clientId) ?? null,
@@ -179,12 +204,13 @@ function NewBookingPageContent() {
     if (form.checkOut && form.checkOut < todayIso) e.checkOut = "Нельзя выбрать прошедшую дату";
     if (form.checkIn && form.checkOut && new Date(form.checkOut) <= new Date(form.checkIn)) e.dates = "Дата выезда должна быть позже даты заезда";
     if (!form.guests || Number(form.guests) < 1) e.guests = "Кол-во гостей должно быть не меньше 1";
-    if (typeof form.pricePerPeriod === "number" && form.pricePerPeriod < 0) e.pricePerPeriod = "Цена не может быть отрицательной";
+    if (form.rentalType && !allowedRentalTypes.includes(form.rentalType)) e.rentalType = "Этот тип аренды недоступен для объекта";
+    if ((Number(form.pricePerPeriod) || 0) <= 0 && !isComplimentary) e.pricePerPeriod = "Укажите цену или подтвердите бесплатное размещение";
 
     // conflict check against current snapshot of bookings
     if (form.apartmentId && form.checkIn && form.checkOut) {
       const conflict = findBookingConflict({
-        bookings: getBookings(),
+        bookings,
         apartmentId: form.apartmentId,
         checkIn: form.checkIn,
         checkOut: form.checkOut,
@@ -228,7 +254,7 @@ function NewBookingPageContent() {
 
     if (form.apartmentId && form.checkIn && form.checkOut) {
       const conflict = findBookingConflict({
-        bookings: getBookings(),
+        bookings,
         apartmentId: form.apartmentId,
         checkIn: form.checkIn,
         checkOut: form.checkOut,
@@ -257,6 +283,8 @@ function NewBookingPageContent() {
       guestEmail: form.guestEmail || "",
       checkIn: form.checkIn || now,
       checkOut: form.checkOut || now,
+      checkInTime: form.checkInTime || "15:00",
+      checkOutTime: form.checkOutTime || "11:00",
       guests: Number(form.guests) || 1,
       rentalType,
       pricePerPeriod: Number(form.pricePerPeriod) || 0,
@@ -267,6 +295,7 @@ function NewBookingPageContent() {
       discount: Number(form.discount) || 0,
       totalAmount: amounts.totalAmount,
       paidAmount: Number(form.paidAmount) || 0,
+      complimentary: isComplimentary,
       status,
       paymentStatus: amounts.paymentStatus,
       source,
@@ -315,8 +344,6 @@ function NewBookingPageContent() {
       }
       return;
     }
-
-    saveBooking(booking);
 
     await emitBookingNotificationEvent("booking_created", booking, {
       actionUrl: `/bookings/${booking.id}`,
@@ -455,10 +482,12 @@ function NewBookingPageContent() {
                   <label>
                     <div className="text-sm text-slate-300">Тип аренды</div>
                     <select value={form.rentalType} onChange={(e) => update("rentalType", e.target.value as Booking["rentalType"])} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
-                      <option value="daily">Посуточно</option>
-                      <option value="weekly">Понедельная</option>
-                      <option value="monthly">Помесячная</option>
+                      {allowedRentalTypes.length === 0 ? <option value="">Сначала выберите объект</option> : null}
+                      {allowedRentalTypes.includes("daily") ? <option value="daily">Посуточно</option> : null}
+                      {allowedRentalTypes.includes("weekly") ? <option value="weekly">Понедельная</option> : null}
+                      {allowedRentalTypes.includes("monthly") ? <option value="monthly">Помесячная</option> : null}
                     </select>
+                    {errors.rentalType ? <p className="text-rose-400 text-sm">{errors.rentalType}</p> : null}
                   </label>
 
                   <label>
@@ -466,6 +495,13 @@ function NewBookingPageContent() {
                     <input type="number" min={0} inputMode="decimal" value={form.pricePerPeriod ?? ""} onChange={(e) => update("pricePerPeriod", Number(e.target.value))} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
                     {errors.pricePerPeriod ? <p className="text-rose-400 text-sm">{errors.pricePerPeriod}</p> : null}
                   </label>
+
+                  {(Number(form.pricePerPeriod) || 0) === 0 ? (
+                    <label className="flex items-center gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                      <input type="checkbox" checked={isComplimentary} onChange={(event) => setIsComplimentary(event.target.checked)} />
+                      Подтверждаю бесплатное размещение
+                    </label>
+                  ) : null}
 
                   <div className="grid gap-4 sm:grid-cols-3">
                     <label>
@@ -505,14 +541,13 @@ function NewBookingPageContent() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label>
                       <div className="text-sm text-slate-300">Время заезда</div>
-                      <input type="time" disabled value="15:00" className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-400 outline-none" />
+                      <input type="time" value={form.checkInTime ?? "15:00"} onChange={(event) => update("checkInTime", event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
                     </label>
                     <label>
                       <div className="text-sm text-slate-300">Время выезда</div>
-                      <input type="time" disabled value="11:00" className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-400 outline-none" />
+                      <input type="time" value={form.checkOutTime ?? "11:00"} onChange={(event) => update("checkOutTime", event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
                     </label>
                   </div>
-                  <p className="text-xs text-slate-500">Точное время заезда/выезда пока отображается как справочное и не сохраняется в модели.</p>
 
                   <label>
                     <div className="text-sm text-slate-300">Примечания</div>

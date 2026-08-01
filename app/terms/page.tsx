@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function TermsPage() { return <main className="min-h-screen bg-[#f5f3ee] px-5 py-12 text-[#17251f]"><div className="mx-auto max-w-3xl"><Link href="/" className="font-bold">opero.</Link><h1 className="mt-20 text-5xl font-semibold">Terms</h1><p className="mt-6 leading-8 text-[#68766d]">Рабочий шаблон условий использования Opero Homes: аккаунты, trial, обязанности клиента и порядок прекращения доступа.</p><p className="mt-10 text-sm text-[#b27827]">Рабочий шаблон, не окончательная юридическая консультация.</p></div></main>; }

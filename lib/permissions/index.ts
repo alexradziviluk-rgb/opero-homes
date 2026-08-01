@@ -73,6 +73,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "checkins.view",
     "checkins.manage",
     "users.view",
+    "users.manage",
+    "users.invite",
+    "users.assignRole",
     "apartments.view",
     "apartments.manage",
     "calendar.view",
@@ -100,7 +103,8 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
 }
 
 export function getEffectivePermissions(user: User): Permission[] {
-  const base = ROLE_PERMISSIONS[user.role] ?? [];
+  const roles = [user.role, ...(user.additionalRoles ?? [])];
+  const base = roles.flatMap((role) => ROLE_PERMISSIONS[role] ?? []);
   const additional = user.additionalPermissions ?? [];
   const denied = new Set(user.deniedPermissions ?? []);
 

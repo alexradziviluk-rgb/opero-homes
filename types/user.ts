@@ -64,6 +64,7 @@ export type User = {
   avatarUrl: string | null;
   language: string;
   notes: string;
+  additionalRoles?: UserRole[];
   clientId?: string;
   invitedByUserId?: string;
   approvedByUserId?: string;

@@ -154,7 +154,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       return pathname === route || pathname.startsWith(`${route}/`);
     };
 
-    const authRoutes = ["/login", "/admin/login", "/guest/login", "/guest/register", "/forgot-password", "/reset-password"];
+    const authRoutes = ["/login", "/admin/login", "/guest/login", "/guest/register", "/register", "/forgot-password", "/reset-password"];
     const isAuthRoute = authRoutes.includes(pathname);
     const internalRoots = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users"];
     const isInternalRoute = internalRoots.some((route) => routeMatches(route));

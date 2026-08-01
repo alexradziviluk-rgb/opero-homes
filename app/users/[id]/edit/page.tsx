@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import {
+  ADDITIONAL_ORGANIZATION_ROLE_CODES,
   MANAGEABLE_ORGANIZATION_ROLE_CODES,
+  type AdditionalOrganizationRoleCode,
   type ManageableMemberStatus,
   type ManageableOrganizationRoleCode,
   type OrganizationUser,
@@ -24,6 +26,7 @@ type EditForm = {
   lastName: string;
   phone: string;
   roleCode: ManageableOrganizationRoleCode;
+  additionalRoleCodes: AdditionalOrganizationRoleCode[];
   status: ManageableMemberStatus;
 };
 
@@ -66,6 +69,7 @@ export default function EditUserPage() {
         lastName: found.lastName,
         phone: found.phone,
         roleCode: found.roleCode,
+        additionalRoleCodes: found.additionalRoleCodes,
         status: found.status === "active" ? "active" : "paused",
       });
       setIsLoading(false);
@@ -122,8 +126,28 @@ export default function EditUserPage() {
                   <label><span className="text-sm text-slate-300">Фамилия</span><input required value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none" /></label>
                   <label><span className="text-sm text-slate-300">Email</span><input readOnly value={user.email} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-400 outline-none" /></label>
                   <label><span className="text-sm text-slate-300">Телефон</span><input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none" /></label>
-                  <label><span className="text-sm text-slate-300">Роль</span><select value={form.roleCode} onChange={(event) => setForm({ ...form, roleCode: event.target.value as ManageableOrganizationRoleCode })} className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none">{MANAGEABLE_ORGANIZATION_ROLE_CODES.map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label>
+                  <label><span className="text-sm text-slate-300">Основная роль</span><select value={form.roleCode} onChange={(event) => { const roleCode = event.target.value as ManageableOrganizationRoleCode; setForm({ ...form, roleCode, additionalRoleCodes: form.additionalRoleCodes.filter((role) => role !== roleCode) }); }} className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none">{MANAGEABLE_ORGANIZATION_ROLE_CODES.map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label>
                   <label><span className="text-sm text-slate-300">Статус</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ManageableMemberStatus })} className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none"><option value="active">Активен</option><option value="paused">Приостановлен</option></select></label>
+                  <fieldset className="sm:col-span-2">
+                    <legend className="text-sm text-slate-300">Дополнительные роли</legend>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {ADDITIONAL_ORGANIZATION_ROLE_CODES.filter((role) => role !== form.roleCode).map((role) => (
+                        <label key={role} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={form.additionalRoleCodes.includes(role)}
+                            onChange={(event) => setForm({
+                              ...form,
+                              additionalRoleCodes: event.target.checked
+                                ? [...form.additionalRoleCodes, role]
+                                : form.additionalRoleCodes.filter((item) => item !== role),
+                            })}
+                          />
+                          {roleLabels[role]}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                 </div>
 
                 {error ? <p className="mt-4 text-sm text-rose-400">{error}</p> : null}

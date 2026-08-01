@@ -384,7 +384,8 @@ async function resolveCurrentUserFromAuthUser(authUser: SupabaseAuthUser | null)
 
   const organizationId = loaded.context.organization?.id ?? "";
   const roleCode = loaded.context.organizationMember?.role_code ?? "guest";
-  const currentUser = mapProfileToCurrentUser(loaded.context.profile, organizationId, roleCode);
+  const additionalRoleCodes = loaded.context.organizationMember?.additional_role_codes ?? [];
+  const currentUser = mapProfileToCurrentUser(loaded.context.profile, organizationId, roleCode, additionalRoleCodes);
 
   if (!currentUser) {
     return {

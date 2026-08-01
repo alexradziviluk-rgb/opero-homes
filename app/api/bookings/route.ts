@@ -7,9 +7,17 @@ type CreateBookingPayload = {
   id?: string;
   apartmentId?: string;
   guestName?: string;
+  guestPhone?: string;
+  guestEmail?: string;
   checkIn?: string;
   checkOut?: string;
-  totalAmount?: number;
+  checkInTime?: string;
+  checkOutTime?: string;
+  guests?: number;
+  rentalType?: string;
+  discount?: number;
+  paidAmount?: number;
+  complimentary?: boolean;
   status?: string;
   paymentStatus?: string;
   source?: string;
@@ -18,6 +26,7 @@ type CreateBookingPayload = {
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in"]);
 const PAYMENT_STATUSES = new Set(["unpaid", "partially_paid", "paid", "refunded"]);
 const MANAGER_ROLES = new Set(["owner", "manager"]);
+const RENTAL_TYPES = new Set(["daily", "weekly", "monthly"]);
 
 function error(status: number, message: string, code?: string) {
   return NextResponse.json({ ok: false, error: message, code }, { status });
@@ -51,7 +60,9 @@ export async function GET() {
   }
 
   const apartmentIds = Array.from(new Set((bookings ?? []).map((booking) => booking.apartment_id).filter(Boolean)));
+  const guestIds = Array.from(new Set((bookings ?? []).map((booking) => booking.primary_guest_id).filter(Boolean)));
   const apartmentTitleById = new Map<string, string>();
+  const guestById = new Map<string, { name: string; phone: string | null; email: string | null }>();
 
   if (apartmentIds.length > 0) {
     const { data: apartments } = await supabase
@@ -64,27 +75,55 @@ export async function GET() {
     });
   }
 
+  if (guestIds.length > 0) {
+    const { data: guests } = await supabase
+      .from("guests")
+      .select("id,first_name,last_name,phone,email")
+      .in("id", guestIds as string[]);
+
+    (guests ?? []).forEach((guest) => {
+      guestById.set(guest.id as string, {
+        name: `${guest.first_name ?? ""} ${guest.last_name ?? ""}`.trim() || "Гость",
+        phone: guest.phone ?? null,
+        email: guest.email ?? null,
+      });
+    });
+  }
+
   return NextResponse.json({
     ok: true,
-    data: (bookings ?? []).map((booking) => ({
+    data: (bookings ?? []).map((booking) => {
+      const guest = booking.primary_guest_id ? guestById.get(booking.primary_guest_id) : undefined;
+      return {
       id: booking.id,
+      bookingNumber: booking.booking_number ?? `Бронь ${String(booking.id).slice(0, 8)}`,
       apartmentId: booking.apartment_id,
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
       clientId: booking.client_id ?? null,
-      guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
-      guestPhone: "guest_phone" in booking ? booking.guest_phone : null,
-      guestEmail: "guest_email" in booking ? booking.guest_email : null,
+      guestName: booking.guest_name ?? booking.customer_name ?? guest?.name ?? "Гость",
+      guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,
+      guestEmail: ("guest_email" in booking ? booking.guest_email : null) ?? guest?.email ?? null,
       checkIn: booking.check_in ?? booking.check_in_date,
       checkOut: booking.check_out ?? booking.check_out_date,
-      guests: "guests" in booking && typeof booking.guests === "number" ? booking.guests : 1,
+      checkInTime: booking.check_in_time ?? null,
+      checkOutTime: booking.check_out_time ?? null,
+      guests: typeof booking.guests === "number" ? booking.guests : typeof booking.adults === "number" ? booking.adults : 1,
+      rentalType: booking.rental_type ?? null,
+      pricePerPeriod: booking.price_per_period ?? booking.nightly_rate ?? null,
+      accommodationAmount: booking.accommodation_amount ?? booking.accommodation_total ?? null,
+      cleaningFee: booking.cleaning_fee ?? null,
+      deposit: booking.deposit ?? booking.security_deposit ?? null,
+      discount: booking.discount ?? null,
       totalAmount: booking.total_amount,
+      paidAmount: booking.paid_amount ?? booking.amount_paid ?? null,
       status: booking.status,
       paymentStatus: booking.payment_status,
       source: booking.source,
       notes: "notes" in booking ? booking.notes : null,
       createdAt: booking.created_at,
       updatedAt: booking.updated_at,
-    })),
+      };
+    }),
   });
 }
 
@@ -104,6 +143,9 @@ export async function POST(request: Request) {
   const guestName = body?.guestName?.trim() ?? "";
   const checkIn = body?.checkIn?.trim() ?? "";
   const checkOut = body?.checkOut?.trim() ?? "";
+  const checkInTime = body?.checkInTime?.trim() || "15:00";
+  const checkOutTime = body?.checkOutTime?.trim() || "11:00";
+  const rentalType = body?.rentalType?.trim() ?? "";
   const status = body?.status?.trim() ?? "pending";
   const paymentStatus = body?.paymentStatus?.trim() ?? "unpaid";
   const source = body?.source?.trim() ?? "direct";
@@ -114,8 +156,47 @@ export async function POST(request: Request) {
   if (!BOOKING_STATUSES.has(status) || !PAYMENT_STATUSES.has(paymentStatus)) {
     return error(400, "Invalid booking status");
   }
+  if (!RENTAL_TYPES.has(rentalType)) {
+    return error(400, "Invalid rental type", "invalid_rental_type");
+  }
 
   const organizationId = auth.context.organization.id;
+  const { data: apartment, error: apartmentError } = await supabase
+    .from("apartments")
+    .select("id,rental_types,daily_price,weekly_price,monthly_price,cleaning_fee,deposit")
+    .eq("organization_id", organizationId)
+    .eq("id", apartmentId)
+    .maybeSingle();
+
+  if (apartmentError) return error(422, apartmentError.message, apartmentError.code);
+  if (!apartment) return error(404, "Apartment not found", "apartment_not_found");
+
+  const rentalTypes = (apartment.rental_types ?? {}) as Record<string, boolean>;
+  if (!rentalTypes[rentalType]) {
+    return error(400, "Rental type is not enabled for this apartment", "rental_type_not_allowed");
+  }
+
+  const configuredPrices: Record<string, number | null> = {
+    daily: apartment.daily_price,
+    weekly: apartment.weekly_price,
+    monthly: apartment.monthly_price,
+  };
+  const complimentary = body?.complimentary === true;
+  const configuredPrice = Number(configuredPrices[rentalType] ?? 0);
+  if ((!Number.isFinite(configuredPrice) || configuredPrice <= 0) && !complimentary) {
+    return error(400, "A positive configured price or complimentary confirmation is required", "price_required");
+  }
+
+  const pricePerPeriod = complimentary ? 0 : configuredPrice;
+  const nights = Math.max(0, Math.ceil((Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86_400_000));
+  const periodsCount = rentalType === "daily" ? nights : rentalType === "weekly" ? Math.ceil(nights / 7) : Math.ceil(nights / 30);
+  const accommodationAmount = pricePerPeriod * periodsCount;
+  const cleaningFee = Math.max(0, Number(apartment.cleaning_fee ?? 0));
+  const deposit = Math.max(0, Number(apartment.deposit ?? 0));
+  const discount = Math.max(0, Number(body?.discount ?? 0));
+  const paidAmount = Math.max(0, Number(body?.paidAmount ?? 0));
+  const totalAmount = Math.max(0, accommodationAmount + cleaningFee + deposit - discount);
+  const derivedPaymentStatus = paidAmount <= 0 ? "unpaid" : paidAmount < totalAmount ? "partially_paid" : "paid";
   const modernConflict = await supabase
     .from("bookings")
     .select("id,check_in,check_out")
@@ -156,8 +237,22 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
-  const totalAmount = typeof body?.totalAmount === "number" && Number.isFinite(body.totalAmount) ? body.totalAmount : 0;
-  const bookingRow: Record<string, string | number> = usesLegacyDates
+  const commercialTerms = {
+    guest_name: guestName,
+    guest_phone: body?.guestPhone?.trim() ?? "",
+    guest_email: body?.guestEmail?.trim() ?? "",
+    check_in_time: checkInTime,
+    check_out_time: checkOutTime,
+    rental_type: rentalType,
+    price_per_period: pricePerPeriod,
+    accommodation_amount: accommodationAmount,
+    cleaning_fee: cleaningFee,
+    deposit,
+    discount,
+    paid_amount: paidAmount,
+    complimentary,
+  };
+  const bookingRow: Record<string, string | number | boolean> = usesLegacyDates
     ? {
         id,
         booking_number: `MAN-${id.slice(0, 8).toUpperCase()}`,
@@ -165,26 +260,32 @@ export async function POST(request: Request) {
         apartment_id: apartmentId,
         check_in_date: checkIn,
         check_out_date: checkOut,
+        adults: Math.max(1, Number(body?.guests ?? 1)),
+        nightly_rate: pricePerPeriod,
+        accommodation_total: accommodationAmount,
+        security_deposit: deposit,
         total_amount: totalAmount,
         status,
-        payment_status: paymentStatus,
+        payment_status: derivedPaymentStatus,
         source,
         created_at: now,
         updated_at: now,
+        ...commercialTerms,
       }
     : {
         id,
         organization_id: organizationId,
         apartment_id: apartmentId,
-        guest_name: guestName,
         check_in: checkIn,
         check_out: checkOut,
+        guests: Math.max(1, Number(body?.guests ?? 1)),
         total_amount: totalAmount,
         status,
-        payment_status: paymentStatus,
+        payment_status: derivedPaymentStatus,
         source,
         created_at: now,
         updated_at: now,
+        ...commercialTerms,
       };
   const { data, error: insertError } = await supabase
     .from("bookings")

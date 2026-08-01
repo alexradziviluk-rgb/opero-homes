@@ -69,8 +69,8 @@ as $$
   select
     b.id,
     b.apartment_id,
-    b.check_in_date,
-    b.check_out_date,
+    b.check_in,
+    b.check_out,
     b.status
   from public.bookings b
   join public.apartments a on a.id = b.apartment_id
@@ -110,36 +110,56 @@ $$;
 revoke all on function public.can_guest_book_apartment(uuid, uuid) from public;
 grant execute on function public.can_guest_book_apartment(uuid, uuid) to authenticated;
 
-drop policy if exists guests_select_own on public.guests;
-create policy guests_select_own on public.guests
-  for select
-  to authenticated
-  using (id = auth.uid());
+-- The remote schema includes guests and primary_guest_id. The local schema
+-- snapshot does not, so apply these policies only when their dependencies exist.
+do $$
+begin
+  if to_regclass('public.guests') is not null then
+    execute $sql$
+      drop policy if exists guests_select_own on public.guests;
+      create policy guests_select_own on public.guests
+        for select
+        to authenticated
+        using (id = auth.uid());
 
-drop policy if exists guests_insert_own on public.guests;
-create policy guests_insert_own on public.guests
-  for insert
-  to authenticated
-  with check (id = auth.uid());
+      drop policy if exists guests_insert_own on public.guests;
+      create policy guests_insert_own on public.guests
+        for insert
+        to authenticated
+        with check (id = auth.uid());
 
-drop policy if exists guests_update_own on public.guests;
-create policy guests_update_own on public.guests
-  for update
-  to authenticated
-  using (id = auth.uid())
-  with check (id = auth.uid());
+      drop policy if exists guests_update_own on public.guests;
+      create policy guests_update_own on public.guests
+        for update
+        to authenticated
+        using (id = auth.uid())
+        with check (id = auth.uid());
+    $sql$;
+  end if;
 
-drop policy if exists bookings_select_own on public.bookings;
-create policy bookings_select_own on public.bookings
-  for select
-  to authenticated
-  using (primary_guest_id = auth.uid());
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'bookings'
+      and column_name = 'primary_guest_id'
+  ) then
+    execute $sql$
+      drop policy if exists bookings_select_own on public.bookings;
+      create policy bookings_select_own on public.bookings
+        for select
+        to authenticated
+        using (primary_guest_id = auth.uid());
 
-drop policy if exists bookings_insert_own on public.bookings;
-create policy bookings_insert_own on public.bookings
-  for insert
-  to authenticated
-  with check (
-    primary_guest_id = auth.uid()
-    and public.can_guest_book_apartment(apartment_id, organization_id)
-  );
+      drop policy if exists bookings_insert_own on public.bookings;
+      create policy bookings_insert_own on public.bookings
+        for insert
+        to authenticated
+        with check (
+          primary_guest_id = auth.uid()
+          and public.can_guest_book_apartment(apartment_id, organization_id)
+        );
+    $sql$;
+  end if;
+end;
+$$;

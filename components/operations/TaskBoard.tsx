@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Task, TaskPriority, TaskStatus, TaskType } from "@/types/task";
+import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
+import type { Apartment } from "@/types/apartment";
 
 type Assignee = {
   userId: string;
@@ -89,20 +91,23 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
   const [dueAt, setDueAt] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("normal");
   const [users, setUsers] = useState<Assignee[]>([]);
+  const [apartments, setApartments] = useState<Apartment[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const [usersResponse, tasksResponse] = await Promise.all([
+      const [usersResponse, tasksResponse, nextApartments] = await Promise.all([
         fetch("/api/notifications/assignees", { cache: "no-store" }),
         fetch("/api/operations/tasks", { cache: "no-store" }),
+        loadApartmentsFromSupabase(),
       ]);
       const usersPayload = (await usersResponse.json()) as { ok: boolean; data?: { responsible?: Assignee[] } };
       const tasksPayload = (await tasksResponse.json()) as { ok: boolean; data?: TaskRow[]; error?: string };
       if (cancelled) return;
 
       if (usersPayload.ok) setUsers(usersPayload.data?.responsible ?? []);
+      setApartments(nextApartments);
       if (tasksPayload.ok) {
         setTasks((tasksPayload.data ?? []).map(mapTask).filter((task) => !filterType || task.taskType === filterType));
       } else {
@@ -191,7 +196,10 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
               {Object.entries(TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           ) : null}
-          <input value={apartmentId} onChange={(event) => setApartmentId(event.target.value)} placeholder="ID объекта" className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm" />
+          <select aria-label="Объект" value={apartmentId} onChange={(event) => setApartmentId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
+            <option value="">Выберите объект</option>
+            {apartments.map((apartment) => <option key={apartment.id} value={apartment.id}>{apartment.title}</option>)}
+          </select>
           <select value={assignedUserId} onChange={(event) => setAssignedUserId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             <option value="">Ответственный</option>
             {users.map((user) => <option key={user.userId} value={user.userId}>{user.firstName} {user.lastName} · {user.roleCode}</option>)}
@@ -219,10 +227,11 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
           <tbody className="divide-y divide-white/5">
             {isLoading ? <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Загрузка...</td></tr> : tasks.length === 0 ? <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Нет задач</td></tr> : tasks.map((task) => {
               const assignee = users.find((user) => user.userId === task.assignedUserId);
+              const apartment = apartments.find((item) => item.id === task.apartmentId);
               return (
                 <tr key={task.id}>
                   <td className="px-4 py-3"><p className="font-medium text-white">{task.title}</p><p className="text-xs text-slate-400">{TYPE_LABELS[task.taskType]}</p></td>
-                  <td className="px-4 py-3 text-slate-300">{task.apartmentId || "—"}</td>
+                  <td className="px-4 py-3 text-slate-300">{apartment?.title ?? "Объект не найден"}</td>
                   <td className="px-4 py-3 text-slate-300">{task.dueAt ? new Date(task.dueAt).toLocaleString("ru-RU") : "—"}</td>
                   <td className="px-4 py-3">
                     {canManage ? (

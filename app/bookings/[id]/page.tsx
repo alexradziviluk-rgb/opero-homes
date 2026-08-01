@@ -5,9 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { getBookingById, deleteBooking } from "@/lib/bookings/booking-repository";
-import { getApartmentById } from "@/app/apartments/apartment-utils";
-import { getClientById } from "@/lib/clients/client-repository";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import { Booking } from "@/types/booking";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
@@ -15,6 +12,7 @@ import BookingNotificationsPanel from "@/components/booking/BookingNotifications
 import BookingControlChecklist from "@/components/booking/BookingControlChecklist";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { hasEffectivePermission } from "@/lib/permissions";
+import { deleteRemoteBooking } from "@/lib/bookings/remote-bookings";
 
 type BookingDetailsResponse =
   | {
@@ -28,8 +26,17 @@ type BookingDetailsResponse =
         guestEmail: string | null;
         checkIn: string;
         checkOut: string;
+        checkInTime: string;
+        checkOutTime: string;
         guests: number | null;
+        rentalType: Booking["rentalType"];
+        pricePerPeriod: number;
+        accommodationAmount: number;
+        cleaningFee: number;
+        deposit: number;
+        discount: number;
         totalAmount: number | null;
+        paidAmount: number;
         status: string | null;
         paymentStatus: string | null;
         source: string | null;
@@ -46,6 +53,7 @@ export default function BookingPage() {
   const bookingId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [apartmentTitle, setApartmentTitle] = useState("Объект");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,6 +69,7 @@ export default function BookingPage() {
 
         if (response.ok && payload.ok) {
           if (!cancelled) {
+            setApartmentTitle(payload.data.apartmentTitle);
             setBooking({
               id: payload.data.id,
               apartmentId: payload.data.apartmentId ?? "",
@@ -70,16 +79,18 @@ export default function BookingPage() {
               guestEmail: payload.data.guestEmail ?? "",
               checkIn: payload.data.checkIn,
               checkOut: payload.data.checkOut,
+              checkInTime: payload.data.checkInTime,
+              checkOutTime: payload.data.checkOutTime,
               guests: payload.data.guests ?? 1,
-              rentalType: "daily",
-              pricePerPeriod: 0,
+              rentalType: payload.data.rentalType,
+              pricePerPeriod: payload.data.pricePerPeriod,
               periodsCount: 0,
-              accommodationAmount: 0,
-              cleaningFee: 0,
-              deposit: 0,
-              discount: 0,
+              accommodationAmount: payload.data.accommodationAmount,
+              cleaningFee: payload.data.cleaningFee,
+              deposit: payload.data.deposit,
+              discount: payload.data.discount,
               totalAmount: payload.data.totalAmount ?? 0,
-              paidAmount: 0,
+              paidAmount: payload.data.paidAmount,
               status: (payload.data.status ?? "pending") as Booking["status"],
               paymentStatus: (payload.data.paymentStatus ?? "unpaid") as Booking["paymentStatus"],
               source: (payload.data.source ?? "website") as Booking["source"],
@@ -96,12 +107,6 @@ export default function BookingPage() {
         }
       }
 
-      if (bookingId) {
-        const fallback = getBookingById(bookingId);
-        if (!cancelled) {
-          setBooking(fallback);
-        }
-      }
     }
 
     void loadBooking();
@@ -117,7 +122,7 @@ export default function BookingPage() {
   async function handleDelete() {
     if (!booking) return;
     if (!confirm("Удалить бронирование?")) return;
-    deleteBooking(booking.id);
+    await deleteRemoteBooking(booking.id);
     await emitBookingNotificationEvent("booking_cancelled", booking, {
       idempotencySeed: `deleted:${new Date().toISOString()}`,
       actionUrl: "/bookings",
@@ -125,8 +130,6 @@ export default function BookingPage() {
     router.push('/bookings');
   }
 
-  const apartment = getApartmentById(booking.apartmentId);
-  const client = booking.clientId ? getClientById(booking.clientId) : null;
   const statusPresentation = getBookingStatusPresentation(booking.status);
   const canDeleteBooking = Boolean(currentUser && hasEffectivePermission(currentUser, "bookings.delete"));
 
@@ -140,7 +143,7 @@ export default function BookingPage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-semibold">Бронирование</h1>
-                <p className="text-sm text-slate-400">{booking.guestName} — {apartment?.title ?? "—"}</p>
+                <p className="text-sm text-slate-400">{booking.guestName} — {apartmentTitle}</p>
               </div>
               <div className="flex gap-2">
                 <Link href="/bookings" className="rounded px-3 py-2 bg-white/5">Назад к бронированиям</Link>
@@ -153,29 +156,23 @@ export default function BookingPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <div className="text-sm text-slate-300">Гость</div>
-                  <div className="text-white">{client ? `${client.firstName} ${client.lastName}` : booking.guestName}</div>
+                  <div className="text-white">{booking.guestName}</div>
                 </div>
                 <div>
                   <div className="text-sm text-slate-300">Телефон</div>
-                  <div className="text-white">{client?.phone ?? booking.guestPhone}</div>
+                  <div className="text-white">{booking.guestPhone || "—"}</div>
                 </div>
                 <div>
                   <div className="text-sm text-slate-300">Email</div>
-                  <div className="text-white">{client?.email ?? booking.guestEmail}</div>
+                  <div className="text-white">{booking.guestEmail || "—"}</div>
                 </div>
-                {client ? (
-                  <div>
-                    <div className="text-sm text-slate-300">Карточка клиента</div>
-                    <Link href={`/clients/${client.id}`} className="text-cyan-300 hover:underline">Открыть клиента</Link>
-                  </div>
-                ) : null}
                 <div>
                   <div className="text-sm text-slate-300">Объект</div>
-                  <div className="text-white">{apartment?.title ?? "—"}</div>
+                  <div className="text-white">{apartmentTitle}</div>
                 </div>
                 <div>
                   <div className="text-sm text-slate-300">Заезд — Выезд</div>
-                  <div className="text-white">{new Date(booking.checkIn).toLocaleDateString()} — {new Date(booking.checkOut).toLocaleDateString()}</div>
+                  <div className="text-white">{new Date(booking.checkIn).toLocaleDateString("ru-RU")} {booking.checkInTime} — {new Date(booking.checkOut).toLocaleDateString("ru-RU")} {booking.checkOutTime}</div>
                 </div>
                 <div>
                   <div className="text-sm text-slate-300">Гостей</div>

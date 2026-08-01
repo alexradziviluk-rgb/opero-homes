@@ -1,9 +1,11 @@
 import type { Permission } from "@/types/user";
 
 export const MANAGEABLE_ORGANIZATION_ROLE_CODES = ["manager", "employee", "cleaner", "maintenance"] as const;
+export const ADDITIONAL_ORGANIZATION_ROLE_CODES = ["employee", "cleaner", "maintenance"] as const;
 export const MANAGEABLE_MEMBER_STATUSES = ["active", "paused"] as const;
 
 export type ManageableOrganizationRoleCode = (typeof MANAGEABLE_ORGANIZATION_ROLE_CODES)[number];
+export type AdditionalOrganizationRoleCode = (typeof ADDITIONAL_ORGANIZATION_ROLE_CODES)[number];
 export type ManageableMemberStatus = (typeof MANAGEABLE_MEMBER_STATUSES)[number];
 
 export type OrganizationUser = {
@@ -14,6 +16,7 @@ export type OrganizationUser = {
   email: string;
   phone: string;
   roleCode: string;
+  additionalRoleCodes: AdditionalOrganizationRoleCode[];
   status: string;
   joinedAt: string;
   createdAt: string;
@@ -27,6 +30,7 @@ export type OrganizationUserUpdate = {
   lastName: string;
   phone: string;
   roleCode: ManageableOrganizationRoleCode;
+  additionalRoleCodes: AdditionalOrganizationRoleCode[];
   status: ManageableMemberStatus;
   additionalPermissions: Permission[];
   deniedPermissions: Permission[];

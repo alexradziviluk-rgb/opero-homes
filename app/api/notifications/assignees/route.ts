@@ -7,9 +7,8 @@ function canBeResponsible(roleCode: string): boolean {
   return ["owner", "manager", "employee", "cleaner", "maintenance"].includes(role);
 }
 
-function canBeBackupManager(roleCode: string): boolean {
-  const role = roleCode.trim().toLowerCase();
-  return ["owner", "manager"].includes(role);
+function canBeBackupManager(roleCodes: string[]): boolean {
+  return roleCodes.some((roleCode) => ["owner", "manager"].includes(roleCode.trim().toLowerCase()));
 }
 
 export async function GET() {
@@ -25,14 +24,14 @@ export async function GET() {
 
   const { data: members, error: membersError } = await supabase
     .from("organization_members")
-    .select("user_id,role_code")
+    .select("user_id,role_code,additional_role_codes")
     .eq("organization_id", auth.context.organization.id);
 
   if (membersError) {
     return NextResponse.json({ ok: false, error: membersError.message }, { status: 422 });
   }
 
-  const memberRows = (members ?? []) as Array<{ user_id: string; role_code: string }>;
+  const memberRows = (members ?? []) as Array<{ user_id: string; role_code: string; additional_role_codes: string[] | null }>;
   const userIds = memberRows.map((member) => member.user_id);
 
   if (userIds.length === 0) {
@@ -72,6 +71,7 @@ export async function GET() {
       return {
         userId: member.user_id,
         roleCode: member.role_code,
+        additionalRoleCodes: member.additional_role_codes ?? [],
         firstName: profile?.first_name ?? "",
         lastName: profile?.last_name ?? "",
         email: profile?.email ?? "",
@@ -83,7 +83,7 @@ export async function GET() {
     .filter((item) => Boolean(item.userId));
 
   const responsible = mapped.filter((item) => canBeResponsible(item.roleCode));
-  const backupManagers = mapped.filter((item) => canBeBackupManager(item.roleCode));
+  const backupManagers = mapped.filter((item) => canBeBackupManager([item.roleCode, ...item.additionalRoleCodes]));
 
   return NextResponse.json({
     ok: true,

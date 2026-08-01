@@ -1,0 +1,6 @@
+import Link from "next/link";
+import { plans } from "@/lib/subscriptions/plans";
+
+export default function PricingPage() {
+  return <main className="min-h-screen bg-[#f5f3ee] px-5 py-10 text-[#17251f] sm:px-10"><div className="mx-auto max-w-6xl"><Link href="/" className="font-bold">opero<span className="text-[#b27827]">.</span></Link><div className="max-w-2xl py-20"><p className="text-sm font-semibold text-[#b27827]">PRICING</p><h1 className="mt-4 text-5xl font-semibold tracking-tight">Выберите темп роста вашей команды</h1><p className="mt-5 text-lg text-[#68766d]">14 дней бесплатно, без списания денег в trial. Перейти на другой план можно позже.</p></div><div className="grid gap-5 lg:grid-cols-3">{plans.map((plan) => <article key={plan.code} className="rounded-2xl border border-[#d9ded6] bg-white p-7"><h2 className="text-xl font-semibold">{plan.name}</h2><p className="mt-4 text-4xl font-semibold">€{plan.monthlyPrice}<span className="text-sm font-normal text-[#68766d]"> / месяц</span></p><ul className="mt-8 space-y-3 text-sm text-[#68766d]">{plan.features.map((feature) => <li key={feature}>+ {feature}</li>)}</ul><Link href={`/register?plan=${plan.code}`} className="mt-8 block rounded-full bg-[#173b32] px-4 py-3 text-center text-sm font-semibold text-white">Начать trial</Link></article>)}</div></div></main>;
+}

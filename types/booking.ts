@@ -23,6 +23,8 @@ export type Booking = {
 
   checkIn: string;
   checkOut: string;
+  checkInTime?: string;
+  checkOutTime?: string;
   guests: number;
 
   rentalType: "daily" | "weekly" | "monthly";
@@ -35,6 +37,7 @@ export type Booking = {
   discount: number;
   totalAmount: number;
   paidAmount: number;
+  complimentary?: boolean;
 
   status: BookingStatus;
   confirmedAt?: string;

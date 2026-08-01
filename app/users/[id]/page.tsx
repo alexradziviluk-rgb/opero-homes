@@ -90,7 +90,8 @@ export default function UserDetailsPage() {
                 <p><span className="text-slate-400">Фамилия:</span> {user.lastName}</p>
                 <p><span className="text-slate-400">Email:</span> {user.email}</p>
                 <p><span className="text-slate-400">Телефон:</span> {user.phone || "—"}</p>
-                <p><span className="text-slate-400">Роль:</span> {roleLabels[user.roleCode] ?? user.roleCode}</p>
+                <p><span className="text-slate-400">Основная роль:</span> {roleLabels[user.roleCode] ?? user.roleCode}</p>
+                <p><span className="text-slate-400">Дополнительные роли:</span> {user.additionalRoleCodes.length > 0 ? user.additionalRoleCodes.map((role) => roleLabels[role] ?? role).join(", ") : "—"}</p>
                 <p><span className="text-slate-400">Статус:</span> {statusLabels[user.status] ?? user.status}</p>
                 <p><span className="text-slate-400">Организация:</span> {user.organizationId}</p>
                 <p><span className="text-slate-400">Создан:</span> {formatDate(user.createdAt)}</p>

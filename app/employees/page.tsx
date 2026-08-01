@@ -13,6 +13,7 @@ type Employee = {
   phone: string;
   status: string;
   roleCode: string;
+  additionalRoleCodes: string[];
   lastSeenAt: string | null;
 };
 
@@ -63,7 +64,11 @@ export default function EmployeesPage() {
   }, []);
 
   return (
-    <OperationalShell title="Сотрудники" description="Загрузка команды, назначения и текущая занятость">
+    <OperationalShell title="Сотрудники" description="Ежедневная работа команды: назначения, задачи, объекты и текущая занятость">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-3 text-sm text-slate-300">
+        <span>Приглашения, роли, статусы и права доступа управляются отдельно.</span>
+        <Link href="/users" className="text-cyan-300 hover:underline">Управление пользователями</Link>
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {employees.length === 0 ? <p className="border-y border-white/10 py-8 text-center text-slate-400 lg:col-span-2">Сотрудники ещё не добавлены</p> : employees.map((employee) => {
           const assignedTasks = tasks.filter((task) => task.assigned_user_id === employee.userId);
@@ -77,7 +82,7 @@ export default function EmployeesPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="font-semibold text-white">{employee.firstName} {employee.lastName}</h2>
-                  <p className="mt-1 text-sm text-cyan-300">{roleLabels[employee.roleCode] ?? employee.roleCode}</p>
+                  <p className="mt-1 text-sm text-cyan-300">{[employee.roleCode, ...employee.additionalRoleCodes].map((role) => roleLabels[role] ?? role).join(" + ")}</p>
                 </div>
                 <span className={`rounded-full px-2 py-1 text-xs ${isOnline ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700/60 text-slate-300"}`}>
                   {isOnline ? "Онлайн" : "Офлайн"}

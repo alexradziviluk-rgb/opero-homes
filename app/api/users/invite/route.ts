@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   }
 
   const requesterRoleCode = normalizeRoleCode(auth.context.organizationMember.role_code);
-  if (requesterRoleCode !== "owner") {
+  if (requesterRoleCode !== "owner" && requesterRoleCode !== "manager") {
     return jsonError(403, "INSUFFICIENT_PERMISSIONS", "Недостаточно прав для приглашения сотрудников.");
   }
 

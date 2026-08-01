@@ -76,6 +76,15 @@ export async function POST(request: Request) {
     return error(400, "Invalid task payload");
   }
 
+  const { data: apartment, error: apartmentError } = await supabase
+    .from("apartments")
+    .select("id")
+    .eq("organization_id", auth.context.organization.id)
+    .eq("id", apartmentId)
+    .maybeSingle();
+  if (apartmentError) return error(422, apartmentError.message);
+  if (!apartment) return error(400, "Apartment is not available in this organization");
+
   const { data, error: insertError } = await supabase
     .from("operational_tasks")
     .insert({

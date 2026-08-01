@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
@@ -88,8 +88,7 @@ const navItems: NavItem[] = [
         <path d="M3 19a6 6 0 0 1 12 0M17 8h4M19 6v4" />
       </svg>
     ),
-    requiredPermission: "users.manage",
-    hiddenForManager: true,
+    requiredPermission: "users.view",
   },
   {
     label: "Задачи",
@@ -162,6 +161,7 @@ const navItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { currentUser, isAuthLoading, logout } = useCurrentUser();
   const { data: dashboardData, isLoading: isDashboardLoading } = useDashboardMetrics();
   const permissions = useMemo(() => (currentUser ? getEffectivePermissions(currentUser) : []), [currentUser]);
@@ -223,7 +223,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-full border-b border-white/10 bg-slate-950/95 px-4 py-5 backdrop-blur-sm lg:w-72 lg:border-b-0 lg:border-r lg:px-6 lg:py-8">
+    <aside className="w-full border-b border-white/10 bg-slate-950/95 px-4 py-3 backdrop-blur-sm lg:w-72 lg:border-b-0 lg:border-r lg:px-6 lg:py-8">
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 via-sky-500 to-indigo-600 shadow-lg shadow-cyan-500/20">
           <span className="text-sm font-semibold tracking-[0.24em] text-white">OH</span>
@@ -232,15 +232,28 @@ export default function Sidebar() {
           <p className="text-base font-semibold tracking-tight text-white">Opero Homes</p>
           <p className="text-sm text-slate-400">Центр управления</p>
         </div>
+        <button
+          type="button"
+          aria-label={isMobileOpen ? "Закрыть меню" : "Открыть меню"}
+          aria-expanded={isMobileOpen}
+          onClick={() => setIsMobileOpen((value) => !value)}
+          className="ml-auto rounded-xl border border-white/10 bg-white/5 p-2 text-slate-200 lg:hidden"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+            {isMobileOpen ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+          </svg>
+        </button>
       </div>
 
-      <nav className="mt-8 flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0">
+      <nav className={`${isMobileOpen ? "flex" : "hidden"} mt-4 flex-col gap-2 lg:mt-8 lg:flex lg:overflow-visible lg:pb-0`}>
         {visibleItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.label}
               href={item.href}
+              aria-current={active ? "page" : undefined}
+              onClick={() => setIsMobileOpen(false)}
               className={`group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition ${active ? "bg-cyan-500/15 text-white" : "text-slate-300 hover:bg-white/10 hover:text-white"}`}
             >
               <span className={`rounded-xl border border-white/10 bg-white/5 p-2 transition ${active ? "border-cyan-400/40 text-cyan-300" : "text-slate-200 group-hover:border-cyan-400/40 group-hover:text-cyan-300"}`}>
@@ -253,7 +266,7 @@ export default function Sidebar() {
       </nav>
 
       {canViewWeeklyRevenue ? (
-        <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-4">
+        <div className={`${isMobileOpen ? "block" : "hidden"} mt-8 rounded-3xl border border-white/10 bg-white/5 p-4 lg:block`}>
           <p className="text-sm font-semibold text-white">На этой неделе</p>
           <p className="mt-2 text-2xl font-semibold text-white">{weeklyRevenueLabel}</p>
           <p className="mt-1 text-sm text-slate-400">{weeklyRevenueDescription}</p>
@@ -263,7 +276,7 @@ export default function Sidebar() {
       <button
         type="button"
         onClick={() => void logout()}
-        className="mt-6 flex w-full items-center gap-3 rounded-2xl border border-white/10 px-3 py-3 text-left text-sm font-medium text-slate-300 transition hover:border-rose-400/30 hover:bg-rose-500/10 hover:text-white"
+        className={`${isMobileOpen ? "flex" : "hidden"} mt-6 w-full items-center gap-3 rounded-2xl border border-white/10 px-3 py-3 text-left text-sm font-medium text-slate-300 transition hover:border-rose-400/30 hover:bg-rose-500/10 hover:text-white lg:flex`}
       >
         <span className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-200">
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">

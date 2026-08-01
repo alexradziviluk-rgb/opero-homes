@@ -65,6 +65,7 @@ const memberSelect = [
   "organization_id",
   "user_id",
   "role_code",
+  "additional_role_codes",
   "status",
 ].join(",");
 

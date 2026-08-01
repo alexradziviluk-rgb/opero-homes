@@ -14,6 +14,18 @@ export type EmployeeInvitationLookup = {
   revokedAt: string | null;
 };
 
+export type ManagedEmployeeInvitation = {
+  invitationId: string;
+  email: string;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  roleCode: EmployeeInviteRoleCode;
+  deliveryStatus: string;
+  expiresAt: string;
+  createdAt: string;
+};
+
 export type EmployeeInvitationApiErrorCode =
   | "INVALID_INPUT"
   | "AUTH_REQUIRED"

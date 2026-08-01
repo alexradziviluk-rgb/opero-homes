@@ -10,6 +10,7 @@ type ServerAuthState = {
   isStaff: boolean;
   isClient: boolean;
   roleCode: string;
+  roleCodes: string[];
   context: CurrentUserContext | null;
 };
 
@@ -21,6 +22,7 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
       isStaff: false,
       isClient: false,
       roleCode: "",
+      roleCodes: [],
       context: null,
     };
   }
@@ -35,6 +37,7 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
       isStaff: false,
       isClient: false,
       roleCode: "",
+      roleCodes: [],
       context: null,
     };
   }
@@ -48,19 +51,22 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
       isStaff: false,
       isClient: true,
       roleCode: "",
+      roleCodes: [],
       context: null,
     };
   }
 
   const hasMembership = hasStaffMembership(context);
   const roleCode = getRoleCodeFromContext(context);
-  const isStaff = hasMembership && isStaffRoleCode(roleCode);
+  const roleCodes = [roleCode, ...(context.organizationMember?.additional_role_codes ?? [])];
+  const isStaff = hasMembership && roleCodes.some((code) => isStaffRoleCode(code));
 
   return {
     isAuthenticated: true,
     isStaff,
     isClient: !isStaff,
     roleCode,
+    roleCodes,
     context,
   };
 }
@@ -90,7 +96,7 @@ export async function requireServerRoleCodesPage(allowedRoleCodes: string[]): Pr
     redirect("/guest");
   }
 
-  if (!allowedRoleCodes.includes(authState.roleCode)) {
+  if (!authState.roleCodes.some((roleCode) => allowedRoleCodes.includes(roleCode))) {
     redirect("/admin");
   }
 

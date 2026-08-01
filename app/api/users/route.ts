@@ -4,8 +4,10 @@ import { mapProfileToCurrentUser } from "@/lib/auth/profile-mapper";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  ADDITIONAL_ORGANIZATION_ROLE_CODES,
   MANAGEABLE_MEMBER_STATUSES,
   MANAGEABLE_ORGANIZATION_ROLE_CODES,
+  type AdditionalOrganizationRoleCode,
   type ManageableMemberStatus,
   type ManageableOrganizationRoleCode,
   type OrganizationUser,
@@ -20,6 +22,7 @@ type OrganizationUserRow = {
   email: string | null;
   phone: string | null;
   role_code: string;
+  additional_role_codes: string[] | null;
   member_status: string;
   joined_at: string;
   created_at: string;
@@ -44,6 +47,18 @@ function parsePermissions(value: unknown): Permission[] | null {
   return value;
 }
 
+function isAdditionalRoleCode(value: unknown): value is AdditionalOrganizationRoleCode {
+  return typeof value === "string" && ADDITIONAL_ORGANIZATION_ROLE_CODES.some((role) => role === value);
+}
+
+function parseRoleCodes(value: unknown): AdditionalOrganizationRoleCode[] | null {
+  if (!Array.isArray(value) || !value.every(isAdditionalRoleCode)) {
+    return null;
+  }
+
+  return Array.from(new Set(value));
+}
+
 function mapUser(row: OrganizationUserRow): OrganizationUser {
   return {
     userId: row.user_id,
@@ -53,6 +68,7 @@ function mapUser(row: OrganizationUserRow): OrganizationUser {
     email: row.email ?? "",
     phone: row.phone ?? "",
     roleCode: row.role_code,
+    additionalRoleCodes: (row.additional_role_codes ?? []).filter(isAdditionalRoleCode),
     status: row.member_status,
     joinedAt: row.joined_at,
     createdAt: row.created_at,
@@ -72,6 +88,7 @@ async function authorize(permission: Permission) {
     auth.context.profile,
     auth.context.organization.id,
     auth.context.organizationMember.role_code,
+    auth.context.organizationMember.additional_role_codes ?? [],
   );
   if (!hasEffectivePermission(currentUser, permission)) {
     return {
@@ -114,6 +131,7 @@ export async function PATCH(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const additionalPermissions = parsePermissions(body?.additionalPermissions);
   const deniedPermissions = parsePermissions(body?.deniedPermissions);
+  const additionalRoleCodes = parseRoleCodes(body?.additionalRoleCodes);
 
   if (
     !body ||
@@ -122,6 +140,8 @@ export async function PATCH(request: NextRequest) {
     typeof body.lastName !== "string" ||
     typeof body.phone !== "string" ||
     !isManageableRoleCode(body.roleCode) ||
+    !additionalRoleCodes ||
+    additionalRoleCodes.some((roleCode) => roleCode === body.roleCode) ||
     !isManageableStatus(body.status) ||
     !additionalPermissions ||
     !deniedPermissions
@@ -141,6 +161,7 @@ export async function PATCH(request: NextRequest) {
     next_last_name: body.lastName,
     next_phone: body.phone,
     next_role_code: body.roleCode,
+    next_additional_role_codes: additionalRoleCodes,
     next_status: body.status,
     next_additional_permissions: additionalPermissions,
     next_denied_permissions: deniedPermissions,

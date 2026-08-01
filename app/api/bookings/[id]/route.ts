@@ -56,20 +56,38 @@ export async function GET(
     .eq("id", booking.apartment_id)
     .maybeSingle();
 
+  const { data: guest } = booking.primary_guest_id
+    ? await supabase
+        .from("guests")
+        .select("first_name,last_name,phone,email")
+        .eq("id", booking.primary_guest_id)
+        .maybeSingle()
+    : { data: null };
+
   return NextResponse.json({
     ok: true,
     data: {
       id: booking.id,
+      bookingNumber: booking.booking_number ?? `Бронь ${String(booking.id).slice(0, 8)}`,
       apartmentId: booking.apartment_id,
       apartmentTitle: apartment?.title ?? "Объект",
       clientId: booking.client_id ?? null,
-      guestName: booking.guest_name ?? booking.customer_name ?? "Гость",
-      guestPhone: "guest_phone" in booking ? booking.guest_phone : null,
-      guestEmail: "guest_email" in booking ? booking.guest_email : null,
+      guestName: booking.guest_name ?? booking.customer_name ?? (`${guest?.first_name ?? ""} ${guest?.last_name ?? ""}`.trim() || "Гость"),
+      guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,
+      guestEmail: ("guest_email" in booking ? booking.guest_email : null) ?? guest?.email ?? null,
       checkIn: booking.check_in ?? booking.check_in_date,
       checkOut: booking.check_out ?? booking.check_out_date,
-      guests: "guests" in booking && typeof booking.guests === "number" ? booking.guests : 1,
+      checkInTime: booking.check_in_time ?? "15:00",
+      checkOutTime: booking.check_out_time ?? "11:00",
+      guests: typeof booking.guests === "number" ? booking.guests : typeof booking.adults === "number" ? booking.adults : 1,
+      rentalType: booking.rental_type ?? "daily",
+      pricePerPeriod: booking.price_per_period ?? booking.nightly_rate ?? 0,
+      accommodationAmount: booking.accommodation_amount ?? booking.accommodation_total ?? 0,
+      cleaningFee: booking.cleaning_fee ?? 0,
+      deposit: booking.deposit ?? booking.security_deposit ?? 0,
+      discount: booking.discount ?? 0,
       totalAmount: booking.total_amount,
+      paidAmount: booking.paid_amount ?? booking.amount_paid ?? 0,
       status: booking.status,
       paymentStatus: booking.payment_status,
       source: booking.source,
@@ -93,14 +111,68 @@ export async function PATCH(
     return error(403, "Insufficient permissions");
   }
 
-  const body = (await request.json().catch(() => null)) as { status?: string } | null;
-  const status = body?.status?.trim() ?? "";
+  const { id } = await context.params;
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return error(400, "Invalid request body");
+
+  const { data: existing, error: loadError } = await loadBookingById(supabase, auth.context.organization.id, id);
+  if (loadError) return error(422, loadError.message, loadError.code);
+  if (!existing) return error(404, "Booking not found");
+
+  const status = typeof body.status === "string" ? body.status.trim() : existing.status;
   if (!BOOKING_STATUSES.has(status)) return error(400, "Invalid booking status");
 
-  const { id } = await context.params;
+  const isStatusOnly = Object.keys(body).every((key) => key === "status");
+  const updateRow: Record<string, string> = { status, updated_at: new Date().toISOString() };
+
+  if (!isStatusOnly) {
+    const guestName = typeof body.guestName === "string" ? body.guestName.trim() : "";
+    const guestPhone = typeof body.guestPhone === "string" ? body.guestPhone.trim() : "";
+    const guestEmail = typeof body.guestEmail === "string" ? body.guestEmail.trim() : "";
+    const checkIn = typeof body.checkIn === "string" ? body.checkIn : "";
+    const checkOut = typeof body.checkOut === "string" ? body.checkOut : "";
+    const checkInTime = typeof body.checkInTime === "string" ? body.checkInTime : "15:00";
+    const checkOutTime = typeof body.checkOutTime === "string" ? body.checkOutTime : "11:00";
+    const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+
+    if (!guestName || !checkIn || !checkOut || checkOut <= checkIn) return error(400, "Invalid booking details");
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(checkInTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkOutTime)) {
+      return error(400, "Invalid check-in or check-out time");
+    }
+
+    const dateColumns = "check_in_date" in existing
+      ? { checkIn: "check_in_date", checkOut: "check_out_date" }
+      : { checkIn: "check_in", checkOut: "check_out" };
+    const { data: conflict, error: conflictError } = await supabase
+      .from("bookings")
+      .select(`id,${dateColumns.checkIn},${dateColumns.checkOut}`)
+      .eq("organization_id", auth.context.organization.id)
+      .eq("apartment_id", existing.apartment_id)
+      .neq("id", id)
+      .neq("status", "cancelled")
+      .lt(dateColumns.checkIn, checkOut)
+      .gt(dateColumns.checkOut, checkIn)
+      .limit(1)
+      .maybeSingle();
+
+    if (conflictError) return error(422, conflictError.message, conflictError.code);
+    if (conflict) return error(409, "Booking dates overlap an existing booking", "booking_conflict");
+
+    Object.assign(updateRow, {
+      [dateColumns.checkIn]: checkIn,
+      [dateColumns.checkOut]: checkOut,
+      guest_name: guestName,
+      guest_phone: guestPhone,
+      guest_email: guestEmail,
+      check_in_time: checkInTime,
+      check_out_time: checkOutTime,
+      notes,
+    });
+  }
+
   const { data, error: updateError } = await supabase
     .from("bookings")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(updateRow)
     .eq("organization_id", auth.context.organization.id)
     .eq("id", id)
     .select("id,status,updated_at")

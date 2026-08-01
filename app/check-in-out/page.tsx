@@ -27,9 +27,12 @@ type ChecklistState = Record<string, Record<string, boolean>>;
 type OperationalBooking = {
   id: string;
   apartmentId: string | null;
+  apartmentTitle: string;
   guestName: string;
   checkIn: string;
   checkOut: string;
+  checkInTime?: string;
+  checkOutTime?: string;
   status: string;
 };
 
@@ -46,7 +49,7 @@ function BookingChecklist({ booking, items, values, onToggle }: {
   return (
     <article className="border-b border-white/10 bg-slate-900/60 p-5 last:border-b-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 className="font-semibold text-white">{booking.guestName}</h3><p className="mt-1 text-sm text-slate-400">Объект: {booking.apartmentId}</p></div>
+        <div><h3 className="font-semibold text-white">{booking.guestName}</h3><p className="mt-1 text-sm text-slate-400">Объект: {booking.apartmentTitle}</p></div>
         <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">{booking.status}</span>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -68,6 +71,9 @@ export default function CheckInOutPage() {
   const today = new Date().toISOString().slice(0, 10);
   const arrivals = bookings.filter((booking) => dateKey(booking.checkIn) === today && booking.status !== "cancelled");
   const departures = bookings.filter((booking) => dateKey(booking.checkOut) === today && booking.status !== "cancelled");
+  const upcoming = bookings
+    .filter((booking) => booking.checkOut >= today && ["confirmed", "checked_in"].includes(booking.status))
+    .sort((left, right) => left.checkIn.localeCompare(right.checkIn));
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +119,20 @@ export default function CheckInOutPage() {
   return (
     <OperationalShell title="Заезд / Выезд" description="Сегодняшние заезды и выезды с операционными чек-листами">
       {isLoading ? <p className="mb-4 text-sm text-slate-400">Загрузка...</p> : null}
+      <section className="mb-6 overflow-hidden rounded-2xl border border-white/10">
+        <h2 className="bg-white/5 px-5 py-4 font-semibold text-white">Ближайшие подтвержденные операции · {upcoming.length}</h2>
+        {upcoming.length === 0 ? <p className="p-6 text-sm text-slate-400">Предстоящих операций нет</p> : (
+          <div className="divide-y divide-white/5">
+            {upcoming.map((booking) => (
+              <article key={booking.id} className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[1fr_1fr_auto]">
+                <div><p className="font-medium text-white">{booking.guestName}</p><p className="text-slate-400">{booking.apartmentTitle}</p></div>
+                <div className="text-slate-300"><p>Заезд: {new Date(`${booking.checkIn}T00:00:00`).toLocaleDateString("ru-RU")} {booking.checkInTime ?? "15:00"}</p><p>Выезд: {new Date(`${booking.checkOut}T00:00:00`).toLocaleDateString("ru-RU")} {booking.checkOutTime ?? "11:00"}</p></div>
+                <span className="self-start rounded-full bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">Подтверждено</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="overflow-hidden rounded-2xl border border-white/10">
           <h2 className="bg-white/5 px-5 py-4 font-semibold text-white">Сегодняшние заезды · {arrivals.length}</h2>

@@ -61,9 +61,14 @@ export function mapProfileToCurrentUser(
   profile: SupabaseProfileRow,
   organizationId: string,
   roleCodeOverride?: string | null,
+  additionalRoleCodes: string[] = [],
 ): User {
   const now = new Date().toISOString();
   const effectiveRoleSource = roleCodeOverride ?? profile.role;
+  const primaryRole = mapRole(effectiveRoleSource);
+  const additionalRoles = additionalRoleCodes
+    .map((roleCode) => mapRole(roleCode))
+    .filter((role, index, roles) => role !== primaryRole && role !== "Гость" && roles.indexOf(role) === index);
 
   return {
     id: profile.id,
@@ -72,7 +77,8 @@ export function mapProfileToCurrentUser(
     lastName: profile.last_name ?? "",
     email: profile.email ?? "",
     phone: profile.phone ?? "",
-    role: mapRole(effectiveRoleSource),
+    role: primaryRole,
+    additionalRoles,
     status: mapStatus(profile.status),
     avatarUrl: profile.avatar_url,
     language: "ru",

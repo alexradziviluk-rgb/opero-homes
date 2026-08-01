@@ -7,8 +7,8 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import type { Apartment } from "@/types/apartment";
 import { loadApartmentFromSupabase, deleteApartmentFromSupabase } from "@/lib/apartments/supabase-apartments";
-import ImageStorageProvider from "@/lib/storage";
 import { Booking } from "@/types/booking";
+import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
 
 export default function ApartmentDetailsPage() {
   const params = useParams();
@@ -17,9 +17,6 @@ export default function ApartmentDetailsPage() {
   const [apartment, setApartment] = useState<Apartment | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  // Gallery preview URLs and active photo id must be declared before any early returns
-  const [previewMap, setPreviewMap] = useState<Record<string, string | null>>({});
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
@@ -38,8 +35,6 @@ export default function ApartmentDetailsPage() {
         return;
       }
       setApartment(found);
-      const cover = (found.photos ?? []).find((photo) => photo.isCover) ?? (found.photos ?? [])[0] ?? null;
-      setActiveId(cover?.id ?? null);
     }
 
     void load();
@@ -52,44 +47,16 @@ export default function ApartmentDetailsPage() {
   useEffect(() => {
     if (!apartment) return;
     let mounted = true;
-    (async () => {
-      try {
-        const repo = await import("@/lib/bookings/booking-repository");
-        const list = repo.getBookingsByApartmentId(apartment.id).filter((b: Booking) => new Date(b.checkOut) > new Date() && b.status !== "cancelled");
-        if (mounted) setUpcomingBookings(list.slice(0, 5));
-      } catch {
-        if (mounted) setUpcomingBookings([]);
-      }
-    })();
+    void fetchStaffBookings().then((bookings) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const list = bookings
+        .filter((booking) => booking.apartmentId === apartment.id && booking.checkOut >= today && booking.status !== "cancelled")
+        .sort((left, right) => left.checkIn.localeCompare(right.checkIn));
+      if (mounted) setUpcomingBookings(list.slice(0, 5));
+    }).catch(() => {
+      if (mounted) setUpcomingBookings([]);
+    });
     return () => { mounted = false; };
-  }, [apartment]);
-
-  // Gallery preview URLs — load previews client-side and revoke created URLs on cleanup
-  useEffect(() => {
-    if (!apartment) return;
-    let mounted = true;
-    const createdUrls: string[] = [];
-
-    (async () => {
-      const map: Record<string, string | null> = {};
-      for (const p of apartment.photos ?? []) {
-        try {
-          const url = await ImageStorageProvider.getPreviewUrl(p);
-          if (url) createdUrls.push(url);
-          map[p.id] = url;
-        } catch (e) {
-          map[p.id] = null;
-        }
-      }
-      if (mounted) setPreviewMap(map);
-    })();
-
-    return () => {
-      mounted = false;
-      createdUrls.forEach((u) => {
-        if (u) ImageStorageProvider.revokePreviewUrl(u);
-      });
-    };
   }, [apartment]);
 
   function handleDelete() {
