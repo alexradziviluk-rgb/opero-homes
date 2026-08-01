@@ -51,7 +51,8 @@ export default function EmployeesPage() {
     let cancelled = false;
     void Promise.all([
       fetch("/api/notifications/assignees", { cache: "no-store" }),
-      fetch("/api/operations/tasks", { cache: "no-store" }),
+      fetch("/api/operations/tasks?includeArchived=true", { cache: "no-store" }),
+      fetch("/api/operations/tasks/cleanup", { method: "POST" }),
     ]).then(async ([employeesResponse, tasksResponse]) => {
       const employeesPayload = (await employeesResponse.json()) as { ok: boolean; data?: { responsible?: Employee[] } };
       const tasksPayload = (await tasksResponse.json()) as { ok: boolean; data?: TaskSummary[] };

@@ -73,7 +73,7 @@ function withTaskDetails<T extends { id: string; assigned_user_id: string }>(row
   }));
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return error(500, "Supabase is not configured");
 
@@ -91,7 +91,16 @@ export async function GET() {
   try {
     const taskIds = (data ?? []).map((row) => row.id);
     const [assignments, checklist] = await Promise.all([getAssignedUserIds(supabase, taskIds), getChecklist(supabase, taskIds)]);
-    return NextResponse.json({ ok: true, data: withTaskDetails(data ?? [], assignments, checklist) });
+    const result = withTaskDetails(data ?? [], assignments, checklist);
+    if (new URL(request.url).searchParams.get("includeArchived") === "true") {
+      const { data: archived, error: archiveError } = await supabase
+        .from("operational_task_archive")
+        .select("task_id,organization_id,apartment_id,booking_id,title,description,task_type,priority,status,assigned_user_id,due_at,created_by,created_at,updated_at")
+        .eq("organization_id", auth.context.organization.id);
+      if (archiveError) return error(422, archiveError.message);
+      result.push(...(archived ?? []).map((row) => ({ ...row, id: row.task_id, assigned_user_ids: [row.assigned_user_id], checklist: [] })));
+    }
+    return NextResponse.json({ ok: true, data: result });
   } catch (assignmentError) {
     return error(422, assignmentError instanceof Error ? assignmentError.message : "Unable to load task assignees");
   }
@@ -183,13 +192,14 @@ export async function PATCH(request: Request) {
   if (!existing) return error(404, "Task not found");
   if (!isManager && existing.assigned_user_id !== auth.context.authUserId) return error(403, "Insufficient permissions");
 
-  const changes: Record<string, string> = {};
+  const changes: Record<string, string | null> = {};
   if (payload.title?.trim() && isManager) changes.title = payload.title.trim();
   if (payload.taskType && isManager && TASK_TYPES.has(payload.taskType)) changes.task_type = payload.taskType;
   if (payload.apartmentId?.trim() && isManager) changes.apartment_id = payload.apartmentId.trim();
   if (payload.status) {
     if (!STATUSES.has(payload.status) || (!isManager && payload.status === "verified")) return error(400, "Invalid task status");
     changes.status = payload.status;
+    changes.completed_at = ["completed", "verified"].includes(payload.status) ? new Date().toISOString() : null;
   }
   const assignedUserIds = payload.assignedUserIds?.map((userId) => userId.trim()).filter(Boolean);
   if (assignedUserIds?.length && isManager) changes.assigned_user_id = assignedUserIds[0];

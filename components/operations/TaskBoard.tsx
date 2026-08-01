@@ -106,6 +106,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
 
     async function load() {
       void fetch("/api/operations/tasks/reminders", { method: "POST" }).catch(() => undefined);
+      void fetch("/api/operations/tasks/cleanup", { method: "POST" }).catch(() => undefined);
       const [usersResponse, tasksResponse, nextApartments] = await Promise.all([
         fetch("/api/notifications/assignees", { cache: "no-store" }),
         fetch("/api/operations/tasks", { cache: "no-store" }),
