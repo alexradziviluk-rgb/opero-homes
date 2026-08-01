@@ -246,7 +246,7 @@ export default function PublicCatalog() {
                     <p className="mt-2 text-sm text-slate-400">Добавьте координаты в карточке объекта.</p>
                   </div>
                 ) : (
-                  <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} />
+                  <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} onHide={() => setViewMode("list")} />
                 )}
               </div>
             ) : null}

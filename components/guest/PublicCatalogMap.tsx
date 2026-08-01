@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import { LayersControl, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import { Icon, type LatLngExpression, type LatLngTuple, type Marker as LeafletMarker } from "leaflet";
@@ -78,18 +78,31 @@ function FocusMarkerById({
   return null;
 }
 
+function InvalidateMapSize({ isFullscreen }: { isFullscreen: boolean }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => map.invalidateSize());
+    return () => cancelAnimationFrame(frame);
+  }, [isFullscreen, map]);
+
+  return null;
+}
+
 export default function PublicCatalogMap({
   apartments,
   focusedApartmentId,
   checkIn,
   checkOut,
   guests,
+  onHide,
 }: {
   apartments: Apartment[];
   focusedApartmentId: string | null;
   checkIn: string;
   checkOut: string;
   guests: string;
+  onHide?: () => void;
 }) {
   const items = useMemo<ApartmentMapItem[]>(() => {
     const coordinateGroups = new Map<string, number>();
@@ -126,13 +139,50 @@ export default function PublicCatalogMap({
   }, [apartments]);
 
   const markerRefs = useRef(new Map<string, LeafletMarker>());
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const points = useMemo<LatLngTuple[]>(() => items.map((item) => [item.latitude, item.longitude]), [items]);
   const defaultCenter: LatLngExpression = points.length > 0 ? points[0] : [39, 35];
 
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === mapContainerRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  async function toggleFullscreen() {
+    if (document.fullscreenElement === mapContainerRef.current) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    if (mapContainerRef.current?.requestFullscreen) {
+      await mapContainerRef.current.requestFullscreen();
+    }
+  }
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80">
-      <MapContainer center={defaultCenter} zoom={6} maxZoom={19} className="h-[clamp(480px,70vh,760px)] w-full">
+    <div ref={mapContainerRef} className={`relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 ${isFullscreen ? "h-screen rounded-none" : ""}`}>
+      <div className="absolute right-3 top-3 z-[1000] flex gap-2">
+        {onHide ? (
+          <button type="button" onClick={onHide} className="rounded-lg border border-white/20 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900">
+            Скрыть карту
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="rounded-lg border border-white/20 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
+          aria-label={isFullscreen ? "Свернуть карту" : "Открыть карту на весь экран"}
+        >
+          {isFullscreen ? "Свернуть" : "На весь экран"}
+        </button>
+      </div>
+      <MapContainer center={defaultCenter} zoom={6} maxZoom={19} className={`w-full ${isFullscreen ? "h-screen" : "h-[360px] sm:h-[420px] lg:h-[480px]"}`}>
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Спутник">
             <TileLayer
@@ -152,6 +202,7 @@ export default function PublicCatalogMap({
 
         <FitAllMarkers points={points} />
         <FocusMarkerById focusedApartmentId={focusedApartmentId} items={items} markerRefs={markerRefs} />
+        <InvalidateMapSize isFullscreen={isFullscreen} />
 
         {items.map((item) => {
           const price = formatApartmentPrice(item.apartment);
