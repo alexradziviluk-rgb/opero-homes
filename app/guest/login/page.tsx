@@ -325,7 +325,7 @@ export default function GuestLoginPage() {
         <Link href="/guest/register" className="text-cyan-300 hover:text-cyan-200">
           Создать аккаунт гостя
         </Link>
-        <Link href="/login" className="text-slate-300 hover:text-white">
+        <Link href="/staff/login" className="text-slate-300 hover:text-white">
           Вход для сотрудников
         </Link>
       </div>

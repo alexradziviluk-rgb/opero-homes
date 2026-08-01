@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getHomeRouteForUser, useCurrentUser } from "@/components/auth/current-user-provider";
+import GuestLoginPage from "@/app/guest/login/page";
 import { getAdminNextPath } from "@/lib/auth/next-route";
 import { login } from "@/lib/supabase/auth";
 
@@ -82,7 +83,7 @@ function formatLoginError(
   return details ? `Неожиданная ошибка авторизации: ${details}` : "Неожиданная ошибка авторизации.";
 }
 
-export default function LoginPage() {
+export function StaffLoginPage() {
   const router = useRouter();
   const { currentUser, isAuthLoading } = useCurrentUser();
   const [nextPath] = useState(() => {
@@ -214,4 +215,8 @@ export default function LoginPage() {
       </div>
     </main>
   );
+}
+
+export default function LoginPage() {
+  return <GuestLoginPage />;
 }

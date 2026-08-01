@@ -56,7 +56,7 @@ export function isPublicPath(pathname: string) {
   const explicitPublic = [
     "/",
     "/login",
-    "/admin/login",
+    "/staff/login",
     "/guest/login",
     "/guest/register",
     "/invite",

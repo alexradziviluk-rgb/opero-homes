@@ -1,5 +1,5 @@
 import { StaffLoginPage } from "@/app/login/page";
 
-export default function AdminLoginPage() {
+export default function StaffLoginRoute() {
   return <StaffLoginPage />;
 }

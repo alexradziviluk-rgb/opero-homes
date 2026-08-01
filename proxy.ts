@@ -13,7 +13,7 @@ import { getRoleCodeFromContext, isStaffRoleCode } from "@/lib/supabase/role-cod
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const currentPathWithSearch = `${pathname}${request.nextUrl.search}`;
-  const isStaffAuthRoute = pathname === "/login" || pathname === "/admin/login";
+  const isStaffAuthRoute = pathname === "/staff/login";
   const isGuestAuthRoute = pathname === "/guest/login" || pathname === "/guest/register";
   const isAuthRoute = isStaffAuthRoute || isGuestAuthRoute;
 
