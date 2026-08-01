@@ -39,17 +39,24 @@ function getAmenities(apartment: Apartment): string[] {
   return amenities.slice(0, 5);
 }
 
-function PublicCatalogHeader() {
+function PublicCatalogHeader({ isMapHidden, onShowMap }: { isMapHidden: boolean; onShowMap: () => void }) {
   return (
     <header className="mb-8 rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 shadow-lg shadow-black/10">
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Публичная навигация">
         <Link href="/" className="text-lg font-bold tracking-tight text-white">opero<span className="text-cyan-300">.</span></Link>
         <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
+          <Link href="/" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Назад</Link>
           <a href="#find-another-property" className="rounded-xl px-3 py-2 text-slate-200 hover:bg-white/10">Поиск жилья</a>
           <Link href="/business" className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-semibold text-cyan-200 hover:bg-cyan-500/20">Стать партнёром</Link>
           <Link href="/login" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Войти</Link>
         </div>
       </nav>
+      {isMapHidden ? (
+        <button type="button" onClick={onShowMap} className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          <span aria-hidden="true" className="text-xl leading-none">⌖</span>
+          <span>Открыть карту объектов</span>
+        </button>
+      ) : null}
     </header>
   );
 }
@@ -230,7 +237,7 @@ export default function PublicCatalog() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
       <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-        <PublicCatalogHeader />
+        <PublicCatalogHeader isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} />
         <section className="space-y-12">
           <section aria-labelledby="catalog-heading">
             <div className="mb-6"><p className="text-sm font-medium text-cyan-300">Курортная недвижимость</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">Все доступные объекты</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Откройте любой объект, чтобы посмотреть фотографии, расположение, условия и свободные даты.</p></div>
