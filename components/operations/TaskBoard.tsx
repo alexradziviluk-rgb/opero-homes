@@ -61,6 +61,8 @@ type TaskRow = {
   due_at: string;
   created_at: string;
   updated_at: string;
+  assigned_user_ids?: string[];
+  checklist?: Array<{ id: string; title: string; completed: boolean; completed_by?: string | null; completed_at?: string | null }>;
 };
 
 function mapTask(row: TaskRow): Task {
@@ -74,6 +76,8 @@ function mapTask(row: TaskRow): Task {
     apartmentId: row.apartment_id,
     bookingId: row.booking_id ?? undefined,
     assignedUserId: row.assigned_user_id,
+    assignedUserIds: row.assigned_user_ids ?? [row.assigned_user_id],
+    checklist: (row.checklist ?? []).map((item) => ({ id: item.id, title: item.title, completed: item.completed, completedBy: item.completed_by ?? undefined, completedAt: item.completed_at ?? undefined })),
     dueAt: row.due_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -86,12 +90,14 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [taskType, setTaskType] = useState<TaskType>(filterType ?? "other");
   const [apartmentId, setApartmentId] = useState("");
   const [assignedUserId, setAssignedUserId] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("normal");
+  const [checklistText, setChecklistText] = useState("");
   const [users, setUsers] = useState<Assignee[]>([]);
   const [apartments, setApartments] = useState<Apartment[]>([]);
 
@@ -99,6 +105,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     let cancelled = false;
 
     async function load() {
+      void fetch("/api/operations/tasks/reminders", { method: "POST" }).catch(() => undefined);
       const [usersResponse, tasksResponse, nextApartments] = await Promise.all([
         fetch("/api/notifications/assignees", { cache: "no-store" }),
         fetch("/api/operations/tasks", { cache: "no-store" }),
@@ -134,7 +141,23 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     };
   }, [filterType]);
 
-  async function saveNewTask(event: React.FormEvent<HTMLFormElement>) {
+  function resetForm() {
+    setTitle(""); setApartmentId(""); setAssignedUserId(""); setDueAt(""); setPriority("normal"); setChecklistText(""); setEditingTaskId(null);
+  }
+
+  function editTask(task: Task) {
+    setEditingTaskId(task.id);
+    setTitle(task.title);
+    setTaskType(task.taskType);
+    setApartmentId(task.apartmentId ?? "");
+    setAssignedUserId(task.assignedUserId ?? "");
+    setDueAt(task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 16) : "");
+    setPriority(task.priority ?? "normal");
+    setChecklistText((task.checklist ?? []).map((item) => item.title).join("\n"));
+    setShowForm(true);
+  }
+
+  async function saveTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim()) {
       setError("Введите название задачи");
@@ -155,38 +178,41 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
 
     setError(null);
 
+    const checklistItems = checklistText.split("\n").map((item) => item.trim()).filter(Boolean);
     const response = await fetch("/api/operations/tasks", {
-      method: "POST",
+      method: editingTaskId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: title.trim(),
         taskType: filterType ?? taskType,
         apartmentId: apartmentId.trim(),
         assignedUserId,
+        ...(editingTaskId ? { id: editingTaskId } : {}),
+        checklistItems,
         dueAt: new Date(dueAt).toISOString(),
         priority,
       }),
     });
     const payload = (await response.json()) as { ok: boolean; data?: TaskRow; error?: string };
     if (!response.ok || !payload.ok || !payload.data) {
-      setError(payload.error ?? "Не удалось создать задачу");
+      setError(payload.error ?? (editingTaskId ? "Не удалось обновить задачу" : "Не удалось создать задачу"));
       return;
     }
 
-    setTasks((current) => [...current, mapTask(payload.data as TaskRow)].sort((left, right) => (left.dueAt ?? "").localeCompare(right.dueAt ?? "")));
-    setTitle("");
-    setApartmentId("");
-    setAssignedUserId("");
-    setDueAt("");
-    setPriority("normal");
+    const savedTask = mapTask(payload.data as TaskRow);
+    setTasks((current) => (editingTaskId ? current.map((task) => task.id === savedTask.id ? savedTask : task) : [...current, savedTask]).sort((left, right) => (left.dueAt ?? "").localeCompare(right.dueAt ?? "")));
+    resetForm();
     setShowForm(false);
   }
 
   async function changeTask(task: Task, changes: Partial<Task>) {
+    const requestChanges = changes.checklist
+      ? { ...changes, checklistItems: changes.checklist.map((item) => ({ id: item.id, title: item.title, completed: item.completed })) }
+      : changes;
     const response = await fetch("/api/operations/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: task.id, ...changes }),
+      body: JSON.stringify({ id: task.id, ...requestChanges }),
     });
     const payload = (await response.json()) as { ok: boolean; data?: TaskRow; error?: string };
     if (!response.ok || !payload.ok || !payload.data) {
@@ -202,7 +228,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     <div className="space-y-4">
       {canManage ? (
         <div className="flex justify-end">
-          <button type="button" onClick={() => setShowForm((value) => !value)} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">
+          <button type="button" onClick={() => { if (showForm) resetForm(); setShowForm((value) => !value); }} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">
             {showForm ? "Закрыть форму" : "+ Создать задачу"}
           </button>
         </div>
@@ -211,7 +237,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
       {error ? <p className="border-y border-rose-400/20 py-3 text-sm text-rose-300">{error}</p> : null}
 
       {showForm ? (
-        <form onSubmit={saveNewTask} className="grid gap-3 border-y border-white/10 bg-slate-900/60 p-4 md:grid-cols-2 xl:grid-cols-3">
+        <form onSubmit={saveTask} className="grid gap-3 border-y border-white/10 bg-slate-900/60 p-4 md:grid-cols-2 xl:grid-cols-3">
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Название задачи" className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm" />
           {!filterType ? (
             <select value={taskType} onChange={(event) => setTaskType(event.target.value as TaskType)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
@@ -241,7 +267,10 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
           <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             {Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <button type="submit" className="rounded-xl bg-cyan-500/20 px-4 py-2 text-sm font-semibold text-cyan-200">Сохранить</button>
+          <label className="grid gap-1 text-xs text-slate-400 xl:col-span-2">Пункты одной задачи
+            <textarea value={checklistText} onChange={(event) => setChecklistText(event.target.value)} placeholder="Постельное\nРасчёт\nУборка" rows={3} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100" />
+          </label>
+          <button type="submit" className="rounded-xl bg-cyan-500/20 px-4 py-2 text-sm font-semibold text-cyan-200">{editingTaskId ? "Сохранить изменения" : "Сохранить"}</button>
         </form>
       ) : null}
 
@@ -255,10 +284,12 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
               <th className="px-4 py-3">Исполнитель</th>
               <th className="px-4 py-3">Приоритет</th>
               <th className="px-4 py-3">{translate("Статус")}</th>
+              <th className="px-4 py-3">Пункты</th>
+              <th className="px-4 py-3">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {isLoading ? <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Загрузка...</td></tr> : tasks.length === 0 ? <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Нет задач</td></tr> : tasks.map((task) => {
+            {isLoading ? <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">Загрузка...</td></tr> : tasks.length === 0 ? <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">Нет задач</td></tr> : tasks.map((task) => {
               const assignee = users.find((user) => user.userId === task.assignedUserId);
               const apartment = apartments.find((item) => item.id === task.apartmentId);
               return (
@@ -280,6 +311,12 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
                       {Object.entries(STATUS_LABELS).filter(([value]) => (canManage || value !== "verified") && value !== "done").map(([value, label]) => <option key={value} value={value}>{translate(label)}</option>)}
                     </select>
                   </td>
+                  <td className="px-4 py-3 align-top">
+                    <div className="space-y-1">
+                      {(task.checklist ?? []).map((item) => <label key={item.id} className="flex items-center gap-2 whitespace-nowrap text-xs text-slate-300"><input type="checkbox" checked={item.completed} onChange={(event) => void changeTask(task, { checklist: (task.checklist ?? []).map((current) => current.id === item.id ? { ...current, completed: event.target.checked } : current) })} />{item.title}</label>)}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3"><button type="button" onClick={() => editTask(task)} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-cyan-200">Редактировать</button></td>
                 </tr>
               );
             })}

@@ -16,6 +16,8 @@ export type Task = {
   bookingId?: string;
   apartmentId?: string;
   assignedUserId?: string;
+  assignedUserIds?: string[];
+  checklist?: TaskChecklistItem[];
   assignedRole?: UserRole;
   priority?: TaskPriority;
   createdAt: string;
@@ -23,6 +25,14 @@ export type Task = {
   sourceType?: "booking_confirmation";
   sourceId?: string;
   sourceKey?: string;
+};
+
+export type TaskChecklistItem = {
+  id: string;
+  title: string;
+  completed: boolean;
+  completedBy?: string;
+  completedAt?: string;
 };
 
 export const TASKS_STORAGE_KEY = "opero-homes-tasks";

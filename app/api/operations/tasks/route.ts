@@ -15,20 +15,62 @@ type CreateTaskPayload = {
   apartmentId?: string;
   bookingId?: string | null;
   assignedUserId?: string;
+  assignedUserIds?: string[];
   dueAt?: string;
   priority?: string;
+  checklistItems?: string[];
 };
 
 type UpdateTaskPayload = {
   id?: string;
+  title?: string;
+  taskType?: string;
+  apartmentId?: string;
   assignedUserId?: string;
+  assignedUserIds?: string[];
   status?: string;
   dueAt?: string;
   priority?: string;
+  checklistItems?: Array<{ id?: string; title?: string; completed?: boolean }>;
 };
 
 function error(status: number, message: string) {
   return NextResponse.json({ ok: false, error: message }, { status });
+}
+
+const TASK_SELECT = "id,title,description,task_type,priority,status,apartment_id,booking_id,assigned_user_id,due_at,created_at,updated_at";
+
+async function getChecklist(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, taskIds: string[]) {
+  if (!supabase || taskIds.length === 0) return new Map<string, Array<{ id: string; title: string; completed: boolean; completed_by: string | null; completed_at: string | null }>>();
+  const { data, error: queryError } = await supabase
+    .from("operational_task_items")
+    .select("id,task_id,title,completed,completed_by,completed_at")
+    .in("task_id", taskIds)
+    .order("position", { ascending: true });
+  if (queryError) throw new Error(queryError.message);
+  const result = new Map<string, Array<{ id: string; title: string; completed: boolean; completed_by: string | null; completed_at: string | null }>>();
+  for (const row of data ?? []) result.set(row.task_id, [...(result.get(row.task_id) ?? []), row]);
+  return result;
+}
+
+async function getAssignedUserIds(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, taskIds: string[]) {
+  if (!supabase || taskIds.length === 0) return new Map<string, string[]>();
+  const { data, error: queryError } = await supabase
+    .from("operational_task_assignees")
+    .select("task_id,user_id")
+    .in("task_id", taskIds);
+  if (queryError) throw new Error(queryError.message);
+  const result = new Map<string, string[]>();
+  for (const row of data ?? []) result.set(row.task_id, [...(result.get(row.task_id) ?? []), row.user_id]);
+  return result;
+}
+
+function withTaskDetails<T extends { id: string; assigned_user_id: string }>(rows: T[], assignments: Map<string, string[]>, checklist: Awaited<ReturnType<typeof getChecklist>>) {
+  return rows.map((row) => ({
+    ...row,
+    assigned_user_ids: assignments.get(row.id) ?? [row.assigned_user_id],
+    checklist: (checklist.get(row.id) ?? []).map((item) => ({ id: item.id, title: item.title, completed: item.completed, completed_by: item.completed_by, completed_at: item.completed_at })),
+  }));
 }
 
 export async function GET() {
@@ -38,20 +80,21 @@ export async function GET() {
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
 
-  const roleCode = normalizeRoleCode(auth.context.organizationMember.role_code);
-  let query = supabase
+  const query = supabase
     .from("operational_tasks")
-    .select("id,title,description,task_type,priority,status,apartment_id,booking_id,assigned_user_id,due_at,created_at,updated_at")
+    .select(TASK_SELECT)
     .eq("organization_id", auth.context.organization.id)
     .order("due_at", { ascending: true });
 
-  if (!MANAGER_ROLES.has(roleCode)) {
-    query = query.eq("assigned_user_id", auth.context.authUserId);
-  }
-
   const { data, error: queryError } = await query;
   if (queryError) return error(422, queryError.message);
-  return NextResponse.json({ ok: true, data: data ?? [] });
+  try {
+    const taskIds = (data ?? []).map((row) => row.id);
+    const [assignments, checklist] = await Promise.all([getAssignedUserIds(supabase, taskIds), getChecklist(supabase, taskIds)]);
+    return NextResponse.json({ ok: true, data: withTaskDetails(data ?? [], assignments, checklist) });
+  } catch (assignmentError) {
+    return error(422, assignmentError instanceof Error ? assignmentError.message : "Unable to load task assignees");
+  }
 }
 
 export async function POST(request: Request) {
@@ -68,9 +111,11 @@ export async function POST(request: Request) {
   const title = body?.title?.trim() ?? "";
   const taskType = body?.taskType?.trim() ?? "";
   const apartmentId = body?.apartmentId?.trim() ?? "";
-  const assignedUserId = body?.assignedUserId?.trim() ?? "";
+  const assignedUserIds = [...new Set((body?.assignedUserIds ?? (body?.assignedUserId ? [body.assignedUserId] : [])).map((id) => id.trim()).filter(Boolean))];
+  const assignedUserId = assignedUserIds[0] ?? "";
   const dueAt = body?.dueAt?.trim() ?? "";
   const priority = body?.priority?.trim() ?? "normal";
+  const checklistItems = [...new Set((body?.checklistItems ?? []).map((item) => item.trim()).filter(Boolean))];
 
   if (!title || !TASK_TYPES.has(taskType) || !apartmentId || !assignedUserId || !dueAt || !PRIORITIES.has(priority)) {
     return error(400, "Invalid task payload");
@@ -100,11 +145,17 @@ export async function POST(request: Request) {
       due_at: dueAt,
       created_by: auth.context.authUserId,
     })
-    .select("id,title,description,task_type,priority,status,apartment_id,booking_id,assigned_user_id,due_at,created_at,updated_at")
+    .select(TASK_SELECT)
     .single();
 
   if (insertError) return error(422, insertError.message);
-  return NextResponse.json({ ok: true, data }, { status: 201 });
+  const { error: assignmentError } = await supabase.from("operational_task_assignees").insert(assignedUserIds.map((userId) => ({ task_id: data.id, user_id: userId })));
+  if (assignmentError) return error(422, assignmentError.message);
+  if (checklistItems.length) {
+    const { error: checklistError } = await supabase.from("operational_task_items").insert(checklistItems.map((item, position) => ({ task_id: data.id, title: item, position })));
+    if (checklistError) return error(422, checklistError.message);
+  }
+  return NextResponse.json({ ok: true, data: { ...data, assigned_user_ids: assignedUserIds, checklist: checklistItems.map((title, index) => ({ id: `${data.id}-${index}`, title, completed: false })) } }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {
@@ -133,22 +184,65 @@ export async function PATCH(request: Request) {
   if (!isManager && existing.assigned_user_id !== auth.context.authUserId) return error(403, "Insufficient permissions");
 
   const changes: Record<string, string> = {};
+  if (payload.title?.trim() && isManager) changes.title = payload.title.trim();
+  if (payload.taskType && isManager && TASK_TYPES.has(payload.taskType)) changes.task_type = payload.taskType;
+  if (payload.apartmentId?.trim() && isManager) changes.apartment_id = payload.apartmentId.trim();
   if (payload.status) {
     if (!STATUSES.has(payload.status) || (!isManager && payload.status === "verified")) return error(400, "Invalid task status");
     changes.status = payload.status;
   }
-  if (payload.assignedUserId && isManager) changes.assigned_user_id = payload.assignedUserId;
+  const assignedUserIds = payload.assignedUserIds?.map((userId) => userId.trim()).filter(Boolean);
+  if (assignedUserIds?.length && isManager) changes.assigned_user_id = assignedUserIds[0];
+  else if (payload.assignedUserId && isManager) changes.assigned_user_id = payload.assignedUserId;
   if (payload.dueAt && isManager) changes.due_at = payload.dueAt;
   if (payload.priority && isManager && PRIORITIES.has(payload.priority)) changes.priority = payload.priority;
 
-  const { data, error: updateError } = await supabase
-    .from("operational_tasks")
-    .update(changes)
-    .eq("organization_id", auth.context.organization.id)
-    .eq("id", id)
-    .select("id,title,description,task_type,priority,status,apartment_id,booking_id,assigned_user_id,due_at,created_at,updated_at")
-    .single();
+  if (payload.checklistItems && (!isManager && existing.assigned_user_id !== auth.context.authUserId)) return error(403, "Insufficient permissions");
+
+  const { data, error: updateError } = Object.keys(changes).length
+    ? await supabase
+      .from("operational_tasks")
+      .update(changes)
+      .eq("organization_id", auth.context.organization.id)
+      .eq("id", id)
+      .select(TASK_SELECT)
+      .single()
+    : await supabase
+      .from("operational_tasks")
+      .select(TASK_SELECT)
+      .eq("organization_id", auth.context.organization.id)
+      .eq("id", id)
+      .single();
 
   if (updateError) return error(422, updateError.message);
-  return NextResponse.json({ ok: true, data });
+  if (assignedUserIds?.length && isManager) {
+    const { error: deleteError } = await supabase.from("operational_task_assignees").delete().eq("task_id", id);
+    if (deleteError) return error(422, deleteError.message);
+    const { error: assignmentError } = await supabase.from("operational_task_assignees").insert(assignedUserIds.map((userId) => ({ task_id: id, user_id: userId })));
+    if (assignmentError) return error(422, assignmentError.message);
+  }
+  if (payload.checklistItems) {
+    const { error: deleteChecklistError } = await supabase.from("operational_task_items").delete().eq("task_id", id);
+    if (deleteChecklistError) return error(422, deleteChecklistError.message);
+    const items = payload.checklistItems.filter((item) => item.title?.trim()).map((item, position) => ({
+      task_id: id,
+      title: item.title?.trim() ?? "",
+      completed: Boolean(item.completed),
+      completed_by: item.completed ? auth.context.authUserId : null,
+      completed_at: item.completed ? new Date().toISOString() : null,
+      position,
+    }));
+    if (items.length) {
+      const { error: insertChecklistError } = await supabase.from("operational_task_items").insert(items);
+      if (insertChecklistError) return error(422, insertChecklistError.message);
+    }
+    const nextStatus = items.length > 0 && items.every((item) => item.completed) ? "completed" : data.status === "completed" ? "in_progress" : data.status;
+    if (nextStatus !== data.status) {
+      const { data: statusData, error: statusError } = await supabase.from("operational_tasks").update({ status: nextStatus }).eq("id", id).select(TASK_SELECT).single();
+      if (statusError) return error(422, statusError.message);
+      return NextResponse.json({ ok: true, data: { ...statusData, assigned_user_ids: assignedUserIds ?? [statusData.assigned_user_id], checklist: items } });
+    }
+    return NextResponse.json({ ok: true, data: { ...data, assigned_user_ids: assignedUserIds ?? [data.assigned_user_id], checklist: items } });
+  }
+  return NextResponse.json({ ok: true, data: { ...data, assigned_user_ids: assignedUserIds ?? [data.assigned_user_id] } });
 }
