@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { getPlan, type PlanCode } from "@/lib/subscriptions/plans";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [companyName, setCompanyName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -42,8 +40,7 @@ export default function RegisterPage() {
       if (!response.ok) { setError("Аккаунт создан, но организацию не удалось подготовить. Повторите onboarding после входа."); return; }
       const sessionContextResponse = await fetch("/api/auth/session-context", { cache: "no-store" });
       if (!sessionContextResponse.ok) { setError("Аккаунт создан, но server session не удалось подтвердить. Повторите вход для продолжения onboarding."); return; }
-      router.replace("/onboarding");
-      router.refresh();
+      window.location.assign("/onboarding");
     } finally { setIsSubmitting(false); }
   }
 
