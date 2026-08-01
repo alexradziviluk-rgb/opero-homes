@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import LanguageSwitcher, { useLanguage } from "@/components/LanguageSwitcher";
 
 type HeaderProps = {
   showSearch?: boolean;
@@ -12,6 +13,7 @@ type HeaderProps = {
 
 export default function Header({ showSearch = true, showNewListing = true, newListingLabel = "+ Добавить объект" }: HeaderProps) {
   const { currentUser, currentUserContext, logout } = useCurrentUser();
+  const [language, setLanguage] = useLanguage();
   const fullName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : "";
   const displayName = fullName || currentUserContext?.authEmail?.split("@")[0] || "Пользователь";
 
@@ -54,6 +56,8 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
           ) : null}
 
           <NotificationBell />
+
+          <LanguageSwitcher language={language} onChange={setLanguage} />
 
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/20 text-sm font-semibold text-cyan-200">

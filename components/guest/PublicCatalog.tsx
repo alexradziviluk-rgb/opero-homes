@@ -19,6 +19,7 @@ import {
   matchesApartmentLocation,
 } from "@/lib/apartments/public-catalog";
 import type { Apartment } from "@/types/apartment";
+import LanguageSwitcher, { useLanguage, type Language } from "@/components/LanguageSwitcher";
 
 const PublicCatalogMap = dynamic(() => import("@/components/guest/PublicCatalogMap"), {
   ssr: false,
@@ -26,22 +27,27 @@ const PublicCatalogMap = dynamic(() => import("@/components/guest/PublicCatalogM
 
 type SortMode = "recommended" | "price_asc" | "price_desc" | "capacity_desc";
 type CatalogViewMode = "list" | "map";
-type Language = "ru" | "en" | "tr";
-
 const catalogCopy = {
   ru: { back: "Назад", search: "Поиск жилья", partner: "Стать партнёром", login: "Войти", openMap: "Открыть карту объектов", hide: "Скрыть карту", resort: "Курортная недвижимость", allProperties: "Все доступные объекты", catalogIntro: "Откройте любой объект, чтобы посмотреть фотографии, расположение, условия и свободные даты.", map: "Карта объектов", chooseOnMap: "Выберите жильё на карте", otherArea: "Другой район или даты", noMatch: "Не нашли подходящий вариант?", searchIntro: "Найдите другой объект по району, датам, вместимости и бюджету.", address: "Город, район или адрес", sort: "Сортировка", recommended: "Рекомендуемые", cheapest: "Цена: сначала дешевле", expensive: "Цена: сначала дороже", capacity: "Больше вместимость", reset: "Сбросить фильтры", city: "Город", allCities: "Все города", district: "Район", allDistricts: "Все районы", dates: "Даты", guests: "Количество гостей", minPrice: "Минимальная цена", maxPrice: "Максимальная цена", bedrooms: "Количество спален", pricePeriod: "Период аренды для цены", any: "Любой", night: "За ночь", week: "За неделю", month: "За месяц", availableOnly: "Показывать только свободные", found: "Найдено объектов", loading: "Загружаем объекты...", showMap: "Показать на карте", ownerTitle: "Сдаёте недвижимость?", ownerText: "Размещайте объекты, управляйте бронированиями и контролируйте статистику в Opero Homes" },
   en: { back: "Back", search: "Find a home", partner: "Become a partner", login: "Sign in", openMap: "Open property map", hide: "Hide map", resort: "Resort property", allProperties: "All available properties", catalogIntro: "Open any property to view photos, location, terms and available dates.", map: "Property map", chooseOnMap: "Choose a home on the map", otherArea: "Another area or dates", noMatch: "Didn't find the right option?", searchIntro: "Find another property by area, dates, capacity and budget.", address: "City, district or address", sort: "Sort", recommended: "Recommended", cheapest: "Price: lowest first", expensive: "Price: highest first", capacity: "Most capacity", reset: "Reset filters", city: "City", allCities: "All cities", district: "District", allDistricts: "All districts", dates: "Dates", guests: "Guests", minPrice: "Minimum price", maxPrice: "Maximum price", bedrooms: "Bedrooms", pricePeriod: "Price rental period", any: "Any", night: "Per night", week: "Per week", month: "Per month", availableOnly: "Show available only", found: "Properties found", loading: "Loading properties...", showMap: "Show on map", ownerTitle: "Do you own a property?", ownerText: "List properties, manage bookings and track performance with Opero Homes" },
   tr: { back: "Geri", search: "Konut ara", partner: "Partner ol", login: "Giriş yap", openMap: "Haritayı aç", hide: "Haritayı gizle", resort: "Tatil konutları", allProperties: "Tüm uygun konutlar", catalogIntro: "Fotoğrafları, konumu, koşulları ve uygun tarihleri görmek için bir konut açın.", map: "Konut haritası", chooseOnMap: "Haritada konut seçin", otherArea: "Başka bölge veya tarihler", noMatch: "Uygun seçenek bulamadınız mı?", searchIntro: "Bölge, tarih, kapasite ve bütçeye göre başka bir konut bulun.", address: "Şehir, bölge veya adres", sort: "Sıralama", recommended: "Önerilen", cheapest: "Fiyat: düşükten yükseğe", expensive: "Fiyat: yüksekten düşüğe", capacity: "En yüksek kapasite", reset: "Filtreleri sıfırla", city: "Şehir", allCities: "Tüm şehirler", district: "Bölge", allDistricts: "Tüm bölgeler", dates: "Tarihler", guests: "Misafir sayısı", minPrice: "Minimum fiyat", maxPrice: "Maksimum fiyat", bedrooms: "Yatak odası sayısı", pricePeriod: "Fiyat dönemi", any: "Tümü", night: "Gecelik", week: "Haftalık", month: "Aylık", availableOnly: "Sadece müsaitleri göster", found: "Bulunan konut", loading: "Konutlar yükleniyor...", showMap: "Haritada göster", ownerTitle: "Gayrimenkulünüzü mü kiralıyorsunuz?", ownerText: "Konutları yayınlayın, rezervasyonları yönetin ve Opero Homes ile istatistikleri takip edin" },
 } as const;
 
-function getAmenities(apartment: Apartment): string[] {
+const cardCopy = {
+  ru: { guests: "гостей", bedrooms: "спальни", beds: "кровати", bathrooms: "санузла", daily: "Посуточно", weekly: "Понедельно", monthly: "Помесячно", available: "Доступно", occupied: "Занято", addressPending: "Адрес уточняется", unavailable: "Фото недоступно", busy: "Занят на выбранные даты", open: "Открыть", book: "Забронировать" },
+  en: { guests: "guests", bedrooms: "bedrooms", beds: "beds", bathrooms: "bathrooms", daily: "Daily", weekly: "Weekly", monthly: "Monthly", available: "Available", occupied: "Occupied", addressPending: "Address pending", unavailable: "Photo unavailable", busy: "Busy on selected dates", open: "Open", book: "Book" },
+  tr: { guests: "misafir", bedrooms: "yatak odası", beds: "yatak", bathrooms: "banyo", daily: "Günlük", weekly: "Haftalık", monthly: "Aylık", available: "Müsait", occupied: "Dolu", addressPending: "Adres bekleniyor", unavailable: "Fotoğraf yok", busy: "Seçilen tarihlerde dolu", open: "Aç", book: "Rezervasyon" },
+} as const;
+
+function getAmenities(apartment: Apartment, language: Language): string[] {
+  const copy = cardCopy[language];
   const amenities: string[] = [];
 
-  if (apartment.bedrooms > 0) amenities.push(`${apartment.bedrooms} спальни`);
-  if (apartment.bathrooms > 0) amenities.push(`${apartment.bathrooms} санузла`);
-  if (apartment.rentalTypes.daily) amenities.push("Посуточно");
-  if (apartment.rentalTypes.weekly) amenities.push("Понедельно");
-  if (apartment.rentalTypes.monthly) amenities.push("Помесячно");
+  if (apartment.bedrooms > 0) amenities.push(`${apartment.bedrooms} ${copy.bedrooms}`);
+  if (apartment.bathrooms > 0) amenities.push(`${apartment.bathrooms} ${copy.bathrooms}`);
+  if (apartment.rentalTypes.daily) amenities.push(copy.daily);
+  if (apartment.rentalTypes.weekly) amenities.push(copy.weekly);
+  if (apartment.rentalTypes.monthly) amenities.push(copy.monthly);
 
   return amenities.slice(0, 5);
 }
@@ -57,9 +63,7 @@ function PublicCatalogHeader({ language, isMapHidden, onShowMap, onLanguageChang
           <a href="#find-another-property" className="rounded-xl px-3 py-2 text-slate-200 hover:bg-white/10">{copy.search}</a>
           <Link href="/business" className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-semibold text-cyan-200 hover:bg-cyan-500/20">{copy.partner}</Link>
           <Link href="/login" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">{copy.login}</Link>
-          <div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1" aria-label="Language">
-            {(["ru", "en", "tr"] as const).map((option) => <button key={option} type="button" onClick={() => onLanguageChange(option)} aria-pressed={language === option} className={`rounded-lg px-2 py-1 text-xs font-semibold ${language === option ? "bg-cyan-500/25 text-cyan-200" : "text-slate-400 hover:text-white"}`}>{option.toUpperCase()}</button>)}
-          </div>
+          <LanguageSwitcher language={language} onChange={onLanguageChange} />
         </div>
       </nav>
       {isMapHidden ? (
@@ -93,6 +97,7 @@ function ApartmentCard({
   checkOut = "",
   guests = "",
   compact = false,
+  language,
 }: {
   apartment: Apartment;
   bookings: ReturnType<typeof getBookings>;
@@ -100,7 +105,9 @@ function ApartmentCard({
   checkOut?: string;
   guests?: string;
   compact?: boolean;
+  language: Language;
 }) {
+  const copy = cardCopy[language];
   const photoCount = countRenderableApartmentPhotos(apartment);
   const availableForDates = checkIn && checkOut
     ? isApartmentAvailableForDates({ apartment, bookings, checkIn, checkOut })
@@ -116,7 +123,7 @@ function ApartmentCard({
             alt={apartment.title}
             className="h-full w-full object-cover"
             placeholderClassName="h-full w-full"
-            placeholderText="Фото недоступно"
+            placeholderText={copy.unavailable}
           />
           {photoCount > 0 ? <div className="absolute right-2 top-2 rounded-full bg-black/50 px-2 py-1 text-xs text-slate-200">{`1 / ${photoCount}`}</div> : null}
         </div>
@@ -127,24 +134,24 @@ function ApartmentCard({
           <Link href={`/properties/${apartment.id}`} className="hover:text-cyan-200">{apartment.title}</Link>
         </h2>
         <p className="mt-1 text-sm text-slate-400">{getApartmentPublicLocation(apartment)}</p>
-        {!compact ? <p className="mt-1 text-sm text-slate-300">{apartment.address || "Адрес уточняется"}</p> : null}
+        {!compact ? <p className="mt-1 text-sm text-slate-300">{apartment.address || copy.addressPending}</p> : null}
 
         <div className="mt-2 flex items-center justify-between gap-3">
           <p className="text-cyan-300">{formatApartmentPrice(apartment)}</p>
-          <p className="text-xs text-slate-300">{availableForDates ? "Доступно" : "Занято"}</p>
+          <p className="text-xs text-slate-300">{availableForDates ? copy.available : copy.occupied}</p>
         </div>
 
-        <p className="mt-2 text-sm text-slate-300">До {apartment.maxGuests} гостей · {apartment.bedrooms} спальни · {apartment.rooms} кровати</p>
+        <p className="mt-2 text-sm text-slate-300">{apartment.maxGuests} {copy.guests} · {apartment.bedrooms} {copy.bedrooms} · {apartment.rooms} {copy.beds}</p>
 
         <div className={`${compact ? "mt-2" : "mt-3"} flex flex-wrap gap-2 text-xs`}>
-          {getAmenities(apartment).slice(0, compact ? 2 : 5).map((amenity) => <span key={amenity} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">{amenity}</span>)}
+          {getAmenities(apartment, language).slice(0, compact ? 2 : 5).map((amenity) => <span key={amenity} className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">{amenity}</span>)}
         </div>
 
-        {!availableForDates && checkIn && checkOut ? <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">Занят на выбранные даты</p> : null}
+        {!availableForDates && checkIn && checkOut ? <p className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">{copy.busy}</p> : null}
 
         <div className={`${compact ? "mt-3" : "mt-4"} flex flex-wrap gap-2`}>
-          <Link href={`/properties/${apartment.id}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">Открыть</Link>
-          <Link href={`/properties/${apartment.id}?openBooking=1${bookingQuery}`} className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/20">Забронировать</Link>
+          <Link href={`/properties/${apartment.id}`} className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.open}</Link>
+          <Link href={`/properties/${apartment.id}?openBooking=1${bookingQuery}`} className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/20">{copy.book}</Link>
         </div>
       </div>
     </article>
@@ -152,7 +159,7 @@ function ApartmentCard({
 }
 
 export default function PublicCatalog() {
-  const [language, setLanguage] = useState<Language>("ru");
+  const [language, setLanguage] = useLanguage();
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
@@ -171,23 +178,6 @@ export default function PublicCatalog() {
   const [bookings, setBookings] = useState<ReturnType<typeof getBookings>>([]);
 
   const copy = catalogCopy[language];
-
-  useEffect(() => {
-    document.documentElement.lang = language;
-  }, [language]);
-
-  useEffect(() => {
-    const storedLanguage = window.localStorage.getItem("opero-language");
-    if (storedLanguage !== "ru" && storedLanguage !== "en" && storedLanguage !== "tr") return;
-    const frame = window.requestAnimationFrame(() => setLanguage(storedLanguage));
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
-
-  function changeLanguage(nextLanguage: Language) {
-    setLanguage(nextLanguage);
-    window.localStorage.setItem("opero-language", nextLanguage);
-    document.documentElement.lang = nextLanguage;
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -269,7 +259,7 @@ export default function PublicCatalog() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
       <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-        <PublicCatalogHeader language={language} isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} onLanguageChange={changeLanguage} />
+        <PublicCatalogHeader language={language} isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} onLanguageChange={setLanguage} />
         <section className="space-y-12">
           <section aria-labelledby="catalog-heading">
             <div className="mb-6"><p className="text-sm font-medium text-cyan-300">{copy.resort}</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">{copy.allProperties}</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">{copy.catalogIntro}</p></div>
@@ -289,7 +279,7 @@ export default function PublicCatalog() {
                 )}
               </div>
             ) : null}
-            {isLoading ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.loading}</div> : publicApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div> : visibleApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><p className="text-slate-100">По вашему запросу ничего не найдено</p><p className="mt-2 text-sm text-slate-400">Попробуйте изменить город, район, даты или количество гостей.</p><button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.reset}</button></div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleApartments.map((apartment) => <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact />)}</div>}
+            {isLoading ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.loading}</div> : publicApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div> : visibleApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><p className="text-slate-100">По вашему запросу ничего не найдено</p><p className="mt-2 text-sm text-slate-400">Попробуйте изменить город, район, даты или количество гостей.</p><button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.reset}</button></div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleApartments.map((apartment) => <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact language={language} />)}</div>}
           </section>
 
           <section id="find-another-property" aria-labelledby="search-heading">
