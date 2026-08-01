@@ -24,6 +24,13 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      setError("Ссылка для сброса недействительна или истекла. Запросите новое письмо.");
+      setLoading(false);
+      return;
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({ password });
     if (updateError) {
       setError(updateError.message);
