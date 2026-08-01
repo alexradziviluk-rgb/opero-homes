@@ -14,8 +14,6 @@ export default function GuestLayout({ children }: { children: React.ReactNode })
   const isPublicGuestRoute =
     pathname === "/guest/login" ||
     pathname === "/guest/register" ||
-    pathname === "/guest/properties" ||
-    pathname.startsWith("/guest/properties/") ||
     pathname === "/guest/book/new";
 
   useEffect(() => {

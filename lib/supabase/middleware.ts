@@ -65,6 +65,7 @@ export function isPublicPath(pathname: string) {
     "/reset-password",
     "/stay",
     "/guest/properties",
+    "/properties",
   ];
 
   if (explicitPublic.includes(pathname)) {
@@ -76,6 +77,10 @@ export function isPublicPath(pathname: string) {
   }
 
   if (pathname.startsWith("/guest/properties/")) {
+    return true;
+  }
+
+  if (pathname.startsWith("/properties/")) {
     return true;
   }
 

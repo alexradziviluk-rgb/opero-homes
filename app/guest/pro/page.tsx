@@ -1,5 +1,5 @@
 import { permanentRedirect } from "next/navigation";
 
-export default function StayCatalogPage() {
+export default function LegacyGuestProPage() {
   permanentRedirect("/");
 }

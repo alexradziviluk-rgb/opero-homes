@@ -149,7 +149,7 @@ export default function GuestPropertyDetailsPage() {
       <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
         <h1 className="text-2xl font-semibold text-white">Объект недоступен</h1>
         <p className="mt-2 text-sm text-slate-400">Объект не найден или скрыт из публичного каталога.</p>
-        <Link href="/guest/properties" className="mt-4 inline-flex rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
+        <Link href="/" className="mt-4 inline-flex rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">
           Вернуться в каталог
         </Link>
       </section>
@@ -209,22 +209,6 @@ export default function GuestPropertyDetailsPage() {
   const requiresManagerConfirmation = priceInfo?.period === "month";
 
   function openBookingPanel() {
-    if (!currentUser) {
-      const propertyId = apartment?.id ?? apartmentId;
-      if (!propertyId) {
-        setSubmitError("Выбранный объект недоступен.");
-        return;
-      }
-
-      const nextParams = new URLSearchParams({ openBooking: "1" });
-      if (checkIn) nextParams.set("checkIn", checkIn);
-      if (checkOut) nextParams.set("checkOut", checkOut);
-      if (guests) nextParams.set("guests", guests);
-      const nextPath = `/guest/properties/${propertyId}?${nextParams.toString()}`;
-      router.push(`/guest/login?next=${encodeURIComponent(nextPath)}`);
-      return;
-    }
-
     setIsBookingPanelOpen(true);
     bookingPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -241,22 +225,6 @@ export default function GuestPropertyDetailsPage() {
   async function handleSubmitBooking() {
     setSubmitError("");
     setSubmitSuccess("");
-
-    if (!currentUser) {
-      const propertyId = apartment?.id ?? apartmentId;
-      if (!propertyId) {
-        setSubmitError("Выбранный объект недоступен.");
-        return;
-      }
-
-      const nextParams = new URLSearchParams({ openBooking: "1" });
-      if (checkIn) nextParams.set("checkIn", checkIn);
-      if (checkOut) nextParams.set("checkOut", checkOut);
-      if (guests) nextParams.set("guests", guests);
-      const nextPath = `/guest/properties/${propertyId}?${nextParams.toString()}`;
-      router.push(`/guest/login?next=${encodeURIComponent(nextPath)}`);
-      return;
-    }
 
     if (!apartment) {
       setSubmitError("Выбранный объект недоступен.");

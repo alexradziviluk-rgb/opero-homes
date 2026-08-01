@@ -142,8 +142,8 @@ export default function PublicCatalogMap({
                   <p>{getApartmentPublicLocation(item.apartment)}</p>
                   <p>{price}</p>
                   <div className="flex gap-2">
-                    <Link href={`/stay/${item.apartment.id}`} className="underline">Подробнее</Link>
-                    <Link href={`/stay/${item.apartment.id}?openBooking=1${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`} className="underline">
+                    <Link href={`/properties/${item.apartment.id}`} className="underline">Подробнее</Link>
+                    <Link href={`/properties/${item.apartment.id}?openBooking=1${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`} className="underline">
                       Забронировать
                     </Link>
                   </div>

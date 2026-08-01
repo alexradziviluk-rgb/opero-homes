@@ -15,5 +15,5 @@ export default async function StayPropertyBookPage({
   if (query.checkOut) queryParts.push(`checkOut=${encodeURIComponent(query.checkOut)}`);
   if (query.guests) queryParts.push(`guests=${encodeURIComponent(query.guests)}`);
 
-  redirect(`/stay/${id}?${queryParts.join("&")}`);
+  redirect(`/properties/${id}?${queryParts.join("&")}`);
 }

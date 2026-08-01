@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 
 const items = [
-  { href: "/guest/properties", label: "Найти жилье" },
+  { href: "/", label: "Найти жилье" },
 ];
 
 export default function GuestNav() {

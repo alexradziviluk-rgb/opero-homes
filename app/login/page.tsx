@@ -207,7 +207,7 @@ export default function LoginPage() {
           <Link href="/forgot-password" className="text-slate-300 hover:text-white">
             Забыли пароль?
           </Link>
-          <Link href="/stay" className="text-cyan-300 hover:text-cyan-200">
+          <Link href="/" className="text-cyan-300 hover:text-cyan-200">
             Посмотреть объекты
           </Link>
         </div>

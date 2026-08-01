@@ -17,7 +17,7 @@ export default function GuestHomePage() {
           <p className="mt-2 text-sm text-slate-400">Даты, статус оплаты и инструкции</p>
         </Link>
 
-        <Link href="/guest/properties" className="rounded-2xl border border-white/10 bg-slate-900/80 p-5 hover:border-cyan-300/40">
+        <Link href="/" className="rounded-2xl border border-white/10 bg-slate-900/80 p-5 hover:border-cyan-300/40">
           <p className="text-lg font-semibold text-white">Найти жилье</p>
           <p className="mt-2 text-sm text-slate-400">Каталог опубликованных объектов</p>
         </Link>

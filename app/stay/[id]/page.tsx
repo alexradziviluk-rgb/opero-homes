@@ -17,5 +17,5 @@ export default async function StayPropertyPage({
   if (query.guests) queryParts.push(`guests=${encodeURIComponent(query.guests)}`);
 
   const suffix = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
-  redirect(`/guest/properties/${id}${suffix}`);
+  redirect(`/properties/${id}${suffix}`);
 }
