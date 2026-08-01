@@ -2,42 +2,25 @@
 -- Apply only after reviewing in a non-production environment.
 
 alter table public.bookings
-  add column if not exists booking_number text,
-  add column if not exists check_in_date date,
-  add column if not exists check_out_date date,
-  add column if not exists guest_email text,
-  add column if not exists guest_phone text,
-  add column if not exists currency text not null default 'EUR',
   add column if not exists guest_comment text not null default '',
   add column if not exists guests_count integer not null default 1,
-  add column if not exists request_status text not null default 'pending',
-  add column if not exists rental_type text,
-  add column if not exists price_per_period numeric,
-  add column if not exists nightly_rate numeric,
-  add column if not exists accommodation_total numeric,
-  add column if not exists cleaning_fee numeric,
-  add column if not exists deposit numeric,
-  add column if not exists security_deposit numeric,
-  add column if not exists discount numeric not null default 0;
+  add column if not exists request_status text;
 
 update public.bookings
-set
-  check_in_date = coalesce(check_in_date, check_in),
-  check_out_date = coalesce(check_out_date, check_out),
-  security_deposit = coalesce(security_deposit, deposit),
-  request_status = case
-    when status in ('pending', 'confirmed', 'rejected', 'cancelled') then status
+set request_status = case status
+  when 'pending' then 'pending'
+  when 'confirmed' then 'confirmed'
+  when 'cancelled' then 'cancelled'
+    when 'checked_in' then 'confirmed'
+    when 'checked_out' then 'confirmed'
+    when 'no_show' then 'confirmed'
     else 'pending'
   end
-where check_in_date is null
-   or check_out_date is null
-   or security_deposit is null
-   or request_status = 'pending' and status is distinct from 'pending';
+where request_status is null;
 
 alter table public.bookings
-  alter column check_in_date set default null,
-  alter column check_out_date set default null,
-  alter column source set default 'manual';
+  alter column request_status set default 'pending',
+  alter column request_status set not null;
 
 do $$
 begin
@@ -52,23 +35,14 @@ begin
       not valid;
   end if;
 
-  if not exists (
+  if exists (
     select 1 from pg_constraint
-    where conname = 'bookings_public_nonnegative_amounts_check'
+    where conname = 'bookings_public_request_status_check'
       and conrelid = 'public.bookings'::regclass
+      and not convalidated
   ) then
     alter table public.bookings
-      add constraint bookings_public_nonnegative_amounts_check
-      check (
-        (price_per_period is null or price_per_period >= 0)
-        and (nightly_rate is null or nightly_rate >= 0)
-        and (accommodation_total is null or accommodation_total >= 0)
-        and (cleaning_fee is null or cleaning_fee >= 0)
-        and (deposit is null or deposit >= 0)
-        and (security_deposit is null or security_deposit >= 0)
-        and (discount is null or discount >= 0)
-        and (total_amount is null or total_amount >= 0)
-      ) not valid;
+      validate constraint bookings_public_request_status_check;
   end if;
 end;
 $$;
@@ -79,22 +53,93 @@ create index if not exists idx_bookings_public_request_status
 create or replace function public.sync_booking_request_status()
 returns trigger
 language plpgsql
-set search_path = public
+set search_path = public, pg_catalog
 as $$
 begin
   if new.request_status is null then
-    new.request_status := coalesce(new.status, 'pending');
-  elsif tg_op = 'UPDATE' and new.status is distinct from old.status and new.request_status is not distinct from old.request_status then
-    new.request_status := new.status;
+    new.request_status := case new.status
+      when 'pending' then 'pending'
+      when 'confirmed' then 'confirmed'
+      when 'cancelled' then 'cancelled'
+      when 'checked_in' then 'confirmed'
+      when 'checked_out' then 'confirmed'
+      when 'no_show' then 'confirmed'
+      else 'pending'
+    end;
+  elsif new.request_status <> 'rejected'
+    and tg_op = 'UPDATE'
+    and new.status is distinct from old.status
+    and new.request_status is not distinct from old.request_status then
+    new.request_status := case new.status
+      when 'pending' then 'pending'
+      when 'confirmed' then 'confirmed'
+      when 'cancelled' then 'cancelled'
+      when 'checked_in' then 'confirmed'
+      when 'checked_out' then 'confirmed'
+      when 'no_show' then 'confirmed'
+      else new.request_status
+    end;
   end if;
   return new;
 end;
 $$;
 
-drop trigger if exists trg_sync_booking_request_status on public.bookings;
-create trigger trg_sync_booking_request_status
-before insert or update of status, request_status on public.bookings
-for each row execute function public.sync_booking_request_status();
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'trg_sync_booking_request_status'
+      and tgrelid = 'public.bookings'::regclass
+      and not tgisinternal
+  ) then
+    create trigger trg_sync_booking_request_status
+    before insert or update of status, request_status on public.bookings
+    for each row execute function public.sync_booking_request_status();
+  end if;
+end;
+$$;
+
+revoke all on table public.bookings from anon;
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'bookings'
+      and policyname = 'internal_bookings_all'
+      and roles = array['authenticated']::name[]
+      and cmd = 'ALL'
+      and qual = 'is_internal_user()'
+      and with_check = 'is_internal_user()'
+  ) then
+    alter policy internal_bookings_all on public.bookings
+      using (public.is_org_manager(organization_id))
+      with check (public.is_org_manager(organization_id));
+  elsif exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'bookings'
+      and policyname = 'internal_bookings_all'
+  ) then
+    raise exception 'internal_bookings_all exists with an unexpected definition; review before rollout';
+  elsif not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'bookings'
+      and policyname = 'bookings_org_managers'
+  ) then
+    create policy bookings_org_managers on public.bookings
+      for all to authenticated
+      using (public.is_org_manager(organization_id))
+      with check (public.is_org_manager(organization_id));
+  end if;
+end;
+$$;
 
 create or replace function public.create_public_booking_request(
   requested_apartment_id uuid,
@@ -122,6 +167,7 @@ declare
   cleaning_fee_value numeric;
   deposit_value numeric;
   total_value numeric;
+  source_value text;
   event_id uuid;
 begin
   if requested_guest_name is null or length(trim(requested_guest_name)) < 2 then
@@ -148,11 +194,14 @@ begin
   where id = requested_apartment_id
   for share;
 
-  if apartment_row.id is null then
+  if apartment_row.id is null or apartment_row.organization_id is null then
     raise exception using errcode = 'P0002', message = 'apartment_not_found';
   end if;
-  if coalesce(apartment_row.publication_status, apartment_row.publish_status) <> 'published'
-     or lower(coalesce(apartment_row.status, '')) = 'черновик'
+  if coalesce(apartment_row.publication_status, '') <> 'published'
+     and coalesce(apartment_row.publish_status, '') <> 'Опубликован' then
+    raise exception using errcode = '42501', message = 'apartment_unavailable';
+  end if;
+  if lower(coalesce(apartment_row.status, '')) = 'черновик'
      or lower(coalesce(apartment_row.availability, '')) = 'на обслуживании' then
     raise exception using errcode = '42501', message = 'apartment_unavailable';
   end if;
@@ -200,19 +249,31 @@ begin
     raise exception using errcode = '23P01', message = 'booking_conflict';
   end if;
 
+  -- Production currently allows website but not public_website in source check.
+  -- Use public_website only when the existing check already supports it.
+  select case
+    when position('public_website' in pg_get_constraintdef(oid)) > 0 then 'public_website'
+    else 'website'
+  end
+  into source_value
+  from pg_constraint
+  where conrelid = 'public.bookings'::regclass
+    and conname = 'bookings_source_check';
+  source_value := coalesce(source_value, 'website');
+
   insert into public.bookings (
-    organization_id, apartment_id, booking_number, check_in, check_out, check_in_date, check_out_date,
+    organization_id, apartment_id, booking_number, check_in_date, check_out_date,
     adults, guests_count, guest_name, guest_email, guest_phone, guest_comment,
     rental_type, price_per_period, nightly_rate, accommodation_total, cleaning_fee,
     deposit, security_deposit, discount, total_amount, currency, status, request_status,
     payment_status, source, created_at, updated_at
   ) values (
     apartment_row.organization_id, apartment_row.id, 'WEB-' || upper(substr(gen_random_uuid()::text, 1, 8)),
-    requested_check_in, requested_check_out, requested_check_in, requested_check_out,
+    requested_check_in, requested_check_out,
     requested_guests_count, requested_guests_count,
     trim(requested_guest_name), lower(trim(requested_guest_email)), trim(requested_guest_phone), coalesce(trim(requested_guest_comment), ''),
     requested_rental_type, price_per_period, price_per_period, accommodation_total, cleaning_fee_value,
-    deposit_value, deposit_value, 0, total_value, 'EUR', 'pending', 'pending', 'unpaid', 'public_website', now(), now()
+    deposit_value, deposit_value, 0, total_value, 'EUR', 'pending', 'pending', 'unpaid', source_value, now(), now()
   ) returning * into booking_row;
 
   if to_regclass('public.notification_events') is not null then
