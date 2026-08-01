@@ -3,6 +3,7 @@ export type BookingStatus =
   | "confirmed"
   | "checked_in"
   | "checked_out"
+  | "rejected"
   | "cancelled";
 
 export type PaymentStatus =
@@ -50,6 +51,7 @@ export type Booking = {
     | "phone"
     | "whatsapp"
     | "website"
+    | "public_website"
     | "airbnb"
     | "booking"
     | "manual"

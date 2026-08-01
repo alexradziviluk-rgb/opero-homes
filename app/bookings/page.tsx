@@ -104,6 +104,45 @@ export default function BookingsPage() {
     }
   }
 
+  async function handleRejectOne(booking: Booking) {
+    if (!currentUser || !canConfirmBookings) {
+      setActionError("Недостаточно прав для отклонения запроса.");
+      return;
+    }
+
+    try {
+      await persistBookingStatus(booking, "rejected");
+      setActionMessage("Запрос отклонён. Даты остались доступными.");
+      await reloadBookings();
+    } catch {
+      setActionError("Не удалось отклонить запрос");
+    }
+  }
+
+  async function handleChangeAmount(booking: Booking) {
+    if (!currentUser || !canConfirmBookings || booking.status !== "pending") return;
+    const nextAmount = window.prompt("Согласованная стоимость", String(booking.totalAmount));
+    if (nextAmount === null) return;
+    const totalAmount = Number(nextAmount);
+    if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+      setActionError("Укажите корректную стоимость.");
+      return;
+    }
+
+    const response = await fetch(`/api/bookings/${booking.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ totalAmount }),
+    });
+    if (!response.ok) {
+      setActionError("Не удалось изменить согласованную стоимость.");
+      return;
+    }
+
+    setActionMessage("Согласованная стоимость изменена.");
+    await reloadBookings();
+  }
+
   async function handleBulkConfirm() {
     if (!currentUser || !canConfirmBookings) {
       setActionError("Недостаточно прав для подтверждения бронирований.");
@@ -276,6 +315,12 @@ export default function BookingsPage() {
                               >
                                 {isSingleConfirmingId === b.id ? "Подтверждаем..." : "Подтвердить"}
                               </button>
+                            ) : null}
+                            {canConfirmThisBooking ? (
+                              <>
+                                <button type="button" onClick={() => void handleChangeAmount(b)} className="rounded px-2 py-1 bg-amber-500/10 text-xs text-amber-200">Изменить сумму</button>
+                                <button type="button" onClick={() => void handleRejectOne(b)} className="rounded px-2 py-1 bg-rose-500/10 text-xs text-rose-200">Отклонить</button>
+                              </>
                             ) : null}
                             <Link href={`/bookings/${b.id}`} className="rounded px-2 py-1 bg-white/5 text-xs">Открыть</Link>
                             <Link href={`/bookings/${b.id}/edit`} className="rounded px-2 py-1 bg-white/5 text-xs">Редактировать</Link>

@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
 
-const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
+const BOOKING_STATUSES = new Set(["pending", "confirmed", "rejected", "checked_in", "checked_out", "cancelled"]);
 const MANAGER_ROLES = new Set(["owner", "manager"]);
 
 function error(status: number, message: string, code?: string) {
@@ -91,7 +91,7 @@ export async function GET(
       status: booking.status,
       paymentStatus: booking.payment_status,
       source: booking.source,
-      notes: "notes" in booking ? booking.notes : null,
+      notes: "notes" in booking ? booking.notes : booking.guest_comment ?? null,
       createdAt: booking.created_at,
       updatedAt: booking.updated_at,
     },
@@ -122,8 +122,12 @@ export async function PATCH(
   const status = typeof body.status === "string" ? body.status.trim() : existing.status;
   if (!BOOKING_STATUSES.has(status)) return error(400, "Invalid booking status");
 
-  const isStatusOnly = Object.keys(body).every((key) => key === "status");
+  const isStatusOnly = Object.keys(body).every((key) => key === "status" || key === "totalAmount");
   const updateRow: Record<string, string> = { status, updated_at: new Date().toISOString() };
+
+  if (typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount) && status === "pending") {
+    updateRow.total_amount = String(Math.max(0, body.totalAmount));
+  }
 
   if (!isStatusOnly) {
     const guestName = typeof body.guestName === "string" ? body.guestName.trim() : "";
@@ -134,6 +138,7 @@ export async function PATCH(
     const checkInTime = typeof body.checkInTime === "string" ? body.checkInTime : "15:00";
     const checkOutTime = typeof body.checkOutTime === "string" ? body.checkOutTime : "11:00";
     const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+    const totalAmount = typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount) ? Math.max(0, body.totalAmount) : null;
 
     if (!guestName || !checkIn || !checkOut || checkOut <= checkIn) return error(400, "Invalid booking details");
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(checkInTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkOutTime)) {
@@ -168,6 +173,9 @@ export async function PATCH(
       check_out_time: checkOutTime,
       notes,
     });
+    if (totalAmount !== null && status === "pending") {
+      updateRow.total_amount = String(totalAmount);
+    }
   }
 
   const { data, error: updateError } = await supabase

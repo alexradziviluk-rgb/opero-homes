@@ -15,7 +15,7 @@ as $$
 $$;
 
 revoke all on function public.is_active_organization_member(uuid) from public;
-grant execute on function public.is_active_organization_member(uuid) to authenticated;
+grant execute on function public.is_active_organization_member(uuid) to anon, authenticated;
 
 drop trigger if exists trg_sync_organization_member_role_code on public.organization_members;
 drop function if exists public.sync_organization_member_role_code();

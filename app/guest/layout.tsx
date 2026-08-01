@@ -35,7 +35,7 @@ export default function GuestLayout({ children }: { children: React.ReactNode })
     }
   }, [currentUser, isAuthLoading, isPublicGuestRoute, router]);
 
-  if (isAuthLoading) {
+  if (isAuthLoading && !isPublicGuestRoute) {
     return <div className="p-6 text-slate-300">Загрузка...</div>;
   }
 

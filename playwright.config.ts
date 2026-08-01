@@ -1,6 +1,23 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const externalBaseUrl = process.env.E2E_BASE_URL;
+const isLocalE2E = process.env.E2E_LOCAL === "true";
+const localBaseUrl = "http://localhost:3201";
+const configuredBaseUrl = process.env.E2E_BASE_URL ?? localBaseUrl;
+const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
+if (isLocalE2E) {
+  if (configuredBaseUrl !== localBaseUrl) {
+    throw new Error(`E2E_LOCAL requires E2E_BASE_URL=${localBaseUrl}.`);
+  }
+
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(configuredSupabaseUrl)) {
+    throw new Error("E2E_LOCAL requires NEXT_PUBLIC_SUPABASE_URL to point to localhost or 127.0.0.1.");
+  }
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("E2E_LOCAL requires SUPABASE_SERVICE_ROLE_KEY for local fixture setup.");
+  }
+}
 
 export default defineConfig({
   testDir: "./e2e",
@@ -8,17 +25,24 @@ export default defineConfig({
   retries: 0,
   reporter: "line",
   use: {
-    baseURL: externalBaseUrl ?? "http://127.0.0.1:3100",
+    baseURL: configuredBaseUrl,
     storageState: process.env.E2E_STORAGE_STATE || undefined,
     trace: "retain-on-failure",
     ...devices["Desktop Chrome"],
   },
-  webServer: externalBaseUrl
+  webServer: process.env.E2E_BASE_URL && !isLocalE2E
     ? undefined
     : {
-        command: "npm run dev -- --port 3100",
-        url: "http://127.0.0.1:3100/login",
-        reuseExistingServer: true,
+        command: "npm run dev -- --port 3201",
+        url: `${localBaseUrl}/login`,
+        reuseExistingServer: false,
         timeout: 120_000,
+        env: {
+          E2E_LOCAL: "true",
+          E2E_BASE_URL: localBaseUrl,
+          NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
+        },
       },
 });

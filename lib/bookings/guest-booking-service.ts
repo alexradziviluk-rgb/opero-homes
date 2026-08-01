@@ -10,6 +10,11 @@ export type GuestBookingInput = {
   checkIn: string;
   checkOut: string;
   guests: number;
+  rentalType: "daily" | "weekly" | "monthly";
+  guestName: string;
+  guestEmail: string;
+  guestPhone: string;
+  guestComment: string;
 };
 
 type ServerApartment = Apartment & {
@@ -27,9 +32,11 @@ export type GuestBookingQuote = {
   currency: string;
   pricePeriod: "night" | "week" | "month";
   pricePerPeriod: number;
+  rentalType: "daily" | "weekly" | "monthly";
   accommodationAmount: number;
   cleaningFee: number;
   deposit: number;
+  discount: number;
   totalAmount: number;
   maxGuests: number;
   minimumStay: number | null;
@@ -121,6 +128,7 @@ export type GuestBookingServiceErrorCode =
   | "capacity_exceeded"
   | "minimum_stay_not_met"
   | "pricing_not_configured"
+  | "rental_type_not_allowed"
   | "booking_conflict"
   | "insert_failed"
   | "permission_denied"
@@ -208,7 +216,13 @@ function isBookableApartment(apartment: Apartment): boolean {
   return isApartmentPublic(apartment) && normalize(apartment.availability) !== "на обслуживании" && normalize(apartment.status) !== "черновик";
 }
 
-function parsePriceAmount(apartment: Apartment): { amount: number; currency: string; period: "night" | "week" | "month" } | null {
+function parsePriceAmount(apartment: Apartment, rentalType: GuestBookingInput["rentalType"]): { amount: number; currency: string; period: "night" | "week" | "month" } | null {
+  const configuredAmount = rentalType === "daily" ? apartment.dailyPrice : rentalType === "weekly" ? apartment.weeklyPrice : apartment.monthlyPrice;
+  const configuredPeriod = rentalType === "daily" ? "night" : rentalType === "weekly" ? "week" : "month";
+  if (apartment.rentalTypes[rentalType] && Number.isFinite(configuredAmount) && (configuredAmount ?? 0) > 0) {
+    return { amount: configuredAmount as number, currency: "EUR", period: configuredPeriod };
+  }
+
   const info = getApartmentPriceInfo(apartment);
   if (!info || !Number.isFinite(info.amount) || info.amount <= 0) {
     return null;
@@ -419,7 +433,7 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
     return { ok: false, errorCode: "apartment_unavailable", errorMessage: "Apartment is temporarily unavailable." };
   }
 
-  const priceInfo = parsePriceAmount(apartment);
+  const priceInfo = parsePriceAmount(apartment, input.rentalType);
   if (!priceInfo) {
     return { ok: false, errorCode: "pricing_not_configured", errorMessage: "Apartment pricing is not configured." };
   }
@@ -499,9 +513,11 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
       currency: priceInfo.currency,
       pricePeriod: priceInfo.period,
       pricePerPeriod: priceInfo.amount,
+      rentalType: input.rentalType,
       accommodationAmount,
       cleaningFee,
       deposit,
+      discount: 0,
       totalAmount,
       maxGuests: apartment.maxGuests,
       minimumStay:
@@ -518,101 +534,55 @@ export async function createGuestBooking(
   supabase: SupabaseClient,
   input: GuestBookingInput,
 ): Promise<GuestBookingServiceResult<GuestBookingRecord & { quote: GuestBookingQuote }>> {
-  const currentUserResult = await getServerCurrentUserContext();
-  if (!currentUserResult.currentUserContext) {
-    return {
-      ok: false,
-      errorCode: currentUserResult.errorCode === "profile_missing" ? "profile_missing" : "session_expired",
-      errorMessage: "Authenticated guest profile is not available.",
-      supabaseErrorCode: currentUserResult.errorCode,
-    };
-  }
-
-  const userContext = currentUserResult.currentUserContext;
-  const profile = userContext.profile;
   const quoteResult = await buildGuestBookingQuote(supabase, input);
   if (!quoteResult.ok) {
     return quoteResult;
   }
 
   const quote = quoteResult.data;
-  const guestName = formatGuestName(profile);
-  const guestFirstName = profile.first_name?.trim() || guestName;
-  const guestLastName = profile.last_name?.trim() || "Гость";
-  const guestEmail = profile.email?.trim().toLowerCase() ?? userContext.authEmail.trim().toLowerCase();
-  const guestPhone = profile.phone?.trim() ?? "";
-
-  const guestResult = await ensureGuestRecord({
-    supabase,
-    organizationId: quote.organizationId,
-    authUserId: userContext.authUserId,
-    firstName: guestFirstName,
-    lastName: guestLastName,
-    email: guestEmail,
-    phone: guestPhone,
-  });
-
-  if (!guestResult.ok) {
-    return guestResult;
-  }
-
-  const insertedAt = new Date().toISOString();
-  const bookingNumber = `WEB-${Date.now()}-${userContext.authUserId.slice(0, 8).toUpperCase()}`;
-  const { data, error } = await supabase
-    .from("bookings")
-    .insert({
-      organization_id: quote.organizationId,
-      apartment_id: quote.apartmentId,
-      primary_guest_id: guestResult.data.id,
-      booking_number: bookingNumber,
-      check_in_date: quote.checkIn,
-      check_out_date: quote.checkOut,
-      adults: quote.guests,
-      nightly_rate: quote.pricePerPeriod,
-      accommodation_total: quote.accommodationAmount,
-      cleaning_fee: quote.cleaningFee,
-      security_deposit: quote.deposit,
-      total_amount: quote.totalAmount,
-      currency: quote.currency,
-      status: "pending",
-      source: "website",
-      created_at: insertedAt,
-      updated_at: insertedAt,
-    })
-    .select("id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at")
-    .single();
+  const { data, error } = await supabase.rpc("create_public_booking_request", {
+    requested_apartment_id: quote.apartmentId,
+    requested_check_in: quote.checkIn,
+    requested_check_out: quote.checkOut,
+    requested_guests_count: quote.guests,
+    requested_rental_type: quote.rentalType,
+    requested_guest_name: input.guestName.trim(),
+    requested_guest_email: input.guestEmail.trim().toLowerCase(),
+    requested_guest_phone: input.guestPhone.trim(),
+    requested_guest_comment: input.guestComment.trim(),
+  }).maybeSingle();
 
   if (error || !data) {
     return {
       ok: false,
-      errorCode: error?.code === "42501" ? "permission_denied" : "insert_failed",
+      errorCode: error?.message?.includes("booking_conflict") ? "booking_conflict" : error?.message?.includes("rental_type_not_allowed") ? "rental_type_not_allowed" : "insert_failed",
       errorMessage: error?.message ?? "Failed to create booking.",
       supabaseErrorCode: error?.code,
     };
   }
 
-  const booking = data as BookingRow;
+  const booking = data as { booking_id: string; organization_id: string; total_amount: number };
 
   return {
     ok: true,
     data: {
       quote,
-      id: booking.id,
+      id: booking.booking_id,
       organizationId: booking.organization_id,
-      apartmentId: booking.apartment_id,
+      apartmentId: quote.apartmentId,
       apartmentTitle: quote.apartmentTitle,
-      clientId: booking.primary_guest_id ?? guestResult.data.id,
-      guestName,
-      guestEmail,
-      guestPhone,
-      checkIn: booking.check_in_date,
-      checkOut: booking.check_out_date,
+      clientId: "",
+      guestName: input.guestName.trim(),
+      guestEmail: input.guestEmail.trim().toLowerCase(),
+      guestPhone: input.guestPhone.trim(),
+      checkIn: quote.checkIn,
+      checkOut: quote.checkOut,
       totalAmount: booking.total_amount ?? quote.totalAmount,
-      status: booking.status ?? "pending",
-      paymentStatus: booking.payment_status,
-      source: booking.source,
-      createdAt: booking.created_at,
-      updatedAt: booking.updated_at,
+      status: "pending",
+      paymentStatus: "unpaid",
+      source: "public_website",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
   };
 }

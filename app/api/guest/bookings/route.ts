@@ -42,14 +42,17 @@ export async function POST(request: Request) {
     checkIn: String(body.checkIn ?? "").trim(),
     checkOut: String(body.checkOut ?? "").trim(),
     guests: parseGuests(body.guests),
+    rentalType: body.rentalType === "weekly" || body.rentalType === "monthly" ? body.rentalType : "daily",
+    guestName: String(body.guestName ?? "").trim(),
+    guestEmail: String(body.guestEmail ?? "").trim(),
+    guestPhone: String(body.guestPhone ?? "").trim(),
+    guestComment: String(body.guestComment ?? "").trim(),
   };
 
   const result = await createGuestBooking(supabase, input);
   if (!result.ok) {
     const status =
-      result.errorCode === "session_expired" || result.errorCode === "profile_missing"
-        ? 401
-        : result.errorCode === "permission_denied"
+      result.errorCode === "permission_denied"
         ? 403
         : result.errorCode === "booking_conflict"
         ? 409

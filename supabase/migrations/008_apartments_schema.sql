@@ -1,4 +1,6 @@
 alter table if exists public.apartments
+  add column if not exists slug text,
+  add column if not exists name text,
   add column if not exists type text,
   add column if not exists google_link text,
   add column if not exists city text,
@@ -35,6 +37,10 @@ alter table if exists public.apartments
   add column if not exists cover_photo_url text;
 
 update public.apartments
+set name = coalesce(name, title)
+where name is null;
+
+update public.apartments
 set
   publication_status = coalesce(publication_status, case when publish_status = 'Опубликован' then 'published' else 'draft' end),
   publish_status = coalesce(publish_status, case when publication_status = 'published' then 'Опубликован' else 'Черновик' end),
@@ -51,6 +57,10 @@ alter table if exists public.apartments
 
 alter table if exists public.apartments
   enable row level security;
+
+grant select on public.apartments to anon, authenticated;
+grant select on public.apartment_photos to anon, authenticated;
+grant select on public.organization_members, public.organizations to anon, authenticated;
 
 drop policy if exists apartments_select_public on public.apartments;
 create policy apartments_select_public on public.apartments

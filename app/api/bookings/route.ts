@@ -23,7 +23,7 @@ type CreateBookingPayload = {
   source?: string;
 };
 
-const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in"]);
+const BOOKING_STATUSES = new Set(["pending", "confirmed", "rejected", "checked_in"]);
 const PAYMENT_STATUSES = new Set(["unpaid", "partially_paid", "paid", "refunded"]);
 const MANAGER_ROLES = new Set(["owner", "manager"]);
 const RENTAL_TYPES = new Set(["daily", "weekly", "monthly"]);
@@ -119,7 +119,7 @@ export async function GET() {
       status: booking.status,
       paymentStatus: booking.payment_status,
       source: booking.source,
-      notes: "notes" in booking ? booking.notes : null,
+      notes: "notes" in booking ? booking.notes : booking.guest_comment ?? null,
       createdAt: booking.created_at,
       updatedAt: booking.updated_at,
       };

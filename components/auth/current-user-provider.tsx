@@ -158,7 +158,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     const isAuthRoute = authRoutes.includes(pathname);
     const internalRoots = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users"];
     const isInternalRoute = internalRoots.some((route) => routeMatches(route));
-    const guestProtectedRoots = ["/guest/book/new", "/guest/bookings", "/guest/messages"];
+    const guestProtectedRoots = ["/guest/bookings", "/guest/messages"];
     const isGuestProtectedRoute = pathname === "/guest" || guestProtectedRoots.some((route) => routeMatches(route));
 
     if (!currentUser && isInternalRoute && !isAuthRoute) {

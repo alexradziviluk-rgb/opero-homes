@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import {
   formatApartmentPrice,
   getApartmentPublicLabel,
-  getApartmentPriceInfo,
   isApartmentPublic,
 } from "@/lib/apartments/public-catalog";
 import type { Apartment } from "@/types/apartment";
@@ -24,7 +23,9 @@ type QuoteResult = {
     accommodationAmount: number;
     cleaningFee: number;
     deposit: number;
+    discount: number;
     totalAmount: number;
+    rentalType: "daily" | "weekly" | "monthly";
     maxGuests: number;
     minimumStay: number | null;
   };
@@ -57,8 +58,7 @@ function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("ru-RU");
 }
 
-export default function GuestBookingNewPage() {
-  const router = useRouter();
+function GuestBookingForm() {
   const searchParams = useSearchParams();
 
   const apartmentIdFromUrl = searchParams.get("apartmentId") ?? "";
@@ -72,6 +72,7 @@ export default function GuestBookingNewPage() {
   const [checkIn, setCheckIn] = useState(checkInFromUrl);
   const [checkOut, setCheckOut] = useState(checkOutFromUrl);
   const [guests, setGuests] = useState(guestsFromUrl);
+  const [rentalType, setRentalType] = useState<"daily" | "weekly" | "monthly">("daily");
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
@@ -105,9 +106,15 @@ export default function GuestBookingNewPage() {
     [apartments, apartmentId],
   );
 
+  const effectiveRentalType = selectedApartment?.rentalTypes[rentalType]
+    ? rentalType
+    : selectedApartment?.rentalTypes.daily
+    ? "daily"
+    : selectedApartment?.rentalTypes.weekly
+    ? "weekly"
+    : "monthly";
+
   const nights = quote?.nights ?? (checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0);
-  const priceInfo = selectedApartment ? getApartmentPriceInfo(selectedApartment) : null;
-  const pricePerPeriod = quote?.pricePerPeriod ?? priceInfo?.amount ?? 0;
   const cleaningFee = quote?.cleaningFee ?? selectedApartment?.cleaningFee ?? 0;
   const deposit = quote?.deposit ?? selectedApartment?.deposit ?? 0;
   const accommodationAmount = quote?.accommodationAmount ?? 0;
@@ -129,7 +136,7 @@ export default function GuestBookingNewPage() {
         const response = await fetch("/api/guest/bookings/quote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apartmentId, checkIn, checkOut, guests: Number(guests) || 1 }),
+          body: JSON.stringify({ apartmentId, checkIn, checkOut, guests: Number(guests) || 1, rentalType: effectiveRentalType }),
           signal: controller.signal,
         });
 
@@ -156,7 +163,7 @@ export default function GuestBookingNewPage() {
     void loadQuote();
 
     return () => controller.abort();
-  }, [apartmentId, checkIn, checkOut, guests]);
+  }, [apartmentId, checkIn, checkOut, guests, effectiveRentalType]);
 
   async function handleSubmit() {
     setError("");
@@ -193,6 +200,11 @@ export default function GuestBookingNewPage() {
       return;
     }
 
+    if (!quote) {
+      setError("Сначала выберите доступные даты и дождитесь расчёта.");
+      return;
+    }
+
 
     setIsSubmitting(true);
     try {
@@ -204,6 +216,11 @@ export default function GuestBookingNewPage() {
           checkIn,
           checkOut,
           guests: Number(guests) || 1,
+          rentalType: effectiveRentalType,
+          guestName,
+          guestPhone,
+          guestEmail,
+          guestComment: notes,
         }),
       });
 
@@ -218,8 +235,7 @@ export default function GuestBookingNewPage() {
         return;
       }
 
-      setSuccess(`Бронирование создано. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
-      router.push(`/guest/bookings?created=${encodeURIComponent(payload.data.id)}`);
+      setSuccess(`Запрос отправлен. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -261,12 +277,22 @@ export default function GuestBookingNewPage() {
             <input type="number" min={1} value={guests} onChange={(event) => setGuests(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
           </label>
 
+          <label>
+            <div className="text-sm text-slate-300">Тип аренды</div>
+            <select value={effectiveRentalType} onChange={(event) => setRentalType(event.target.value as "daily" | "weekly" | "monthly")} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none">
+              {selectedApartment?.rentalTypes.daily ? <option value="daily">Посуточно</option> : null}
+              {selectedApartment?.rentalTypes.weekly ? <option value="weekly">Понедельно</option> : null}
+              {selectedApartment?.rentalTypes.monthly ? <option value="monthly">Помесячно</option> : null}
+            </select>
+          </label>
+
           <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-300">
             <p>Ночей: {nights}</p>
             <p>Тариф: {selectedApartment ? formatApartmentPrice(selectedApartment) : "Цена по запросу"}</p>
             <p>Проживание: {accommodationAmount.toLocaleString("ru-RU")} {currency}</p>
             <p>Уборка: {cleaningFee.toLocaleString("ru-RU")} {currency}</p>
             <p>Залог: {deposit.toLocaleString("ru-RU")} {currency}</p>
+            <p>Скидка: 0 {currency}</p>
             <p className="mt-1 font-semibold text-white">Итого: {totalAmount.toLocaleString("ru-RU")} {currency}</p>
             {isLoadingQuote ? <p className="mt-1 text-xs text-slate-400">Пересчитываем стоимость...</p> : null}
             {quoteError ? <p className="mt-1 text-xs text-rose-300">{quoteError}</p> : null}
@@ -300,10 +326,10 @@ export default function GuestBookingNewPage() {
           <button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={isSubmitting || isLoadingQuote}
+            disabled={isSubmitting || isLoadingQuote || !quote}
             className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Отправляем..." : "Забронировать"}
+            {isSubmitting ? "Отправляем..." : "Отправить запрос на бронирование"}
           </button>
           <Link href="/" className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
             Назад в каталог
@@ -311,5 +337,13 @@ export default function GuestBookingNewPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+export default function GuestBookingNewPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-slate-300">Загрузка формы...</div>}>
+      <GuestBookingForm />
+    </Suspense>
   );
 }

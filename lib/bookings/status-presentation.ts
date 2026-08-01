@@ -14,6 +14,7 @@ export function normalizeBookingStatus(status: unknown): BookingStatus {
   if (value === "confirmed" || value === "подтверждено" || value === "забронирован") return "confirmed";
   if (value === "checked_in" || value === "заезд") return "checked_in";
   if (value === "checked_out" || value === "выезд") return "checked_out";
+  if (value === "rejected" || value === "отклонено") return "rejected";
   if (value === "cancelled" || value === "отменено") return "cancelled";
 
   return "pending";
@@ -55,6 +56,15 @@ export function getBookingStatusPresentation(inputStatus: unknown): BookingStatu
       label: "Выезд",
       badgeClassName: "bg-slate-500/20 text-slate-200 border border-slate-400/30",
       dotClassName: "bg-slate-400 text-slate-900",
+    };
+  }
+
+  if (status === "rejected") {
+    return {
+      status,
+      label: "Отклонено",
+      badgeClassName: "bg-rose-500/20 text-rose-200 border border-rose-400/30",
+      dotClassName: "bg-rose-400 text-slate-900",
     };
   }
 

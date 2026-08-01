@@ -65,20 +65,39 @@ update public.bookings
 set check_out_time = time '11:00'
 where check_out_time is null;
 
-update public.bookings
-set price_per_period = total_amount
-where coalesce(price_per_period, 0) = 0
-  and coalesce(total_amount, 0) > 0
-  and coalesce(accommodation_total, 0) = 0
-  and coalesce(cleaning_fee, 0) = 0
-  and coalesce(security_deposit, 0) = 0;
+do $$
+declare
+  deposit_column text := 'deposit';
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'bookings' and column_name = 'security_deposit'
+  ) then
+    deposit_column := 'security_deposit';
+  end if;
 
-update public.bookings
-set accommodation_total = total_amount
-where coalesce(accommodation_total, 0) = 0
-  and coalesce(total_amount, 0) > 0
-  and coalesce(cleaning_fee, 0) = 0
-  and coalesce(security_deposit, 0) = 0;
+  execute format(
+    'update public.bookings
+     set price_per_period = total_amount
+     where coalesce(price_per_period, 0) = 0
+       and coalesce(total_amount, 0) > 0
+       and coalesce(accommodation_total, 0) = 0
+       and coalesce(cleaning_fee, 0) = 0
+       and coalesce(%I, 0) = 0',
+    deposit_column
+  );
+
+  execute format(
+    'update public.bookings
+     set accommodation_total = total_amount
+     where coalesce(accommodation_total, 0) = 0
+       and coalesce(total_amount, 0) > 0
+       and coalesce(cleaning_fee, 0) = 0
+       and coalesce(%I, 0) = 0',
+    deposit_column
+  );
+end;
+$$;
 
 update public.bookings
 set discount = 0

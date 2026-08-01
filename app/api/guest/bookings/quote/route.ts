@@ -23,6 +23,11 @@ export async function POST(request: Request) {
     checkIn: String(body.checkIn ?? "").trim(),
     checkOut: String(body.checkOut ?? "").trim(),
     guests: parseGuests(body.guests),
+    rentalType: body.rentalType === "weekly" || body.rentalType === "monthly" ? body.rentalType : "daily",
+    guestName: "",
+    guestEmail: "",
+    guestPhone: "",
+    guestComment: "",
   };
 
   const result = await buildGuestBookingQuote(supabase, input);
