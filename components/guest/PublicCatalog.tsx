@@ -45,7 +45,7 @@ function PublicCatalogHeader({ isMapHidden, onShowMap }: { isMapHidden: boolean;
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Публичная навигация">
         <Link href="/" className="text-lg font-bold tracking-tight text-white">opero<span className="text-cyan-300">.</span></Link>
         <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
-          <Link href="/" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Назад</Link>
+          <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.href = "/"; }} className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Назад</button>
           <a href="#find-another-property" className="rounded-xl px-3 py-2 text-slate-200 hover:bg-white/10">Поиск жилья</a>
           <Link href="/business" className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-semibold text-cyan-200 hover:bg-cyan-500/20">Стать партнёром</Link>
           <Link href="/login" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Войти</Link>
