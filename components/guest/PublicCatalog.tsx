@@ -145,7 +145,7 @@ export default function PublicCatalog() {
   const [bedrooms, setBedrooms] = useState("");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("recommended");
-  const [viewMode, setViewMode] = useState<CatalogViewMode>("list");
+  const [viewMode, setViewMode] = useState<CatalogViewMode>("map");
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<ReturnType<typeof getBookings>>([]);
@@ -231,6 +231,22 @@ export default function PublicCatalog() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
       <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
         <PublicCatalogHeader />
+        {viewMode === "map" && !isLoading && visibleApartments.length > 0 ? (
+          <section aria-labelledby="map-heading" className="mb-12 space-y-4">
+            <div>
+              <p className="text-sm font-medium text-cyan-300">Карта объектов</p>
+              <h2 id="map-heading" className="mt-1 text-2xl font-semibold text-white">Выберите жильё на карте</h2>
+            </div>
+            {mapApartments.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">
+                <p>{hasAnyPublicCoordinates ? "Объекты доступны в списке, но пока не отображаются на карте." : "Для объектов пока не указаны координаты."}</p>
+                <p className="mt-2 text-sm text-slate-400">Добавьте координаты в карточке объекта.</p>
+              </div>
+            ) : (
+              <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} />
+            )}
+          </section>
+        ) : null}
         <section className="space-y-12">
           <section aria-labelledby="catalog-heading">
             <div className="mb-6"><p className="text-sm font-medium text-cyan-300">Курортная недвижимость</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">Все доступные объекты</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Откройте любой объект, чтобы посмотреть фотографии, расположение, условия и свободные даты.</p></div>
@@ -246,7 +262,6 @@ export default function PublicCatalog() {
               <p className="mt-2 text-xs text-slate-500">Фильтр цены применяется по исходному тарифному периоду без автоматической конвертации.</p><label className="mt-4 inline-flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-900 text-cyan-300" />Показывать только свободные</label>
             </div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4"><p className="text-sm text-slate-200">{isLoading ? "Загружаем объекты..." : `Найдено объектов: ${visibleApartments.length}`}</p><div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1"><button type="button" onClick={() => setViewMode((current) => current === "map" ? "list" : "map")} className={`rounded-lg px-3 py-1 text-sm ${viewMode === "map" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}>{viewMode === "map" ? "Скрыть карту" : "Показать на карте"}</button></div></div>
-            {viewMode === "map" && !isLoading && visibleApartments.length > 0 ? mapApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300"><p>{hasAnyPublicCoordinates ? "Объекты доступны в списке, но пока не отображаются на карте." : "Для объектов пока не указаны координаты."}</p><p className="mt-2 text-sm text-slate-400">Добавьте координаты в карточке объекта.</p></div> : <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} /> : null}
           </section>
           <PartnerCallout />
         </section>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
 import type { MutableRefObject } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import { LayersControl, MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import { Icon, type LatLngExpression, type LatLngTuple, type Marker as LeafletMarker } from "leaflet";
 import type { Apartment } from "@/types/apartment";
 import { formatApartmentPrice, getApartmentCoordinates, getApartmentPublicLocation } from "@/lib/apartments/public-catalog";
@@ -132,11 +132,23 @@ export default function PublicCatalogMap({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80">
-      <MapContainer center={defaultCenter} zoom={6} className="h-[540px] w-full">
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+      <MapContainer center={defaultCenter} zoom={6} maxZoom={19} className="h-[clamp(480px,70vh,760px)] w-full">
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Спутник">
+            <TileLayer
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Карта">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
         <FitAllMarkers points={points} />
         <FocusMarkerById focusedApartmentId={focusedApartmentId} items={items} markerRefs={markerRefs} />
