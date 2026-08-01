@@ -7,7 +7,7 @@ import type { ApartmentPhoto } from "@/types/apartment";
 type Props = {
   apartmentId: string;
   photos: ApartmentPhoto[];
-  onChange: (photos: ApartmentPhoto[]) => void;
+  onChange: (photos: ApartmentPhoto[]) => Promise<void> | void;
   disabled?: boolean;
 };
 
@@ -138,11 +138,13 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
     const hasCover = combined.some((p) => p.isCover);
     const normalized = combined.map((p, i) => ({ ...p, sortOrder: i, isCover: hasCover ? p.isCover : i === 0 }));
 
-    setPhotos(normalized);
     try {
-      onChange(normalized);
+      await onChange(normalized);
+      setPhotos(normalized);
     } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : "неизвестная ошибка";
+      enqueueError(`Не удалось сохранить фотографии (${message})`);
     }
 
     setIsUploading(false);
@@ -174,11 +176,14 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
 
   async function handleRemove(photo: ApartmentPhoto) {
     const next = photos.filter((p) => p.id !== photo.id);
-    setPhotos(next);
     try {
-      onChange(next);
+      await onChange(next);
+      setPhotos(next);
     } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : "неизвестная ошибка";
+      enqueueError(`Не удалось сохранить фотографии (${message})`);
+      return;
     }
     try {
       await ImageStorageProvider.remove(photo);
@@ -187,17 +192,19 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
     }
   }
 
-  function handleMakeCover(idx: number) {
+  async function handleMakeCover(idx: number) {
     const next = photos.map((p) => ({ ...p, isCover: false }));
     next[idx].isCover = true;
     const [item] = next.splice(idx, 1);
     next.unshift(item);
     const normalized = next.map((p, i) => ({ ...p, sortOrder: i }));
-    setPhotos(normalized);
     try {
-      onChange(normalized);
+      await onChange(normalized);
+      setPhotos(normalized);
     } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : "неизвестная ошибка";
+      enqueueError(`Не удалось сохранить фотографии (${message})`);
     }
   }
 
@@ -208,19 +215,42 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
   function onDragOver(e: React.DragEvent) {
     e.preventDefault();
   }
-  function onDrop(e: React.DragEvent, idx: number) {
+  async function onDrop(e: React.DragEvent, idx: number) {
     e.preventDefault();
+    e.stopPropagation();
     const from = draggingIdx.current;
     if (from === null || from === undefined) return;
     const arr = [...photos];
     const [item] = arr.splice(from, 1);
     arr.splice(idx, 0, item);
     const normalized = arr.map((p, i) => ({ ...p, sortOrder: i }));
-    setPhotos(normalized);
     try {
-      onChange(normalized);
+      await onChange(normalized);
+      setPhotos(normalized);
     } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : "неизвестная ошибка";
+      enqueueError(`Не удалось сохранить фотографии (${message})`);
+    }
+    draggingIdx.current = null;
+  }
+
+  async function handleDropToEnd(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const from = draggingIdx.current;
+    if (from === null) return;
+
+    const next = [...photos];
+    const [item] = next.splice(from, 1);
+    next.push(item);
+    const normalized = next.map((photo, index) => ({ ...photo, sortOrder: index }));
+    try {
+      await onChange(normalized);
+      setPhotos(normalized);
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "неизвестная ошибка";
+      enqueueError(`Не удалось сохранить фотографии (${message})`);
     }
     draggingIdx.current = null;
   }
@@ -266,29 +296,14 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       <div
         className="grid grid-cols-3 gap-3"
         onDragOver={onDragOver}
-        onDrop={(e) => {
-          // drop to end
-          const from = draggingIdx.current;
-          if (from === null) return;
-          const arr = [...photos];
-          const [item] = arr.splice(from!, 1);
-          arr.push(item);
-          const normalized = arr.map((p, i) => ({ ...p, sortOrder: i }));
-          setPhotos(normalized);
-          try {
-            onChange(normalized);
-          } catch (e) {
-            console.error(e);
-          }
-          draggingIdx.current = null;
-        }}
+        onDrop={(e) => void handleDropToEnd(e)}
       >
         {photos.map((p, idx) => (
           <div
             key={p.id}
             draggable
             onDragStart={(e) => onDragStart(e, idx)}
-            onDrop={(e) => onDrop(e, idx)}
+            onDrop={(e) => void onDrop(e, idx)}
             className="relative rounded-lg border border-white/10 bg-slate-900/60 p-2"
           >
             <div className="h-36 w-full overflow-hidden rounded-md bg-white/5 flex items-center justify-center">
@@ -304,7 +319,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
                 {p.isCover ? (
                   <div className="rounded-full bg-cyan-500/20 px-2 py-1 text-xs text-cyan-200">Главная</div>
                 ) : (
-                  <button type="button" onClick={() => handleMakeCover(idx)} className="rounded-full bg-white/5 px-2 py-1 text-xs text-slate-200">Сделать главной</button>
+                  <button type="button" onClick={() => void handleMakeCover(idx)} className="rounded-full bg-white/5 px-2 py-1 text-xs text-slate-200">Сделать главной</button>
                 )}
                 <button type="button" onClick={() => void handleRemove(p)} className="rounded-full bg-rose-500/10 px-2 py-1 text-xs text-rose-300">Удалить</button>
               </div>

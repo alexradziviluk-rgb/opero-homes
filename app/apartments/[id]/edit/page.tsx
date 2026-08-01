@@ -115,9 +115,19 @@ export default function EditApartmentPage() {
     void loadAssignees();
   }, []);
 
-  const handlePhotosChange = useCallback((nextPhotos: ApartmentPhoto[]) => {
+  const handlePhotosChange = useCallback(async (nextPhotos: ApartmentPhoto[]) => {
+    if (!apartment) return;
+
     setPhotos(nextPhotos);
-  }, []);
+    const savedApartment = await saveApartmentToSupabase({
+      ...apartment,
+      photos: nextPhotos,
+      coverPhotoUrl: nextPhotos.find((photo) => photo.isCover)?.storagePath ?? null,
+    });
+    setApartment(savedApartment);
+    setPhotos(savedApartment.photos ?? []);
+    showToast("Фотографии сохранены");
+  }, [apartment]);
 
   function update<K extends keyof ApartmentForm>(key: K, value: ApartmentForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
