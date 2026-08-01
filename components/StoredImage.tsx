@@ -5,17 +5,24 @@ import { getBlob } from "@/lib/storage/indexed-db";
 
 type Props = {
   storagePath: string;
+  sourceUrl?: string;
   alt?: string;
   className?: string;
   fallback?: React.ReactNode;
 };
 
-export default function StoredImage({ storagePath, alt = "", className = "", fallback = null }: Props) {
-  const [url, setUrl] = useState<string | null>(null);
+export default function StoredImage({ storagePath, sourceUrl, alt = "", className = "", fallback = null }: Props) {
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const [sourceFailed, setSourceFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     let created: string | null = null;
+    if (sourceUrl) {
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!storagePath) return;
 
     (async () => {
@@ -24,7 +31,7 @@ export default function StoredImage({ storagePath, alt = "", className = "", fal
         if (!blob) return;
         const obj = URL.createObjectURL(blob);
         created = obj;
-        if (!cancelled) setUrl(obj);
+        if (!cancelled) setLocalUrl(obj);
       } catch (e) {
         console.error("Failed to load blob for", storagePath, e);
       }
@@ -38,10 +45,11 @@ export default function StoredImage({ storagePath, alt = "", className = "", fal
         } catch {}
       }
     };
-  }, [storagePath]);
+  }, [sourceUrl, storagePath]);
 
+  const url = sourceUrl && !sourceFailed ? sourceUrl : localUrl;
   if (url) {
-    return <img src={url} alt={alt} className={className} />;
+    return <img src={url} alt={alt} className={className} onError={() => sourceUrl ? setSourceFailed(true) : setLocalUrl(null)} />;
   }
 
   if (fallback) return <>{fallback}</>;

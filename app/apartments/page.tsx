@@ -201,6 +201,7 @@ export default function ApartmentsPage() {
                                     <Link href={`/apartments/${a.id}`} onClick={(e) => e.stopPropagation()}>
                                       <StoredImage
                                         storagePath={coverPhoto.storagePath}
+                                        sourceUrl={coverPhoto.url}
                                         alt={a.title}
                                         className="h-16 w-24 rounded-xl object-cover"
                                         fallback={
