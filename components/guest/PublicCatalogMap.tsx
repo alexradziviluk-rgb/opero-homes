@@ -167,7 +167,7 @@ export default function PublicCatalogMap({
 
   return (
     <div ref={mapContainerRef} className={`relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 ${isFullscreen ? "h-screen rounded-none" : ""}`}>
-      <div className="absolute right-3 top-3 z-[1000] flex gap-2">
+      <div className="flex items-center justify-end gap-2 border-b border-white/10 bg-slate-950/90 p-2">
         {onHide ? (
           <button type="button" onClick={onHide} className="rounded-lg border border-white/20 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900">
             Скрыть карту
@@ -182,16 +182,16 @@ export default function PublicCatalogMap({
           {isFullscreen ? "Свернуть" : "На весь экран"}
         </button>
       </div>
-      <MapContainer center={defaultCenter} zoom={6} maxZoom={19} className={`w-full ${isFullscreen ? "h-screen" : "h-[360px] sm:h-[420px] lg:h-[480px]"}`}>
+      <MapContainer center={defaultCenter} zoom={6} maxZoom={19} className={`w-full ${isFullscreen ? "h-[calc(100vh-58px)]" : "h-[360px] sm:h-[420px] lg:h-[480px]"}`}>
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Спутник">
+          <LayersControl.BaseLayer name="Спутник">
             <TileLayer
               attribution='&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               maxZoom={19}
             />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Карта">
+          <LayersControl.BaseLayer checked name="Карта">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
