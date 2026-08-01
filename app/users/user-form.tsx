@@ -1,6 +1,7 @@
 "use client";
 
 import type { UserCreateInput, UserRole, UserStatus } from "@/types/user";
+import { useAdminText } from "@/lib/i18n/admin";
 
 type UserFormValues = Omit<UserCreateInput, "organizationId">;
 
@@ -28,6 +29,7 @@ const statusOptions: UserStatus[] = [
 ];
 
 export default function UserForm({ value, errors, onChange }: UserFormProps) {
+  const translate = useAdminText();
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <label>
@@ -70,7 +72,7 @@ export default function UserForm({ value, errors, onChange }: UserFormProps) {
         <select value={value.status} onChange={(event) => onChange("status", event.target.value as UserStatus)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none">
           {statusOptions.map((status) => (
             <option key={status} value={status} className="bg-slate-900">
-              {status}
+              {translate(status)}
             </option>
           ))}
         </select>

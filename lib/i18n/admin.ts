@@ -35,6 +35,8 @@ const translations: Record<string, { en: string; tr: string }> = {
   "Заблокирован": { en: "Blocked", tr: "Engellendi" },
   "Неактивен": { en: "Inactive", tr: "Pasif" },
   "Приглашен": { en: "Invited", tr: "Davet edildi" },
+  "Ожидает подтверждения": { en: "Pending confirmation", tr: "Onay bekliyor" },
+  "Приглашение истекло": { en: "Invitation expired", tr: "Davetin süresi doldu" },
   "Активные приглашения": { en: "Active invitations", tr: "Aktif davetler" },
   "Приглашение сотрудника": { en: "Invite employee", tr: "Çalışan davet et" },
   "Настройки уведомлений": { en: "Notification settings", tr: "Bildirim ayarları" },

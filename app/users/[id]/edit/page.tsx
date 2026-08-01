@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
+import { useAdminText } from "@/lib/i18n/admin";
 import {
   ADDITIONAL_ORGANIZATION_ROLE_CODES,
   MANAGEABLE_ORGANIZATION_ROLE_CODES,
@@ -38,6 +39,7 @@ export default function EditUserPage() {
   const params = useParams();
   const userId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
+  const translate = useAdminText();
   const [user, setUser] = useState<OrganizationUser | null>(null);
   const [form, setForm] = useState<EditForm | null>(null);
   const [error, setError] = useState("");
@@ -127,7 +129,7 @@ export default function EditUserPage() {
                   <label><span className="text-sm text-slate-300">Email</span><input readOnly value={user.email} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-400 outline-none" /></label>
                   <label><span className="text-sm text-slate-300">Телефон</span><input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none" /></label>
                   <label><span className="text-sm text-slate-300">Основная роль</span><select value={form.roleCode} onChange={(event) => { const roleCode = event.target.value as ManageableOrganizationRoleCode; setForm({ ...form, roleCode, additionalRoleCodes: form.additionalRoleCodes.filter((role) => role !== roleCode) }); }} className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none">{MANAGEABLE_ORGANIZATION_ROLE_CODES.map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label>
-                  <label><span className="text-sm text-slate-300">Статус</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ManageableMemberStatus })} className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none"><option value="active">Активен</option><option value="paused">Приостановлен</option></select></label>
+                  <label><span className="text-sm text-slate-300">{translate("Статус")}</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ManageableMemberStatus })} className="mt-1 w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm outline-none"><option value="active">{translate("Активен")}</option><option value="paused">{translate("Приостановлен")}</option></select></label>
                   <fieldset className="sm:col-span-2">
                     <legend className="text-sm text-slate-300">Дополнительные роли</legend>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
