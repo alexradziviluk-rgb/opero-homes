@@ -106,7 +106,11 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
       const tasksPayload = (await tasksResponse.json()) as { ok: boolean; data?: TaskRow[]; error?: string };
       if (cancelled) return;
 
-      if (usersPayload.ok) setUsers(usersPayload.data?.responsible ?? []);
+      if (usersPayload.ok) {
+        setUsers(usersPayload.data?.responsible ?? []);
+      } else {
+        setError("Не удалось загрузить список сотрудников");
+      }
       setApartments(nextApartments);
       if (tasksPayload.ok) {
         setTasks((tasksPayload.data ?? []).map(mapTask).filter((task) => !filterType || task.taskType === filterType));
@@ -130,7 +134,24 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
 
   async function saveNewTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!title.trim() || !apartmentId.trim() || !assignedUserId || !dueAt) return;
+    if (!title.trim()) {
+      setError("Введите название задачи");
+      return;
+    }
+    if (!apartmentId.trim()) {
+      setError("Выберите объект");
+      return;
+    }
+    if (!assignedUserId) {
+      setError("Выберите ответственного сотрудника");
+      return;
+    }
+    if (!dueAt) {
+      setError("Укажите срок выполнения");
+      return;
+    }
+
+    setError(null);
 
     const response = await fetch("/api/operations/tasks", {
       method: "POST",
