@@ -225,7 +225,18 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
             <option value="">Ответственный</option>
             {users.map((user) => <option key={user.userId} value={user.userId}>{user.firstName} {user.lastName} · {user.roleCode}</option>)}
           </select>
-          <input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm" />
+          <label className="grid gap-1 text-xs text-slate-400">
+            Дата и время выполнения
+            <input
+              type="datetime-local"
+              aria-label="Дата и время выполнения"
+              value={dueAt}
+              onChange={(event) => setDueAt(event.target.value)}
+              onClick={(event) => event.currentTarget.showPicker()}
+              onFocus={(event) => event.currentTarget.showPicker()}
+              className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+            />
+          </label>
           <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             {Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
