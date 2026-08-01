@@ -23,8 +23,11 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const resetOrigin = configuredSiteUrl || (isLocalhost ? "https://operohq.netlify.app" : window.location.origin);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${resetOrigin}/reset-password`,
     });
     if (resetError) {
       setError(resetError.message);
