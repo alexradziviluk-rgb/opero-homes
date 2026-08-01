@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Task, TaskPriority, TaskStatus, TaskType } from "@/types/task";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import type { Apartment } from "@/types/apartment";
+import { useAdminText } from "@/lib/i18n/admin";
 
 type Assignee = {
   userId: string;
@@ -14,13 +15,13 @@ type Assignee = {
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  pending: "Pending",
-  assigned: "Assigned",
-  in_progress: "In Progress",
-  completed: "Completed",
-  verified: "Verified",
-  done: "Completed",
-  cancelled: "Cancelled",
+  pending: "Ожидает",
+  assigned: "Назначена",
+  in_progress: "В работе",
+  completed: "Завершена",
+  verified: "Проверена",
+  done: "Завершена",
+  cancelled: "Отменена",
 };
 
 const TYPE_LABELS: Record<TaskType, string> = {
@@ -80,6 +81,7 @@ function mapTask(row: TaskRow): Task {
 }
 
 export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
+  const translate = useAdminText();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +174,6 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     }
 
     setTasks((current) => [...current, mapTask(payload.data as TaskRow)].sort((left, right) => (left.dueAt ?? "").localeCompare(right.dueAt ?? "")));
-
     setTitle("");
     setApartmentId("");
     setAssignedUserId("");
@@ -253,7 +254,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
               <th className="px-4 py-3">Срок</th>
               <th className="px-4 py-3">Исполнитель</th>
               <th className="px-4 py-3">Приоритет</th>
-              <th className="px-4 py-3">Статус</th>
+              <th className="px-4 py-3">{translate("Статус")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -276,7 +277,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
                   <td className="px-4 py-3 text-slate-300">{PRIORITY_LABELS[task.priority ?? "normal"]}</td>
                   <td className="px-4 py-3">
                     <select value={task.status} onChange={(event) => void changeTask(task, { status: event.target.value as TaskStatus })} className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1">
-                      {Object.entries(STATUS_LABELS).filter(([value]) => canManage || value !== "verified").map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      {Object.entries(STATUS_LABELS).filter(([value]) => (canManage || value !== "verified") && value !== "done").map(([value, label]) => <option key={value} value={value}>{translate(label)}</option>)}
                     </select>
                   </td>
                 </tr>
