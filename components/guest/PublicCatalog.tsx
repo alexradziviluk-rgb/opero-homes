@@ -152,11 +152,7 @@ function ApartmentCard({
 }
 
 export default function PublicCatalog() {
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window === "undefined") return "ru";
-    const storedLanguage = window.localStorage.getItem("opero-language");
-    return storedLanguage === "ru" || storedLanguage === "en" || storedLanguage === "tr" ? storedLanguage : "ru";
-  });
+  const [language, setLanguage] = useState<Language>("ru");
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
@@ -179,6 +175,13 @@ export default function PublicCatalog() {
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+
+  useEffect(() => {
+    const storedLanguage = window.localStorage.getItem("opero-language");
+    if (storedLanguage !== "ru" && storedLanguage !== "en" && storedLanguage !== "tr") return;
+    const frame = window.requestAnimationFrame(() => setLanguage(storedLanguage));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   function changeLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
