@@ -24,6 +24,14 @@ type ApartmentMapItem = {
   longitude: number;
 };
 
+type Language = "ru" | "en" | "tr";
+
+const mapCopy = {
+  ru: { hide: "Скрыть карту", fullscreen: "На весь экран", collapse: "Свернуть", details: "Подробнее", book: "Забронировать", satellite: "Спутник", street: "Карта" },
+  en: { hide: "Hide map", fullscreen: "Full screen", collapse: "Collapse", details: "Details", book: "Book", satellite: "Satellite", street: "Street map" },
+  tr: { hide: "Haritayı gizle", fullscreen: "Tam ekran", collapse: "Daralt", details: "Detaylar", book: "Rezervasyon", satellite: "Uydu", street: "Harita" },
+} as const;
+
 function getCoordinateKey(latitude: number, longitude: number): string {
   return `${latitude.toFixed(6)}:${longitude.toFixed(6)}`;
 }
@@ -96,6 +104,7 @@ export default function PublicCatalogMap({
   checkOut,
   guests,
   onHide,
+  language = "ru",
 }: {
   apartments: Apartment[];
   focusedApartmentId: string | null;
@@ -103,7 +112,9 @@ export default function PublicCatalogMap({
   checkOut: string;
   guests: string;
   onHide?: () => void;
+  language?: Language;
 }) {
+  const copy = mapCopy[language];
   const items = useMemo<ApartmentMapItem[]>(() => {
     const coordinateGroups = new Map<string, number>();
 
@@ -170,28 +181,28 @@ export default function PublicCatalogMap({
       <div className="flex items-center justify-end gap-2 border-b border-white/10 bg-slate-950/90 p-2">
         {onHide ? (
           <button type="button" onClick={onHide} className="rounded-lg border border-white/20 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900">
-            Скрыть карту
+            {copy.hide}
           </button>
         ) : null}
         <button
           type="button"
           onClick={toggleFullscreen}
           className="rounded-lg border border-white/20 bg-slate-950/85 px-3 py-2 text-sm font-medium text-white shadow-lg backdrop-blur hover:bg-slate-900"
-          aria-label={isFullscreen ? "Свернуть карту" : "Открыть карту на весь экран"}
+          aria-label={isFullscreen ? copy.collapse : copy.fullscreen}
         >
-          {isFullscreen ? "Свернуть" : "На весь экран"}
+          {isFullscreen ? copy.collapse : copy.fullscreen}
         </button>
       </div>
       <MapContainer center={defaultCenter} zoom={6} maxZoom={19} className={`w-full ${isFullscreen ? "h-[calc(100vh-58px)]" : "h-[360px] sm:h-[420px] lg:h-[480px]"}`}>
         <LayersControl position="topright">
-          <LayersControl.BaseLayer name="Спутник">
+          <LayersControl.BaseLayer name={copy.satellite}>
             <TileLayer
               attribution='&copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               maxZoom={19}
             />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer checked name="Карта">
+          <LayersControl.BaseLayer checked name={copy.street}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -226,9 +237,9 @@ export default function PublicCatalogMap({
                   <p>{getApartmentPublicLocation(item.apartment)}</p>
                   <p>{price}</p>
                   <div className="flex gap-2">
-                    <Link href={`/properties/${item.apartment.id}`} className="underline">Подробнее</Link>
+                    <Link href={`/properties/${item.apartment.id}`} className="underline">{copy.details}</Link>
                     <Link href={`/properties/${item.apartment.id}?openBooking=1${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`} className="underline">
-                      Забронировать
+                      {copy.book}
                     </Link>
                   </div>
                 </div>

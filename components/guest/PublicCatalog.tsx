@@ -26,6 +26,13 @@ const PublicCatalogMap = dynamic(() => import("@/components/guest/PublicCatalogM
 
 type SortMode = "recommended" | "price_asc" | "price_desc" | "capacity_desc";
 type CatalogViewMode = "list" | "map";
+type Language = "ru" | "en" | "tr";
+
+const catalogCopy = {
+  ru: { back: "Назад", search: "Поиск жилья", partner: "Стать партнёром", login: "Войти", openMap: "Открыть карту объектов", hide: "Скрыть карту", resort: "Курортная недвижимость", allProperties: "Все доступные объекты", catalogIntro: "Откройте любой объект, чтобы посмотреть фотографии, расположение, условия и свободные даты.", map: "Карта объектов", chooseOnMap: "Выберите жильё на карте", otherArea: "Другой район или даты", noMatch: "Не нашли подходящий вариант?", searchIntro: "Найдите другой объект по району, датам, вместимости и бюджету.", address: "Город, район или адрес", sort: "Сортировка", recommended: "Рекомендуемые", cheapest: "Цена: сначала дешевле", expensive: "Цена: сначала дороже", capacity: "Больше вместимость", reset: "Сбросить фильтры", city: "Город", allCities: "Все города", district: "Район", allDistricts: "Все районы", dates: "Даты", guests: "Количество гостей", minPrice: "Минимальная цена", maxPrice: "Максимальная цена", bedrooms: "Количество спален", pricePeriod: "Период аренды для цены", any: "Любой", night: "За ночь", week: "За неделю", month: "За месяц", availableOnly: "Показывать только свободные", found: "Найдено объектов", loading: "Загружаем объекты...", showMap: "Показать на карте", ownerTitle: "Сдаёте недвижимость?", ownerText: "Размещайте объекты, управляйте бронированиями и контролируйте статистику в Opero Homes" },
+  en: { back: "Back", search: "Find a home", partner: "Become a partner", login: "Sign in", openMap: "Open property map", hide: "Hide map", resort: "Resort property", allProperties: "All available properties", catalogIntro: "Open any property to view photos, location, terms and available dates.", map: "Property map", chooseOnMap: "Choose a home on the map", otherArea: "Another area or dates", noMatch: "Didn't find the right option?", searchIntro: "Find another property by area, dates, capacity and budget.", address: "City, district or address", sort: "Sort", recommended: "Recommended", cheapest: "Price: lowest first", expensive: "Price: highest first", capacity: "Most capacity", reset: "Reset filters", city: "City", allCities: "All cities", district: "District", allDistricts: "All districts", dates: "Dates", guests: "Guests", minPrice: "Minimum price", maxPrice: "Maximum price", bedrooms: "Bedrooms", pricePeriod: "Price rental period", any: "Any", night: "Per night", week: "Per week", month: "Per month", availableOnly: "Show available only", found: "Properties found", loading: "Loading properties...", showMap: "Show on map", ownerTitle: "Do you own a property?", ownerText: "List properties, manage bookings and track performance with Opero Homes" },
+  tr: { back: "Geri", search: "Konut ara", partner: "Partner ol", login: "Giriş yap", openMap: "Haritayı aç", hide: "Haritayı gizle", resort: "Tatil konutları", allProperties: "Tüm uygun konutlar", catalogIntro: "Fotoğrafları, konumu, koşulları ve uygun tarihleri görmek için bir konut açın.", map: "Konut haritası", chooseOnMap: "Haritada konut seçin", otherArea: "Başka bölge veya tarihler", noMatch: "Uygun seçenek bulamadınız mı?", searchIntro: "Bölge, tarih, kapasite ve bütçeye göre başka bir konut bulun.", address: "Şehir, bölge veya adres", sort: "Sıralama", recommended: "Önerilen", cheapest: "Fiyat: düşükten yükseğe", expensive: "Fiyat: yüksekten düşüğe", capacity: "En yüksek kapasite", reset: "Filtreleri sıfırla", city: "Şehir", allCities: "Tüm şehirler", district: "Bölge", allDistricts: "Tüm bölgeler", dates: "Tarihler", guests: "Misafir sayısı", minPrice: "Minimum fiyat", maxPrice: "Maksimum fiyat", bedrooms: "Yatak odası sayısı", pricePeriod: "Fiyat dönemi", any: "Tümü", night: "Gecelik", week: "Haftalık", month: "Aylık", availableOnly: "Sadece müsaitleri göster", found: "Bulunan konut", loading: "Konutlar yükleniyor...", showMap: "Haritada göster", ownerTitle: "Gayrimenkulünüzü mü kiralıyorsunuz?", ownerText: "Konutları yayınlayın, rezervasyonları yönetin ve Opero Homes ile istatistikleri takip edin" },
+} as const;
 
 function getAmenities(apartment: Apartment): string[] {
   const amenities: string[] = [];
@@ -39,36 +46,41 @@ function getAmenities(apartment: Apartment): string[] {
   return amenities.slice(0, 5);
 }
 
-function PublicCatalogHeader({ isMapHidden, onShowMap }: { isMapHidden: boolean; onShowMap: () => void }) {
+function PublicCatalogHeader({ language, isMapHidden, onShowMap, onLanguageChange }: { language: Language; isMapHidden: boolean; onShowMap: () => void; onLanguageChange: (language: Language) => void }) {
+  const copy = catalogCopy[language];
   return (
     <header className="mb-8 rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 shadow-lg shadow-black/10">
       <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Публичная навигация">
         <Link href="/" className="text-lg font-bold tracking-tight text-white">opero<span className="text-cyan-300">.</span></Link>
         <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
-          <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.href = "/"; }} className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Назад</button>
-          <a href="#find-another-property" className="rounded-xl px-3 py-2 text-slate-200 hover:bg-white/10">Поиск жилья</a>
-          <Link href="/business" className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-semibold text-cyan-200 hover:bg-cyan-500/20">Стать партнёром</Link>
-          <Link href="/login" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">Войти</Link>
+          <button type="button" onClick={() => { if (window.history.length > 1) window.history.back(); else window.location.href = "/"; }} className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">{copy.back}</button>
+          <a href="#find-another-property" className="rounded-xl px-3 py-2 text-slate-200 hover:bg-white/10">{copy.search}</a>
+          <Link href="/business" className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 font-semibold text-cyan-200 hover:bg-cyan-500/20">{copy.partner}</Link>
+          <Link href="/login" className="rounded-xl border border-white/10 px-3 py-2 text-slate-200 hover:bg-white/10">{copy.login}</Link>
+          <div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1" aria-label="Language">
+            {(["ru", "en", "tr"] as const).map((option) => <button key={option} type="button" onClick={() => onLanguageChange(option)} aria-pressed={language === option} className={`rounded-lg px-2 py-1 text-xs font-semibold ${language === option ? "bg-cyan-500/25 text-cyan-200" : "text-slate-400 hover:text-white"}`}>{option.toUpperCase()}</button>)}
+          </div>
         </div>
       </nav>
       {isMapHidden ? (
         <button type="button" onClick={onShowMap} className="mt-3 flex w-full items-center justify-center gap-3 rounded-xl border border-cyan-300/30 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
           <span aria-hidden="true" className="text-xl leading-none">⌖</span>
-          <span>Открыть карту объектов</span>
+          <span>{copy.openMap}</span>
         </button>
       ) : null}
     </header>
   );
 }
 
-function PartnerCallout() {
+function PartnerCallout({ language }: { language: Language }) {
+  const copy = catalogCopy[language];
   return (
     <section className="rounded-3xl border border-cyan-300/20 bg-[linear-gradient(120deg,rgba(8,47,73,0.95),rgba(15,23,42,0.96))] p-6 shadow-xl shadow-cyan-950/10 sm:p-8" aria-labelledby="partner-heading">
       <div className="max-w-3xl">
-        <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">Для владельцев недвижимости</p>
-        <h2 id="partner-heading" className="mt-3 text-3xl font-semibold text-white">Сдаёте недвижимость?</h2>
-        <p className="mt-3 text-base leading-7 text-slate-300">Размещайте объекты, управляйте бронированиями и контролируйте статистику в Opero Homes</p>
-        <Link href="/business" className="mt-6 inline-flex rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-200">Стать партнёром</Link>
+        <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-300">{copy.partner}</p>
+        <h2 id="partner-heading" className="mt-3 text-3xl font-semibold text-white">{copy.ownerTitle}</h2>
+        <p className="mt-3 text-base leading-7 text-slate-300">{copy.ownerText}</p>
+        <Link href="/business" className="mt-6 inline-flex rounded-xl bg-cyan-300 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-200">{copy.partner}</Link>
       </div>
     </section>
   );
@@ -140,6 +152,11 @@ function ApartmentCard({
 }
 
 export default function PublicCatalog() {
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window === "undefined") return "ru";
+    const storedLanguage = window.localStorage.getItem("opero-language");
+    return storedLanguage === "ru" || storedLanguage === "en" || storedLanguage === "tr" ? storedLanguage : "ru";
+  });
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
@@ -156,6 +173,18 @@ export default function PublicCatalog() {
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<ReturnType<typeof getBookings>>([]);
+
+  const copy = catalogCopy[language];
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
+  function changeLanguage(nextLanguage: Language) {
+    setLanguage(nextLanguage);
+    window.localStorage.setItem("opero-language", nextLanguage);
+    document.documentElement.lang = nextLanguage;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -237,15 +266,15 @@ export default function PublicCatalog() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
       <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-        <PublicCatalogHeader isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} />
+        <PublicCatalogHeader language={language} isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} onLanguageChange={changeLanguage} />
         <section className="space-y-12">
           <section aria-labelledby="catalog-heading">
-            <div className="mb-6"><p className="text-sm font-medium text-cyan-300">Курортная недвижимость</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">Все доступные объекты</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Откройте любой объект, чтобы посмотреть фотографии, расположение, условия и свободные даты.</p></div>
+            <div className="mb-6"><p className="text-sm font-medium text-cyan-300">{copy.resort}</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">{copy.allProperties}</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">{copy.catalogIntro}</p></div>
             {viewMode === "map" && !isLoading && visibleApartments.length > 0 ? (
               <div className="mb-12 space-y-4" aria-labelledby="map-heading">
                 <div>
-                  <p className="text-sm font-medium text-cyan-300">Карта объектов</p>
-                  <h2 id="map-heading" className="mt-1 text-2xl font-semibold text-white">Выберите жильё на карте</h2>
+                  <p className="text-sm font-medium text-cyan-300">{copy.map}</p>
+                  <h2 id="map-heading" className="mt-1 text-2xl font-semibold text-white">{copy.chooseOnMap}</h2>
                 </div>
                 {mapApartments.length === 0 ? (
                   <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">
@@ -253,24 +282,24 @@ export default function PublicCatalog() {
                     <p className="mt-2 text-sm text-slate-400">Добавьте координаты в карточке объекта.</p>
                   </div>
                 ) : (
-                  <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} onHide={() => setViewMode("list")} />
+                  <PublicCatalogMap apartments={visibleApartments} focusedApartmentId={null} checkIn={checkIn} checkOut={checkOut} guests={guests} language={language} onHide={() => setViewMode("list")} />
                 )}
               </div>
             ) : null}
-            {isLoading ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Загружаем объекты...</div> : publicApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div> : visibleApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><p className="text-slate-100">По вашему запросу ничего не найдено</p><p className="mt-2 text-sm text-slate-400">Попробуйте изменить город, район, даты или количество гостей.</p><button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">Сбросить фильтры</button></div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleApartments.map((apartment) => <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact />)}</div>}
+            {isLoading ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.loading}</div> : publicApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Пока нет опубликованных объектов.</div> : visibleApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><p className="text-slate-100">По вашему запросу ничего не найдено</p><p className="mt-2 text-sm text-slate-400">Попробуйте изменить город, район, даты или количество гостей.</p><button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.reset}</button></div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleApartments.map((apartment) => <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact />)}</div>}
           </section>
 
           <section id="find-another-property" aria-labelledby="search-heading">
-            <div className="mb-6"><p className="text-sm font-medium text-cyan-300">Другой район или даты</p><h2 id="search-heading" className="mt-1 text-2xl font-semibold text-white">Не нашли подходящий вариант?</h2><p className="mt-2 max-w-2xl text-sm text-slate-300">Найдите другой объект по району, датам, вместимости и бюджету.</p></div>
+            <div className="mb-6"><p className="text-sm font-medium text-cyan-300">{copy.otherArea}</p><h2 id="search-heading" className="mt-1 text-2xl font-semibold text-white">{copy.noMatch}</h2><p className="mt-2 max-w-2xl text-sm text-slate-300">{copy.searchIntro}</p></div>
             <div className="mb-6 rounded-3xl border border-white/10 bg-slate-900/80 p-6">
-              <div className="mt-4 grid gap-3 lg:grid-cols-4"><label className="lg:col-span-2"><div className="text-xs text-slate-400">Город, район или адрес</div><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Аланья, Махмутлар, Ataturk, 305" className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">Сортировка</div><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="recommended">Рекомендуемые</option><option value="price_asc">Цена: сначала дешевле</option><option value="price_desc">Цена: сначала дороже</option><option value="capacity_desc">Больше вместимость</option></select></label><div className="flex items-end"><button type="button" onClick={resetFilters} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">Сбросить фильтры</button></div></div>
-              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4"><label><div className="text-xs text-slate-400">Город</div><select value={selectedCity} onChange={(event) => { setSelectedCity(event.target.value); setSelectedDistrict(""); }} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="">Все города</option>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</select></label><label><div className="text-xs text-slate-400">Район</div><select value={selectedDistrict} onChange={(event) => setSelectedDistrict(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="">Все районы</option>{districts.map((district) => <option key={district} value={district}>{district}</option>)}</select></label><label><div className="text-xs text-slate-400">Даты</div><div className="mt-1 grid grid-cols-2 gap-2"><input type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-sm text-white outline-none" /><input type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-sm text-white outline-none" /></div></label><label><div className="text-xs text-slate-400">Количество гостей</div><input type="number" min={1} value={guests} onChange={(event) => setGuests(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label></div>
-              <div className="mt-3 grid gap-3 md:grid-cols-3"><label><div className="text-xs text-slate-400">Минимальная цена</div><input type="number" min={0} value={minPrice} onChange={(event) => setMinPrice(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">Максимальная цена</div><input type="number" min={0} value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">Количество спален</div><input type="number" min={1} value={bedrooms} onChange={(event) => setBedrooms(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">Период аренды для цены</div><select value={pricePeriod} onChange={(event) => setPricePeriod(event.target.value as "" | "night" | "week" | "month")} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="">Любой</option><option value="night">За ночь</option><option value="week">За неделю</option><option value="month">За месяц</option></select></label></div>
-              <p className="mt-2 text-xs text-slate-500">Фильтр цены применяется по исходному тарифному периоду без автоматической конвертации.</p><label className="mt-4 inline-flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-900 text-cyan-300" />Показывать только свободные</label>
+              <div className="mt-4 grid gap-3 lg:grid-cols-4"><label className="lg:col-span-2"><div className="text-xs text-slate-400">{copy.address}</div><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Alanya, Mahmutlar, Ataturk, 305" className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">{copy.sort}</div><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="recommended">{copy.recommended}</option><option value="price_asc">{copy.cheapest}</option><option value="price_desc">{copy.expensive}</option><option value="capacity_desc">{copy.capacity}</option></select></label><div className="flex items-end"><button type="button" onClick={resetFilters} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.reset}</button></div></div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4"><label><div className="text-xs text-slate-400">{copy.city}</div><select value={selectedCity} onChange={(event) => { setSelectedCity(event.target.value); setSelectedDistrict(""); }} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="">{copy.allCities}</option>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</select></label><label><div className="text-xs text-slate-400">{copy.district}</div><select value={selectedDistrict} onChange={(event) => setSelectedDistrict(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="">{copy.allDistricts}</option>{districts.map((district) => <option key={district} value={district}>{district}</option>)}</select></label><label><div className="text-xs text-slate-400">{copy.dates}</div><div className="mt-1 grid grid-cols-2 gap-2"><input type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-sm text-white outline-none" /><input type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-sm text-white outline-none" /></div></label><label><div className="text-xs text-slate-400">{copy.guests}</div><input type="number" min={1} value={guests} onChange={(event) => setGuests(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label></div>
+              <div className="mt-3 grid gap-3 md:grid-cols-3"><label><div className="text-xs text-slate-400">{copy.minPrice}</div><input type="number" min={0} value={minPrice} onChange={(event) => setMinPrice(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">{copy.maxPrice}</div><input type="number" min={0} value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">{copy.bedrooms}</div><input type="number" min={1} value={bedrooms} onChange={(event) => setBedrooms(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" /></label><label><div className="text-xs text-slate-400">{copy.pricePeriod}</div><select value={pricePeriod} onChange={(event) => setPricePeriod(event.target.value as "" | "night" | "week" | "month")} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"><option value="">{copy.any}</option><option value="night">{copy.night}</option><option value="week">{copy.week}</option><option value="month">{copy.month}</option></select></label></div>
+              <p className="mt-2 text-xs text-slate-500">{language === "ru" ? "Фильтр цены применяется по исходному тарифному периоду без автоматической конвертации." : language === "en" ? "The price filter uses the original rental period without automatic conversion." : "Fiyat filtresi, otomatik dönüşüm olmadan orijinal kiralama dönemini kullanır."}</p><label className="mt-4 inline-flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="h-4 w-4 rounded border-white/20 bg-slate-900 text-cyan-300" />{copy.availableOnly}</label>
             </div>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4"><p className="text-sm text-slate-200">{isLoading ? "Загружаем объекты..." : `Найдено объектов: ${visibleApartments.length}`}</p><div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1"><button type="button" onClick={() => setViewMode((current) => current === "map" ? "list" : "map")} className={`rounded-lg px-3 py-1 text-sm ${viewMode === "map" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}>{viewMode === "map" ? "Скрыть карту" : "Показать на карте"}</button></div></div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4"><p className="text-sm text-slate-200">{isLoading ? copy.loading : `${copy.found}: ${visibleApartments.length}`}</p><div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1"><button type="button" onClick={() => setViewMode((current) => current === "map" ? "list" : "map")} className={`rounded-lg px-3 py-1 text-sm ${viewMode === "map" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}>{viewMode === "map" ? copy.hide : copy.showMap}</button></div></div>
           </section>
-          <PartnerCallout />
+          <PartnerCallout language={language} />
         </section>
       </main>
     </div>
