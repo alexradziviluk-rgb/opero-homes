@@ -31,16 +31,16 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
   return (
     <header className="border-b border-white/10 bg-slate-950/70 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <p className="text-sm font-medium uppercase tracking-[0.28em] text-cyan-300">{text.eyebrow}</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-medium uppercase tracking-[0.28em] text-cyan-300">{text.eyebrow}</p>
+          <h1 className="mt-1 break-words text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             {text.welcome}
           </h1>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
+        <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-end">
           {showSearch ? (
-            <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+            <label className="flex w-full min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 md:w-auto">
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="6" />
                 <path d="m20 20-4.2-4.2" />
@@ -56,7 +56,7 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
           {showNewListing ? (
             <Link
               href="/apartments/new"
-              className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 cursor-pointer"
+              className="w-full rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-center text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 cursor-pointer md:w-auto md:whitespace-nowrap"
             >
               {newListingLabel}
             </Link>
@@ -66,7 +66,7 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
 
           <LanguageSwitcher language={language} onChange={setLanguage} />
 
-          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+          <div className="flex w-full min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 md:w-auto">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cyan-500/20 text-sm font-semibold text-cyan-200">
               {displayName.slice(0, 1).toUpperCase()}
             </div>

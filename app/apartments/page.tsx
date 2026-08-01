@@ -128,30 +128,30 @@ export default function ApartmentsPage() {
           <Header showSearch={false} showNewListing={false} />
 
           <main className="p-4 sm:p-6 lg:p-8">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight text-white">Объекты</h1>
                 <p className="mt-1 text-sm text-slate-400">Список объектов и их параметры</p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+              <div className="flex w-full min-w-0 flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+                <label className="flex w-full min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 sm:w-auto">
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
                     <circle cx="11" cy="11" r="6" />
                     <path d="m20 20-4.2-4.2" />
                   </svg>
-                  <input placeholder="Поиск объектов..." className="w-48 bg-transparent text-sm outline-none placeholder:text-slate-500" />
+                  <input placeholder="Поиск объектов..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-500 sm:w-48 sm:flex-none" />
                 </label>
 
                 {canManagePropertyDefinition ? (
-                  <Link href="/apartments/new" className="cursor-pointer rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 inline-flex items-center justify-center">
+                  <Link href="/apartments/new" className="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 sm:w-auto sm:whitespace-nowrap">
                     + Новый объект
                   </Link>
                 ) : null}
               </div>
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm font-medium text-white">Все</button>
               <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm text-slate-300">Свободные</button>
               <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm text-slate-300">Занятые</button>

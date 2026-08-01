@@ -80,13 +80,13 @@ export default function EmployeesPage() {
           const isOnline = isCurrent || Boolean(employee.lastSeenAt && renderedAt - new Date(employee.lastSeenAt).getTime() < 5 * 60 * 1000);
 
           return (
-            <article key={employee.userId} className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="font-semibold text-white">{employee.firstName} {employee.lastName}</h2>
-                  <p className="mt-1 text-sm text-cyan-300">{[employee.roleCode, ...employee.additionalRoleCodes].map((role) => translate(roleLabels[role] ?? role)).join(" + ")}</p>
+            <article key={employee.userId} className="min-w-0 rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h2 className="break-words font-semibold text-white">{employee.firstName} {employee.lastName}</h2>
+                  <p className="mt-1 break-words text-sm text-cyan-300">{[employee.roleCode, ...employee.additionalRoleCodes].map((role) => translate(roleLabels[role] ?? role)).join(" + ")}</p>
                 </div>
-                <span className={`rounded-full px-2 py-1 text-xs ${isOnline ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700/60 text-slate-300"}`}>
+                <span className={`self-start rounded-full px-2 py-1 text-xs ${isOnline ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700/60 text-slate-300"}`}>
                   {translate(isOnline ? "Онлайн" : "Офлайн")}
                 </span>
               </div>
