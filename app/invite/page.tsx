@@ -30,7 +30,7 @@ function normalizeSignInError(message: string | undefined): string {
   return message ?? "Не удалось выполнить вход.";
 }
 
-export default function InvitationPage() {
+export function InvitationPage() {
   return (
     <Suspense
       fallback={
@@ -343,3 +343,5 @@ function InvitationPageContent() {
     </main>
   );
 }
+
+export default InvitationPage;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createSupabaseClient } from "@/lib/supabase/client";
+import { buildPasswordResetUrl } from "@/lib/auth/site-url";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -23,13 +24,8 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
-    const isLocalhost = (value: string) => value.includes("localhost") || value.includes("127.0.0.1");
-    const resetOrigin = configuredSiteUrl && !isLocalhost(configuredSiteUrl)
-      ? configuredSiteUrl
-      : "https://operohq.netlify.app";
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${resetOrigin}/reset-password`,
+      redirectTo: buildPasswordResetUrl(),
     });
     if (resetError) {
       setError(resetError.message);

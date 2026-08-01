@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { useDashboardMetrics } from "@/components/dashboard/dashboard-metrics-provider";
 import { getEffectivePermissions, hasPermissionInList, type Permission } from "@/lib/permissions";
+import { useLanguage } from "@/components/LanguageSwitcher";
+import { useAdminText } from "@/lib/i18n/admin";
 
 type NavItem = {
   label: string;
@@ -161,11 +163,18 @@ const navItems: NavItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [language] = useLanguage();
+  const translate = useAdminText();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { currentUser, isAuthLoading, logout } = useCurrentUser();
   const { data: dashboardData, isLoading: isDashboardLoading } = useDashboardMetrics();
   const permissions = useMemo(() => (currentUser ? getEffectivePermissions(currentUser) : []), [currentUser]);
   const canViewWeeklyRevenue = hasPermissionInList(permissions, "finance.view");
+  const text = {
+    ru: { management: "Центр управления", loading: "Загрузка профиля...", open: "Открыть меню", close: "Закрыть меню", weekly: "Поступления за неделю", noData: "Нет данных" },
+    en: { management: "Control center", loading: "Loading profile...", open: "Open menu", close: "Close menu", weekly: "Weekly revenue", noData: "No data" },
+    tr: { management: "Yönetim merkezi", loading: "Profil yükleniyor...", open: "Menüyü aç", close: "Menüyü kapat", weekly: "Haftalık gelir", noData: "Veri yok" },
+  }[language];
 
   const weeklyRevenueLabel = useMemo(() => {
     if (isDashboardLoading) {
@@ -188,7 +197,7 @@ export default function Sidebar() {
     }
 
     if (!dashboardData) {
-      return "Нет данных";
+      return text.noData;
     }
 
     if (dashboardData.revenueDataStatus === "no_payments") {
@@ -199,8 +208,8 @@ export default function Sidebar() {
       return "Недостаточно данных";
     }
 
-    return "Оплаченные поступления за неделю";
-  }, [dashboardData, isDashboardLoading]);
+    return text.weekly;
+  }, [dashboardData, isDashboardLoading, text.noData, text.weekly]);
 
   const visibleItems = navItems.filter((item) => {
     if (currentUser?.role === "Менеджер" && item.hiddenForManager) {
@@ -217,7 +226,7 @@ export default function Sidebar() {
   if (isAuthLoading) {
     return (
       <aside className="w-full border-b border-white/10 bg-slate-950/95 px-4 py-5 backdrop-blur-sm lg:w-72 lg:border-b-0 lg:border-r lg:px-6 lg:py-8">
-        <p className="text-sm text-slate-400">Загрузка профиля...</p>
+        <p className="text-sm text-slate-400">{text.loading}</p>
       </aside>
     );
   }
@@ -230,11 +239,11 @@ export default function Sidebar() {
         </div>
         <div>
           <p className="text-base font-semibold tracking-tight text-white">Opero Homes</p>
-          <p className="text-sm text-slate-400">Центр управления</p>
+          <p className="text-sm text-slate-400">{text.management}</p>
         </div>
         <button
           type="button"
-          aria-label={isMobileOpen ? "Закрыть меню" : "Открыть меню"}
+          aria-label={isMobileOpen ? text.close : text.open}
           aria-expanded={isMobileOpen}
           onClick={() => setIsMobileOpen((value) => !value)}
           className="ml-auto rounded-xl border border-white/10 bg-white/5 p-2 text-slate-200 lg:hidden"
@@ -259,7 +268,7 @@ export default function Sidebar() {
               <span className={`rounded-xl border border-white/10 bg-white/5 p-2 transition ${active ? "border-cyan-400/40 text-cyan-300" : "text-slate-200 group-hover:border-cyan-400/40 group-hover:text-cyan-300"}`}>
                 {item.icon}
               </span>
-              <span>{item.label}</span>
+              <span>{translate(item.label)}</span>
             </Link>
           );
         })}

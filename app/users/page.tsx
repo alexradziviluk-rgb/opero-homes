@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { useAdminText } from "@/lib/i18n/admin";
 import type { ManagedEmployeeInvitation } from "@/types/invitation";
 import type { OrganizationUser } from "@/types/organization-user";
 
@@ -31,6 +32,7 @@ function formatDate(value: string) {
 
 export default function UsersPage() {
   const { currentUser, isAuthLoading } = useCurrentUser();
+  const translate = useAdminText();
   const effectivePermissions = useMemo(() => (currentUser ? getEffectivePermissions(currentUser) : []), [currentUser]);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -141,7 +143,7 @@ export default function UsersPage() {
   const canInviteUsers = hasPermissionInList(effectivePermissions, "users.invite");
 
   if (isAuthLoading) {
-    return <div className="p-6 text-slate-300">Загрузка...</div>;
+    return <div className="p-6 text-slate-300">{translate("Загрузка...")}</div>;
   }
 
   if (!currentUser) {
@@ -156,44 +158,44 @@ export default function UsersPage() {
           <Header showSearch={false} showNewListing={false} />
           <main className="p-6">
             {!canViewUsers ? (
-              <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">Недостаточно прав для просмотра пользователей.</div>
+              <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{translate("Недостаточно прав для просмотра пользователей.")}</div>
             ) : (
               <>
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-semibold">Управление пользователями</h1>
-                    <p className="mt-1 text-sm text-slate-400">Приглашения, роли, статусы active/paused и права доступа</p>
+                    <h1 className="text-2xl font-semibold">{translate("Управление пользователями")}</h1>
+                    <p className="mt-1 text-sm text-slate-400">{translate("Приглашения, роли, статусы active/paused и права доступа")}</p>
                   </div>
                   {canInviteUsers ? (
                     <Link href="/users/invite" className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">
-                      + Пригласить сотрудника
+                      + {translate("Пригласить сотрудника")}
                     </Link>
                   ) : null}
                 </div>
 
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-3 text-sm text-slate-300">
-                  <span>Ежедневные назначения, задачи и загрузка команды находятся в разделе сотрудников.</span>
-                  <Link href="/employees" className="text-cyan-300 hover:underline">Открыть сотрудников</Link>
+                  <span>{translate("Ежедневные назначения, задачи и загрузка команды находятся в разделе сотрудников.")}</span>
+                  <Link href="/employees" className="text-cyan-300 hover:underline">{translate("Открыть сотрудников")}</Link>
                 </div>
 
                 <div className="mb-4 grid gap-3 sm:grid-cols-3">
                   <input
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Поиск по имени, телефону, email"
+                    placeholder={translate("Поиск по имени, телефону, email")}
                     className="rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none sm:col-span-2"
                   />
 
                   <div className="grid grid-cols-2 gap-3">
                     <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
-                      <option value="all">Все роли</option>
+                      <option value="all">{translate("Все роли")}</option>
                       {Object.entries(roleLabels).map(([role, label]) => (
                         <option key={role} value={role}>{label}</option>
                       ))}
                     </select>
 
                     <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-2xl border border-white/10 bg-slate-900/80 px-3 py-2 text-sm text-slate-200">
-                      <option value="all">Все статусы</option>
+                      <option value="all">{translate("Все статусы")}</option>
                       {Object.entries(statusLabels).map(([status, label]) => (
                         <option key={status} value={status}>{label}</option>
                       ))}
@@ -206,13 +208,13 @@ export default function UsersPage() {
                 <section className="mb-6 border-y border-white/10 bg-slate-900/50 py-4">
                   <div className="mb-3 flex items-center justify-between gap-3 px-4">
                     <div>
-                      <h2 className="font-semibold text-white">Активные приглашения</h2>
-                      <p className="text-xs text-slate-400">Непринятое приглашение можно отозвать и отправить заново.</p>
+                      <h2 className="font-semibold text-white">{translate("Активные приглашения")}</h2>
+                      <p className="text-xs text-slate-400">{translate("Непринятое приглашение можно отозвать и отправить заново.")}</p>
                     </div>
                     <span className="text-sm text-slate-400">{invitations.length}</span>
                   </div>
                   {invitations.length === 0 ? (
-                    <p className="px-4 py-3 text-sm text-slate-400">Активных приглашений нет.</p>
+                    <p className="px-4 py-3 text-sm text-slate-400">{translate("Активных приглашений нет.")}</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-sm">
@@ -254,13 +256,13 @@ export default function UsersPage() {
                   <table className="min-w-full text-sm">
                     <thead className="bg-white/5 text-left text-slate-300">
                       <tr>
-                        <th className="px-4 py-3">Пользователь</th>
+                            <th className="px-4 py-3">{translate("Пользователь")}</th>
                         <th className="px-4 py-3">Email</th>
-                        <th className="px-4 py-3">Телефон</th>
-                        <th className="px-4 py-3">Роль</th>
-                        <th className="px-4 py-3">Статус</th>
-                        <th className="px-4 py-3">Создан</th>
-                        <th className="px-4 py-3">Действия</th>
+                        <th className="px-4 py-3">{translate("Телефон")}</th>
+                        <th className="px-4 py-3">{translate("Роль")}</th>
+                        <th className="px-4 py-3">{translate("Статус")}</th>
+                        <th className="px-4 py-3">{translate("Создан")}</th>
+                        <th className="px-4 py-3">{translate("Действия")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -276,15 +278,15 @@ export default function UsersPage() {
                           <td className="px-4 py-3 text-slate-300">{formatDate(user.createdAt)}</td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-2">
-                              <Link href={`/users/${user.userId}`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">Открыть</Link>
-                              {canManageUsers && user.roleCode !== "owner" ? <Link href={`/users/${user.userId}/edit`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">Редактировать</Link> : null}
-                              {canManageUsers && user.roleCode !== "owner" ? <button type="button" onClick={() => void toggleStatus(user)} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-amber-300">{user.status === "active" ? "Приостановить" : "Активировать"}</button> : null}
+                              <Link href={`/users/${user.userId}`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">{translate("Открыть")}</Link>
+                              {canManageUsers && user.roleCode !== "owner" ? <Link href={`/users/${user.userId}/edit`} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-slate-300">{translate("Редактировать")}</Link> : null}
+                              {canManageUsers && user.roleCode !== "owner" ? <button type="button" onClick={() => void toggleStatus(user)} className="rounded-xl border border-white/10 px-3 py-1 text-xs text-amber-300">{translate(user.status === "active" ? "Приостановить" : "Активировать")}</button> : null}
                             </div>
                           </td>
                         </tr>
                       ))}
                       {!isLoading && filteredUsers.length === 0 ? (
-                        <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Пользователи не найдены.</td></tr>
+                        <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">{translate("Пользователи не найдены.")}</td></tr>
                       ) : null}
                       {isLoading ? (
                         <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Загрузка...</td></tr>

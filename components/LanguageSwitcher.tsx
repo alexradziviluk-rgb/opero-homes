@@ -18,10 +18,23 @@ export function useLanguage(): [Language, (language: Language) => void] {
     document.documentElement.lang = language;
   }, [language]);
 
+  useEffect(() => {
+    function handleLanguageChange(event: Event) {
+      const nextLanguage = (event as CustomEvent<Language>).detail;
+      if (nextLanguage === "ru" || nextLanguage === "en" || nextLanguage === "tr") {
+        setLanguage(nextLanguage);
+      }
+    }
+
+    window.addEventListener("opero-language-change", handleLanguageChange);
+    return () => window.removeEventListener("opero-language-change", handleLanguageChange);
+  }, []);
+
   function changeLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
     window.localStorage.setItem("opero-language", nextLanguage);
     document.documentElement.lang = nextLanguage;
+    window.dispatchEvent(new CustomEvent("opero-language-change", { detail: nextLanguage }));
   }
 
   return [language, changeLanguage];

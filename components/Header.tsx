@@ -14,6 +14,11 @@ type HeaderProps = {
 export default function Header({ showSearch = true, showNewListing = true, newListingLabel = "+ Добавить объект" }: HeaderProps) {
   const { currentUser, currentUserContext, logout } = useCurrentUser();
   const [language, setLanguage] = useLanguage();
+  const text = {
+    ru: { eyebrow: "Обзор операций", welcome: "Добро пожаловать в Opero Homes", search: "Поиск", searchPlaceholder: "Поиск объектов...", logout: "Выйти", guest: "Гость" },
+    en: { eyebrow: "Operations overview", welcome: "Welcome to Opero Homes", search: "Search", searchPlaceholder: "Search properties...", logout: "Log out", guest: "Guest" },
+    tr: { eyebrow: "Operasyon özeti", welcome: "Opero Homes'a hoş geldiniz", search: "Arama", searchPlaceholder: "Mülkleri ara...", logout: "Çıkış yap", guest: "Misafir" },
+  }[language];
   const fullName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : "";
   const displayName = fullName || currentUserContext?.authEmail?.split("@")[0] || "Пользователь";
 
@@ -25,9 +30,9 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
     <header className="border-b border-white/10 bg-slate-950/70 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.28em] text-cyan-300">Обзор операций</p>
+          <p className="text-sm font-medium uppercase tracking-[0.28em] text-cyan-300">{text.eyebrow}</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            Добро пожаловать в Opero Homes
+            {text.welcome}
           </h1>
         </div>
 
@@ -39,8 +44,8 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
                 <path d="m20 20-4.2-4.2" />
               </svg>
               <input
-                aria-label="Поиск"
-                placeholder="Поиск объектов..."
+                aria-label={text.search}
+                placeholder={text.searchPlaceholder}
                 className="w-full bg-transparent text-sm outline-none placeholder:text-slate-500 sm:w-48"
               />
             </label>
@@ -65,10 +70,10 @@ export default function Header({ showSearch = true, showNewListing = true, newLi
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-white">{displayName}</p>
-              <p className="text-xs text-slate-400">{currentUser?.role ?? "Гость"}</p>
+              <p className="text-xs text-slate-400">{currentUser?.role ?? text.guest}</p>
             </div>
             <button type="button" onClick={handleLogout} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/10">
-              Выйти
+              {text.logout}
             </button>
           </div>
         </div>

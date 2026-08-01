@@ -5,6 +5,7 @@ import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { useAdminText } from "@/lib/i18n/admin";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions";
 import type { UserRole } from "@/types/user";
 import { EMPLOYEE_INVITE_ROLE_LABELS, EMPLOYEE_INVITE_ROLE_CODES, mapInviteRoleCodeToUserRoleLabel } from "@/lib/users/invitations";
@@ -20,6 +21,7 @@ function isValidEmail(value: string): boolean {
 
 export default function InviteUserPage() {
   const { currentUser, isAuthLoading } = useCurrentUser();
+  const translate = useAdminText();
   const effectivePermissions = currentUser ? getEffectivePermissions(currentUser) : [];
 
   const [firstName, setFirstName] = useState("");
@@ -34,7 +36,7 @@ export default function InviteUserPage() {
   const canInvite = hasPermissionInList(effectivePermissions, "users.invite");
 
   if (isAuthLoading) {
-    return <div className="p-6 text-slate-300">Загрузка...</div>;
+    return <div className="p-6 text-slate-300">{translate("Загрузка...")}</div>;
   }
 
   if (!currentUser) {
@@ -119,11 +121,11 @@ export default function InviteUserPage() {
           <main className="p-6">
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Приглашение сотрудника</h1>
+                <h1 className="text-2xl font-semibold">{translate("Приглашение сотрудника")}</h1>
                 <p className="text-sm text-slate-400">После принятия приглашения сотрудник перейдет в статус «Ожидает подтверждения».</p>
                 <p className="mt-1 text-xs text-amber-300">SMS-приглашения сейчас недоступны. Приглашение отправляется только по email.</p>
               </div>
-              <Link href="/users" className="text-sm text-cyan-300">К списку пользователей</Link>
+              <Link href="/users" className="text-sm text-cyan-300">{translate("К списку пользователей")}</Link>
             </div>
 
             {!canInvite ? (
@@ -132,11 +134,11 @@ export default function InviteUserPage() {
               <form className="rounded-2xl border border-white/10 bg-slate-900/80 p-6" onSubmit={handleSubmit}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label>
-                    <div className="text-sm text-slate-300">Имя</div>
+                    <div className="text-sm text-slate-300">{translate("Имя")}</div>
                     <input value={firstName} onChange={(event) => setFirstName(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
                   </label>
                   <label>
-                    <div className="text-sm text-slate-300">Фамилия</div>
+                    <div className="text-sm text-slate-300">{translate("Фамилия")}</div>
                     <input value={lastName} onChange={(event) => setLastName(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
                   </label>
                   <label>
@@ -148,7 +150,7 @@ export default function InviteUserPage() {
                     <input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
                   </label>
                   <label className="sm:col-span-2">
-                    <div className="text-sm text-slate-300">Роль</div>
+                    <div className="text-sm text-slate-300">{translate("Роль")}</div>
                     <select value={role} onChange={(event) => setRole(event.target.value as UserRole)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none">
                       {roleOptions.map((option) => (
                         <option key={option.value} value={option.value} className="bg-slate-900">
@@ -163,8 +165,8 @@ export default function InviteUserPage() {
                 {submitSuccess ? <p className="mt-4 text-sm text-emerald-300">{submitSuccess}</p> : null}
 
                 <div className="mt-6 flex gap-2">
-                  <button type="submit" disabled={isSubmitting} className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Отправляем..." : "Отправить приглашение"}</button>
-                  <Link href="/users" className="rounded-2xl bg-white/5 px-4 py-2">Отмена</Link>
+                  <button type="submit" disabled={isSubmitting} className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? translate("Отправляем...") : translate("Отправить приглашение")}</button>
+                  <Link href="/users" className="rounded-2xl bg-white/5 px-4 py-2">{translate("Отмена")}</Link>
                 </div>
               </form>
             )}

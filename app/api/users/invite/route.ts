@@ -4,7 +4,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { createEmailProvider } from "@/lib/notifications/providers/email-provider";
 import {
-  buildInvitationNextPath,
   isEmployeeInviteRoleCode,
   mapInviteRoleCodeToUserRoleLabel,
   mapUserRoleToInviteRoleCode,
@@ -12,6 +11,7 @@ import {
   normalizeInvitePhone,
 } from "@/lib/users/invitations";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
+import { buildEmployeeInvitationUrl } from "@/lib/auth/invitation-url";
 
 type InviteUserRequest = {
   firstName?: string;
@@ -32,10 +32,6 @@ function jsonError(status: number, errorCode: string, error: string) {
 
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
-}
-
-function resolveSiteUrl(request: Request): string {
-  return process.env.NEXT_PUBLIC_SITE_URL?.trim() || new URL(request.url).origin;
 }
 
 function isInviteRequest(value: unknown): value is InviteUserRequest {
@@ -164,7 +160,7 @@ export async function POST(request: Request) {
     return jsonError(500, "UNEXPECTED", insertError?.message ?? "Не удалось создать приглашение.");
   }
 
-  const inviteUrl = new URL(buildInvitationNextPath(token), resolveSiteUrl(request)).toString();
+  const inviteUrl = buildEmployeeInvitationUrl(token);
   const organizationName = auth.context.organization.name;
   const roleLabel = mapInviteRoleCodeToUserRoleLabel(roleCode);
   const emailResult = await createEmailProvider().send({

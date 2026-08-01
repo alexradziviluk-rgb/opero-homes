@@ -47,5 +47,5 @@ export function normalizeInvitePhone(value: string): string | null {
 }
 
 export function buildInvitationNextPath(token: string): string {
-  return `/invite?invite=${encodeURIComponent(token)}`;
+  return `/auth/accept-invite?invite=${encodeURIComponent(token)}`;
 }

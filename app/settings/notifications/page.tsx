@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import { useAdminText } from "@/lib/i18n/admin";
 import { BOOKING_NOTIFICATION_EVENT_TYPES } from "@/lib/notifications/constants";
 
 type PreferenceItem = {
@@ -50,6 +51,7 @@ function eventLabel(eventType: string): string {
 }
 
 export default function NotificationSettingsPage() {
+  const translate = useAdminText();
   const [prefs, setPrefs] = useState<PreferenceItem[]>([]);
   const [settings, setSettings] = useState<SettingsDto>(defaultSettings);
   const [assignees, setAssignees] = useState<AssigneeItem[]>([]);
@@ -148,24 +150,24 @@ export default function NotificationSettingsPage() {
           <Header showSearch={false} showNewListing={false} />
           <main className="space-y-6 p-6">
             <div>
-              <h1 className="text-2xl font-semibold">Настройки уведомлений</h1>
-              <p className="text-sm text-slate-400">Каналы отправки и персональные предпочтения</p>
+              <h1 className="text-2xl font-semibold">{translate("Настройки уведомлений")}</h1>
+              <p className="text-sm text-slate-400">{translate("Каналы отправки и персональные предпочтения")}</p>
             </div>
 
             {error ? <p className="text-sm text-rose-400">{error}</p> : null}
             {status ? <p className="text-sm text-emerald-300">{status}</p> : null}
 
             <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
-              <h2 className="text-lg font-semibold text-white">Организация</h2>
+              <h2 className="text-lg font-semibold text-white">{translate("Организация")}</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <label>
-                  <div className="text-sm text-slate-300">Менеджер по умолчанию</div>
+                  <div className="text-sm text-slate-300">{translate("Менеджер по умолчанию")}</div>
                   <select
                     value={settings.defaultBookingManagerUserId ?? ""}
                     onChange={(event) => setSettings((prev) => ({ ...prev, defaultBookingManagerUserId: event.target.value || null }))}
                     className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
                   >
-                    <option value="">Не выбран</option>
+                    <option value="">{translate("Не выбран")}</option>
                     {assignees.map((item) => (
                       <option key={item.userId} value={item.userId}>
                         {item.firstName} {item.lastName} ({item.roleCode})
@@ -180,7 +182,7 @@ export default function NotificationSettingsPage() {
                     checked={settings.emailEnabled}
                     onChange={(event) => setSettings((prev) => ({ ...prev, emailEnabled: event.target.checked }))}
                   />
-                  Email канал включен
+                  {translate("Email канал включен")}
                 </label>
 
                 <label className="inline-flex items-center gap-2 text-sm text-slate-200">
@@ -189,7 +191,7 @@ export default function NotificationSettingsPage() {
                     checked={settings.whatsappEnabled}
                     onChange={(event) => setSettings((prev) => ({ ...prev, whatsappEnabled: event.target.checked }))}
                   />
-                  WhatsApp канал включен
+                  {translate("WhatsApp канал включен")}
                 </label>
 
                 <label className="inline-flex items-center gap-2 text-sm text-slate-200">
@@ -198,11 +200,11 @@ export default function NotificationSettingsPage() {
                     checked={settings.whatsappChannelConnected}
                     onChange={(event) => setSettings((prev) => ({ ...prev, whatsappChannelConnected: event.target.checked }))}
                   />
-                  WhatsApp канал подключен
+                  {translate("WhatsApp канал подключен")}
                 </label>
 
                 <label>
-                  <div className="text-sm text-slate-300">WhatsApp провайдер</div>
+                  <div className="text-sm text-slate-300">{translate("WhatsApp провайдер")}</div>
                   <input
                     value={settings.whatsappProvider ?? ""}
                     onChange={(event) => setSettings((prev) => ({ ...prev, whatsappProvider: event.target.value || null }))}
@@ -212,7 +214,7 @@ export default function NotificationSettingsPage() {
                 </label>
 
                 <label>
-                  <div className="text-sm text-slate-300">Напоминание о заезде, часов</div>
+                  <div className="text-sm text-slate-300">{translate("Напоминание о заезде, часов")}</div>
                   <input
                     type="number"
                     min={1}
@@ -223,7 +225,7 @@ export default function NotificationSettingsPage() {
                 </label>
 
                 <label>
-                  <div className="text-sm text-slate-300">Напоминание о выезде, часов</div>
+                  <div className="text-sm text-slate-300">{translate("Напоминание о выезде, часов")}</div>
                   <input
                     type="number"
                     min={1}
@@ -239,7 +241,7 @@ export default function NotificationSettingsPage() {
                     checked={settings.backupManagerWhatsAppEnabled}
                     onChange={(event) => setSettings((prev) => ({ ...prev, backupManagerWhatsAppEnabled: event.target.checked }))}
                   />
-                  Разрешить WhatsApp backup-менеджеру
+                  {translate("Разрешить WhatsApp backup-менеджеру")}
                 </label>
               </div>
 
@@ -248,17 +250,17 @@ export default function NotificationSettingsPage() {
                 onClick={() => void saveOrganizationSettings()}
                 className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200"
               >
-                Сохранить организационные настройки
+                {translate("Сохранить организационные настройки")}
               </button>
             </section>
 
             <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
-              <h2 className="text-lg font-semibold text-white">Мои события</h2>
+              <h2 className="text-lg font-semibold text-white">{translate("Мои события")}</h2>
               <div className="mt-4 overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-left text-slate-400">
-                      <th className="px-3 py-2">Событие</th>
+                      <th className="px-3 py-2">{translate("Событие")}</th>
                       <th className="px-3 py-2">In-App</th>
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">WhatsApp</th>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import OperationalShell from "@/components/operations/OperationalShell";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { useAdminText } from "@/lib/i18n/admin";
 
 type Employee = {
   userId: string;
@@ -41,6 +42,7 @@ const statusLabels: Record<string, string> = {
 
 export default function EmployeesPage() {
   const { currentUser } = useCurrentUser();
+  const translate = useAdminText();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [renderedAt] = useState(() => Date.now());
@@ -64,10 +66,10 @@ export default function EmployeesPage() {
   }, []);
 
   return (
-    <OperationalShell title="Сотрудники" description="Ежедневная работа команды: назначения, задачи, объекты и текущая занятость">
+    <OperationalShell title={translate("Сотрудники")} description={translate("Ежедневная работа команды: назначения, задачи, объекты и текущая занятость")}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-y border-white/10 py-3 text-sm text-slate-300">
         <span>Приглашения, роли, статусы и права доступа управляются отдельно.</span>
-        <Link href="/users" className="text-cyan-300 hover:underline">Управление пользователями</Link>
+        <Link href="/users" className="text-cyan-300 hover:underline">{translate("Управление пользователями")}</Link>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {employees.length === 0 ? <p className="border-y border-white/10 py-8 text-center text-slate-400 lg:col-span-2">Сотрудники ещё не добавлены</p> : employees.map((employee) => {
@@ -82,10 +84,10 @@ export default function EmployeesPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="font-semibold text-white">{employee.firstName} {employee.lastName}</h2>
-                  <p className="mt-1 text-sm text-cyan-300">{[employee.roleCode, ...employee.additionalRoleCodes].map((role) => roleLabels[role] ?? role).join(" + ")}</p>
+                  <p className="mt-1 text-sm text-cyan-300">{[employee.roleCode, ...employee.additionalRoleCodes].map((role) => translate(roleLabels[role] ?? role)).join(" + ")}</p>
                 </div>
                 <span className={`rounded-full px-2 py-1 text-xs ${isOnline ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700/60 text-slate-300"}`}>
-                  {isOnline ? "Онлайн" : "Офлайн"}
+                  {translate(isOnline ? "Онлайн" : "Офлайн")}
                 </span>
               </div>
 
@@ -93,11 +95,11 @@ export default function EmployeesPage() {
                 <div><dt className="text-slate-500">Назначенные объекты</dt><dd className="mt-1 text-white">{apartmentIds.length}</dd></div>
                 <div><dt className="text-slate-500">Активные задачи</dt><dd className="mt-1 text-white">{assignedTasks.length - completedTasks.length}</dd></div>
                 <div><dt className="text-slate-500">Выполнено</dt><dd className="mt-1 text-white">{completedTasks.length}</dd></div>
-                <div><dt className="text-slate-500">Статус</dt><dd className="mt-1 text-white">{statusLabels[employee.status] ?? employee.status}</dd></div>
+                <div><dt className="text-slate-500">{translate("Статус")}</dt><dd className="mt-1 text-white">{translate(statusLabels[employee.status] ?? employee.status)}</dd></div>
               </dl>
 
               <div className="mt-4 space-y-1 text-sm text-slate-300">
-                <p>{employee.phone || "Телефон не указан"}</p>
+                <p>{employee.phone || translate("Телефон не указан")}</p>
                 <p>{employee.email}</p>
               </div>
 
