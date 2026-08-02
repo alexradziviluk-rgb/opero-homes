@@ -30,6 +30,7 @@ type StaffBookingRecord = {
   totalAmount: number | null;
   paidAmount?: number | null;
   status: string | null;
+  requestStatus?: string | null;
   paymentStatus: string | null;
   source: string | null;
   notes: string | null;
@@ -72,6 +73,7 @@ export async function fetchStaffBookings(): Promise<StaffBooking[]> {
     totalAmount: booking.totalAmount ?? 0,
     paidAmount: booking.paidAmount ?? 0,
     status: (booking.status ?? "pending") as Booking["status"],
+    requestStatus: (booking.requestStatus ?? booking.status ?? "pending") as NonNullable<Booking["requestStatus"]>,
     paymentStatus: (booking.paymentStatus ?? "unpaid") as Booking["paymentStatus"],
     source: (booking.source ?? "direct") as Booking["source"],
     notes: booking.notes ?? "",

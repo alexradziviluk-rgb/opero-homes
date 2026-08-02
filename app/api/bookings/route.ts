@@ -18,12 +18,14 @@ type CreateBookingPayload = {
   discount?: number;
   paidAmount?: number;
   complimentary?: boolean;
+  notes?: string;
+  guestComment?: string;
   status?: string;
   paymentStatus?: string;
   source?: string;
 };
 
-const BOOKING_STATUSES = new Set(["pending", "confirmed", "rejected", "checked_in"]);
+const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in"]);
 const PAYMENT_STATUSES = new Set(["unpaid", "partially_paid", "paid", "refunded"]);
 const MANAGER_ROLES = new Set(["owner", "manager"]);
 const RENTAL_TYPES = new Set(["daily", "weekly", "monthly"]);
@@ -117,6 +119,7 @@ export async function GET() {
       totalAmount: booking.total_amount,
       paidAmount: booking.paid_amount ?? booking.amount_paid ?? null,
       status: booking.status,
+      requestStatus: booking.request_status,
       paymentStatus: booking.payment_status,
       source: booking.source,
       notes: "notes" in booking ? booking.notes : booking.guest_comment ?? null,
@@ -237,6 +240,8 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
+  const guestComment = body?.guestComment?.trim() ?? body?.notes?.trim() ?? "";
+  const requestStatus = status === "pending" ? "pending" : "confirmed";
   const commercialTerms = {
     guest_name: guestName,
     guest_phone: body?.guestPhone?.trim() ?? "",
@@ -245,14 +250,17 @@ export async function POST(request: Request) {
     check_out_time: checkOutTime,
     rental_type: rentalType,
     price_per_period: pricePerPeriod,
-    accommodation_amount: accommodationAmount,
+    accommodation_total: accommodationAmount,
     cleaning_fee: cleaningFee,
     deposit,
     discount,
     paid_amount: paidAmount,
     complimentary,
+    guest_comment: guestComment,
+    guests_count: Math.max(1, Number(body?.guests ?? 1)),
+    request_status: requestStatus,
   };
-  const bookingRow: Record<string, string | number | boolean> = usesLegacyDates
+  const bookingRow: Record<string, unknown> = usesLegacyDates
     ? {
         id,
         booking_number: `MAN-${id.slice(0, 8).toUpperCase()}`,
@@ -261,10 +269,17 @@ export async function POST(request: Request) {
         check_in_date: checkIn,
         check_out_date: checkOut,
         adults: Math.max(1, Number(body?.guests ?? 1)),
+        children: 0,
+        infants: 0,
+        pets: 0,
         nightly_rate: pricePerPeriod,
-        accommodation_total: accommodationAmount,
         security_deposit: deposit,
+        taxes_total: 0,
+        discount_total: discount,
         total_amount: totalAmount,
+        amount_paid: paidAmount,
+        currency: "EUR",
+        metadata: {},
         status,
         payment_status: derivedPaymentStatus,
         source,

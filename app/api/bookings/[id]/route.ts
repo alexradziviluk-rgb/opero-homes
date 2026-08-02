@@ -3,7 +3,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
 
-const BOOKING_STATUSES = new Set(["pending", "confirmed", "rejected", "checked_in", "checked_out", "cancelled"]);
+const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
+const BOOKING_REQUEST_STATUSES = new Set(["pending", "confirmed", "rejected", "cancelled"]);
 const MANAGER_ROLES = new Set(["owner", "manager"]);
 
 function error(status: number, message: string, code?: string) {
@@ -119,11 +120,23 @@ export async function PATCH(
   if (loadError) return error(422, loadError.message, loadError.code);
   if (!existing) return error(404, "Booking not found");
 
-  const status = typeof body.status === "string" ? body.status.trim() : existing.status;
+  const requestedStatus = typeof body.status === "string" ? body.status.trim() : existing.status;
+  const requestedRequestStatus = typeof body.requestStatus === "string" ? body.requestStatus.trim() : existing.request_status;
+  const isReject = requestedStatus === "rejected" || requestedRequestStatus === "rejected";
+  const requestStatus = isReject ? "rejected" : requestedRequestStatus;
+  const status = isReject ? "cancelled" : requestedStatus;
   if (!BOOKING_STATUSES.has(status)) return error(400, "Invalid booking status");
+  if (!BOOKING_REQUEST_STATUSES.has(requestStatus)) return error(400, "Invalid booking request status");
 
-  const isStatusOnly = Object.keys(body).every((key) => key === "status" || key === "totalAmount");
-  const updateRow: Record<string, string> = { status, updated_at: new Date().toISOString() };
+  if (isReject && existing.status === "cancelled" && existing.request_status === "rejected") {
+    return NextResponse.json({
+      ok: true,
+      data: { id: existing.id, status: existing.status, request_status: existing.request_status, updated_at: existing.updated_at },
+    });
+  }
+
+  const isStatusOnly = Object.keys(body).every((key) => key === "status" || key === "requestStatus" || key === "totalAmount");
+  const updateRow: Record<string, string> = { status, request_status: requestStatus, updated_at: new Date().toISOString() };
 
   if (typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount) && status === "pending") {
     updateRow.total_amount = String(Math.max(0, body.totalAmount));
@@ -183,7 +196,7 @@ export async function PATCH(
     .update(updateRow)
     .eq("organization_id", auth.context.organization.id)
     .eq("id", id)
-    .select("id,status,updated_at")
+    .select("id,status,request_status,updated_at")
     .maybeSingle();
 
   if (updateError) return error(422, updateError.message, updateError.code);

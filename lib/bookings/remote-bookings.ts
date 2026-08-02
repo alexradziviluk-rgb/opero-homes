@@ -15,10 +15,11 @@ async function createRemoteBooking(booking: Booking): Promise<void> {
 }
 
 export async function persistBookingStatus(booking: Booking, status: Booking["status"]): Promise<void> {
+  const isReject = status === "rejected";
   const response = await fetch(`/api/bookings/${booking.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(isReject ? { status: "cancelled", requestStatus: "rejected" } : { status }),
   });
 
   if (response.ok) return;

@@ -16,9 +16,7 @@ import { fetchStaffBookings, type StaffBooking } from "@/lib/bookings/staff-book
 export default function BookingsPage() {
   const { currentUser } = useCurrentUser();
   const [bookings, setBookings] = useState<StaffBooking[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string | null>(() =>
-    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status"),
-  );
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
   const [isBulkConfirming, setIsBulkConfirming] = useState(false);
   const [isSingleConfirmingId, setIsSingleConfirmingId] = useState<string | null>(null);
@@ -297,8 +295,8 @@ export default function BookingsPage() {
                         ) : null}
                         <td className="px-3 py-2">{b.guestName}</td>
                         <td className="px-3 py-2">{b.apartmentTitle}</td>
-                        <td className="px-3 py-2">{new Date(b.checkIn).toLocaleDateString()}</td>
-                        <td className="px-3 py-2">{new Date(b.checkOut).toLocaleDateString()}</td>
+                        <td className="px-3 py-2">{new Date(`${b.checkIn}T00:00:00`).toLocaleDateString("ru-RU", { timeZone: "UTC" })}</td>
+                        <td className="px-3 py-2">{new Date(`${b.checkOut}T00:00:00`).toLocaleDateString("ru-RU", { timeZone: "UTC" })}</td>
                         <td className="px-3 py-2">{b.guests}</td>
                         <td className="px-3 py-2">{b.totalAmount} €</td>
                         <td className="px-3 py-2"><span className={`inline-flex rounded-full px-2 py-1 text-xs ${statusPresentation.badgeClassName}`}>{statusPresentation.label}</span></td>

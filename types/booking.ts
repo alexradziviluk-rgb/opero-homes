@@ -41,6 +41,7 @@ export type Booking = {
   complimentary?: boolean;
 
   status: BookingStatus;
+  requestStatus?: "pending" | "confirmed" | "rejected" | "cancelled";
   confirmedAt?: string;
   confirmedByUserId?: string;
   confirmationSource?: "public_instant_booking" | "manual_confirmation";
