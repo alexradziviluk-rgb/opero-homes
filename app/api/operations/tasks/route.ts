@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
 
@@ -115,6 +115,7 @@ export async function POST(request: Request) {
 
   const roleCode = normalizeRoleCode(auth.context.organizationMember.role_code);
   if (!MANAGER_ROLES.has(roleCode)) return error(403, "Insufficient permissions");
+  const writeSupabase = createSupabaseServiceRoleClient() ?? supabase;
 
   const body = (await request.json().catch(() => null)) as CreateTaskPayload | null;
   const title = body?.title?.trim() ?? "";
@@ -139,7 +140,7 @@ export async function POST(request: Request) {
   if (apartmentError) return error(422, apartmentError.message);
   if (!apartment) return error(400, "Apartment is not available in this organization");
 
-  const { data, error: insertError } = await supabase
+  const { data, error: insertError } = await writeSupabase
     .from("operational_tasks")
     .insert({
       organization_id: auth.context.organization.id,
@@ -158,10 +159,10 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError) return error(422, insertError.message);
-  const { error: assignmentError } = await supabase.from("operational_task_assignees").insert(assignedUserIds.map((userId) => ({ task_id: data.id, user_id: userId })));
+  const { error: assignmentError } = await writeSupabase.from("operational_task_assignees").insert(assignedUserIds.map((userId) => ({ task_id: data.id, user_id: userId })));
   if (assignmentError) return error(422, assignmentError.message);
   if (checklistItems.length) {
-    const { error: checklistError } = await supabase.from("operational_task_items").insert(checklistItems.map((item, position) => ({ task_id: data.id, title: item, position })));
+    const { error: checklistError } = await writeSupabase.from("operational_task_items").insert(checklistItems.map((item, position) => ({ task_id: data.id, title: item, position })));
     if (checklistError) return error(422, checklistError.message);
   }
   return NextResponse.json({ ok: true, data: { ...data, assigned_user_ids: assignedUserIds, checklist: checklistItems.map((title, index) => ({ id: `${data.id}-${index}`, title, completed: false })) } }, { status: 201 });
@@ -173,6 +174,7 @@ export async function PATCH(request: Request) {
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
+  const writeSupabase = createSupabaseServiceRoleClient() ?? supabase;
 
   const body = (await request.json().catch(() => null)) as UpdateTaskPayload | null;
   const id = body?.id?.trim() ?? "";
@@ -210,7 +212,7 @@ export async function PATCH(request: Request) {
   if (payload.checklistItems && (!isManager && existing.assigned_user_id !== auth.context.authUserId)) return error(403, "Insufficient permissions");
 
   const { data, error: updateError } = Object.keys(changes).length
-    ? await supabase
+    ? await writeSupabase
       .from("operational_tasks")
       .update(changes)
       .eq("organization_id", auth.context.organization.id)
@@ -226,13 +228,13 @@ export async function PATCH(request: Request) {
 
   if (updateError) return error(422, updateError.message);
   if (assignedUserIds?.length && isManager) {
-    const { error: deleteError } = await supabase.from("operational_task_assignees").delete().eq("task_id", id);
+    const { error: deleteError } = await writeSupabase.from("operational_task_assignees").delete().eq("task_id", id);
     if (deleteError) return error(422, deleteError.message);
-    const { error: assignmentError } = await supabase.from("operational_task_assignees").insert(assignedUserIds.map((userId) => ({ task_id: id, user_id: userId })));
+    const { error: assignmentError } = await writeSupabase.from("operational_task_assignees").insert(assignedUserIds.map((userId) => ({ task_id: id, user_id: userId })));
     if (assignmentError) return error(422, assignmentError.message);
   }
   if (payload.checklistItems) {
-    const { error: deleteChecklistError } = await supabase.from("operational_task_items").delete().eq("task_id", id);
+    const { error: deleteChecklistError } = await writeSupabase.from("operational_task_items").delete().eq("task_id", id);
     if (deleteChecklistError) return error(422, deleteChecklistError.message);
     const items = payload.checklistItems.filter((item) => item.title?.trim()).map((item, position) => ({
       task_id: id,
@@ -243,12 +245,12 @@ export async function PATCH(request: Request) {
       position,
     }));
     if (items.length) {
-      const { error: insertChecklistError } = await supabase.from("operational_task_items").insert(items);
+      const { error: insertChecklistError } = await writeSupabase.from("operational_task_items").insert(items);
       if (insertChecklistError) return error(422, insertChecklistError.message);
     }
     const nextStatus = items.length > 0 && items.every((item) => item.completed) ? "completed" : data.status === "completed" ? "in_progress" : data.status;
     if (nextStatus !== data.status) {
-      const { data: statusData, error: statusError } = await supabase.from("operational_tasks").update({ status: nextStatus }).eq("id", id).select(TASK_SELECT).single();
+      const { data: statusData, error: statusError } = await writeSupabase.from("operational_tasks").update({ status: nextStatus }).eq("id", id).select(TASK_SELECT).single();
       if (statusError) return error(422, statusError.message);
       return NextResponse.json({ ok: true, data: { ...statusData, assigned_user_ids: assignedUserIds ?? [statusData.assigned_user_id], checklist: items } });
     }
