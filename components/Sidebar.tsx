@@ -51,6 +51,29 @@ const navItems: NavItem[] = [
     requiredPermission: "bookings.view",
   },
   {
+    label: "Операции",
+    href: "/operations",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+        <circle cx="8" cy="7" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="11" cy="17" r="1" />
+      </svg>
+    ),
+    requiredPermission: "tasks.view",
+  },
+  {
+    label: "Команда",
+    href: "/employees",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="9" cy="8" r="3" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M3 19a6 6 0 0 1 12 0M15 19a4 4 0 0 1 6 0" />
+      </svg>
+    ),
+    requiredPermission: "users.view",
+  },
+  {
     label: "Уборки",
     href: "/cleaning",
     icon: (
@@ -212,6 +235,9 @@ export default function Sidebar() {
   }, [dashboardData, isDashboardLoading, text.noData, text.weekly]);
 
   const visibleItems = navItems.filter((item) => {
+    if (["Уборки", "Ремонты", "Сотрудники", "Управление пользователями", "Задачи"].includes(item.label)) {
+      return false;
+    }
     if (currentUser?.role === "Менеджер" && item.hiddenForManager) {
       return false;
     }

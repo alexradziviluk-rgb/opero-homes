@@ -44,7 +44,7 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 };
 
 type TaskBoardProps = {
-  filterType?: "cleaning" | "technical";
+  filterType?: "cleaning" | "technical" | "all";
   canManage: boolean;
 };
 
@@ -90,9 +90,10 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [activeFilterType, setActiveFilterType] = useState<"all" | "cleaning" | "technical">(filterType ?? "all");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [taskType, setTaskType] = useState<TaskType>(filterType ?? "other");
+  const [taskType, setTaskType] = useState<TaskType>(filterType === "all" ? "cleaning" : filterType ?? "other");
   const [apartmentId, setApartmentId] = useState("");
   const [assignedUserId, setAssignedUserId] = useState("");
   const [dueAt, setDueAt] = useState("");
@@ -123,7 +124,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
       }
       setApartments(nextApartments);
       if (tasksPayload.ok) {
-        setTasks((tasksPayload.data ?? []).map(mapTask).filter((task) => !filterType || task.taskType === filterType));
+        setTasks((tasksPayload.data ?? []).map(mapTask).filter((task) => activeFilterType === "all" || task.taskType === activeFilterType));
       } else {
         setError(tasksPayload.error ?? "Не удалось загрузить задачи");
       }
@@ -140,7 +141,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     return () => {
       cancelled = true;
     };
-  }, [filterType]);
+  }, [activeFilterType, filterType]);
 
   function resetForm() {
     setTitle(""); setApartmentId(""); setAssignedUserId(""); setDueAt(""); setPriority("normal"); setChecklistText(""); setEditingTaskId(null);
@@ -185,7 +186,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: title.trim(),
-        taskType: filterType ?? taskType,
+        taskType: filterType === "all" ? taskType : filterType ?? taskType,
         apartmentId: apartmentId.trim(),
         assignedUserId,
         ...(editingTaskId ? { id: editingTaskId } : {}),
@@ -235,14 +236,30 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
         </div>
       ) : null}
 
+      {filterType === "all" ? (
+        <div className="flex flex-wrap gap-2 border-y border-white/10 py-3">
+          {(["all", "cleaning", "technical"] as const).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setActiveFilterType(type)}
+              className={`rounded-xl px-3 py-2 text-sm ${activeFilterType === type ? "bg-cyan-500/20 text-cyan-200" : "border border-white/10 text-slate-300 hover:bg-white/5"}`}
+            >
+              {type === "all" ? "Все задачи" : type === "cleaning" ? "Уборка" : "Ремонт"}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {error ? <p className="border-y border-rose-400/20 py-3 text-sm text-rose-300">{error}</p> : null}
 
       {showForm ? (
         <form onSubmit={saveTask} className="grid gap-3 border-y border-white/10 bg-slate-900/60 p-4 md:grid-cols-2 xl:grid-cols-3">
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Название задачи" className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm" />
-          {!filterType ? (
+          {filterType === "all" ? (
             <select value={taskType} onChange={(event) => setTaskType(event.target.value as TaskType)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
-              {Object.entries(TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              <option value="cleaning">Уборка</option>
+              <option value="technical">Ремонт</option>
             </select>
           ) : null}
           <select aria-label="Объект" value={apartmentId} onChange={(event) => setApartmentId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
