@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
+import { createBookingNotifications } from "@/lib/notifications/service";
+import { processNotificationQueue } from "@/lib/notifications/queue";
 
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
 const BOOKING_REQUEST_STATUSES = new Set(["pending", "confirmed", "rejected", "cancelled"]);
@@ -9,6 +11,58 @@ const MANAGER_ROLES = new Set(["owner", "manager"]);
 
 function error(status: number, message: string, code?: string) {
   return NextResponse.json({ ok: false, error: message, code }, { status });
+}
+
+async function notifyBookingChange(params: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+  actorUserId: string;
+  organizationId: string;
+  booking: Record<string, unknown>;
+  eventType: "booking_confirmed" | "booking_cancelled" | "booking_changed";
+  idempotencyKey: string;
+}) {
+  const { supabase, actorUserId, organizationId, booking, eventType, idempotencyKey } = params;
+  const apartmentId = String(booking.apartment_id ?? "");
+  const { data: apartment } = await supabase.from("apartments").select("title:name").eq("id", apartmentId).maybeSingle();
+  const checkIn = String(booking.check_in_date ?? booking.check_in ?? "");
+  const checkOut = String(booking.check_out_date ?? booking.check_out ?? "");
+  const guestEmail = String(booking.guest_email ?? "").trim().toLowerCase();
+
+  if (!apartmentId || !checkIn || !checkOut || !guestEmail) return;
+
+  try {
+    await createBookingNotifications({
+      supabase,
+      organizationId,
+      actorUserId,
+      request: {
+        eventType,
+        idempotencyKey,
+        bookingId: String(booking.id),
+        apartmentId,
+        payload: {
+          bookingId: String(booking.id),
+          apartmentId,
+          apartmentTitle: String(apartment?.title ?? "Объект"),
+          guestName: String(booking.guest_name ?? booking.customer_name ?? "Гость"),
+          guestPhone: String(booking.guest_phone ?? ""),
+          guestEmail,
+          checkIn,
+          checkOut,
+          guests: Number(booking.guests_count ?? booking.adults ?? booking.guests ?? 1),
+          totalAmount: Number(booking.total_amount ?? 0),
+          currency: String(booking.currency ?? "EUR"),
+          bookingStatus: String(booking.status ?? "pending"),
+          paymentStatus: String(booking.payment_status ?? "unpaid"),
+          notes: String(booking.guest_comment ?? booking.notes ?? ""),
+          actionUrl: `/bookings/${booking.id}`,
+        },
+      },
+    });
+    await processNotificationQueue({ supabase, organizationId, limit: 10 });
+  } catch (notificationError) {
+    console.error("Failed to send booking lifecycle notifications:", notificationError);
+  }
 }
 
 async function loadBookingById(
@@ -201,6 +255,21 @@ export async function PATCH(
 
   if (updateError) return error(422, updateError.message, updateError.code);
   if (!data) return error(404, "Booking not found");
+
+  const eventType = isReject
+    ? "booking_cancelled"
+    : requestStatus === "confirmed" || status === "confirmed"
+    ? "booking_confirmed"
+    : "booking_changed";
+  await notifyBookingChange({
+    supabase,
+    actorUserId: auth.context.authUserId,
+    organizationId: auth.context.organization.id,
+    booking: { ...existing, ...updateRow, id },
+    eventType,
+    idempotencyKey: `booking-lifecycle:${id}:${eventType}:${data.updated_at}`,
+  });
+
   return NextResponse.json({ ok: true, data });
 }
 

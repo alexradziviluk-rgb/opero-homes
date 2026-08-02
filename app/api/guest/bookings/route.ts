@@ -5,6 +5,9 @@ import {
   listGuestBookings,
   type GuestBookingInput,
 } from "@/lib/bookings/guest-booking-service";
+import { createBookingNotifications } from "@/lib/notifications/service";
+import { processNotificationQueue } from "@/lib/notifications/queue";
+import { getServerCurrentUserContext } from "@/lib/supabase/server";
 
 function parseGuests(value: unknown): number {
   const numberValue = typeof value === "number" ? value : Number(value);
@@ -59,6 +62,50 @@ export async function POST(request: Request) {
         : 422;
 
     return NextResponse.json(result, { status });
+  }
+
+  const currentUser = await getServerCurrentUserContext();
+  if (currentUser.currentUserContext) {
+    try {
+      await createBookingNotifications({
+        supabase,
+        organizationId: result.data.organizationId,
+        actorUserId: currentUser.currentUserContext.authUserId,
+        request: {
+          eventType: "booking_created",
+          idempotencyKey: `public-booking-request:${result.data.id}`,
+          bookingId: result.data.id,
+          apartmentId: result.data.apartmentId,
+          payload: {
+            bookingId: result.data.id,
+            apartmentId: result.data.apartmentId,
+            apartmentTitle: result.data.apartmentTitle,
+            clientId: result.data.clientId || undefined,
+            clientUserId: currentUser.currentUserContext.authUserId,
+            guestName: result.data.guestName,
+            guestPhone: result.data.guestPhone,
+            guestEmail: result.data.guestEmail,
+            checkIn: result.data.checkIn,
+            checkOut: result.data.checkOut,
+            guests: result.data.quote.guests,
+            totalAmount: result.data.totalAmount,
+            currency: result.data.quote.currency,
+            bookingStatus: result.data.status,
+            paymentStatus: result.data.paymentStatus ?? "unpaid",
+            notes: input.guestComment,
+            actionUrl: `/bookings/${result.data.id}`,
+          },
+        },
+      });
+
+      await processNotificationQueue({
+        supabase,
+        organizationId: result.data.organizationId,
+        limit: 10,
+      });
+    } catch (error) {
+      console.error("Failed to queue public booking email notifications:", error);
+    }
   }
 
   return NextResponse.json(result, { status: 201 });

@@ -29,6 +29,18 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## External email notifications
+
+Booking emails use a Resend-compatible HTTP API. Configure these server-only variables in Netlify:
+
+```text
+NOTIFICATIONS_EMAIL_API_URL=https://api.resend.com
+NOTIFICATIONS_EMAIL_API_KEY=re_...
+NOTIFICATIONS_EMAIL_FROM=Opero Homes <bookings@example.com>
+```
+
+New bookings and booking status changes are queued in Supabase, sent by the server, and retried when the provider is unavailable.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
