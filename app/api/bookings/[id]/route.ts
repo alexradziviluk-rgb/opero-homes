@@ -4,6 +4,7 @@ import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { processNotificationQueue } from "@/lib/notifications/queue";
+import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
 const BOOKING_REQUEST_STATUSES = new Set(["pending", "confirmed", "rejected", "cancelled"]);
@@ -208,6 +209,11 @@ export async function PATCH(
     const totalAmount = typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount) ? Math.max(0, body.totalAmount) : null;
 
     if (!guestName || !checkIn || !checkOut || checkOut <= checkIn) return error(400, "Invalid booking details");
+    const existingCheckIn = String(existing.check_in_date ?? existing.check_in ?? "");
+    const existingCheckOut = String(existing.check_out_date ?? existing.check_out ?? "");
+    if (hasPastBookingDate(checkIn, checkOut) && (checkIn !== existingCheckIn || checkOut !== existingCheckOut)) {
+      return error(400, "Нельзя сохранить бронирование на прошедшие даты", "past_booking_date");
+    }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(checkInTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(checkOutTime)) {
       return error(400, "Invalid check-in or check-out time");
     }

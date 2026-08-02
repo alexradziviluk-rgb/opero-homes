@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { normalizeRoleCode } from "@/lib/supabase/role-code";
+import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 
 type CreateBookingPayload = {
   id?: string;
@@ -155,6 +156,9 @@ export async function POST(request: Request) {
 
   if (!id || !apartmentId || !guestName || !checkIn || !checkOut || checkOut <= checkIn) {
     return error(400, "Invalid booking payload");
+  }
+  if (hasPastBookingDate(checkIn, checkOut)) {
+    return error(400, "Нельзя создать бронирование на прошедшие даты", "past_booking_date");
   }
   if (!BOOKING_STATUSES.has(status) || !PAYMENT_STATUSES.has(paymentStatus)) {
     return error(400, "Invalid booking status");

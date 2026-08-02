@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { Booking } from "@/types/booking";
 import { findBookingConflict, isBlockingBooking } from "@/lib/bookings/booking-conflicts";
+import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
 
@@ -157,6 +158,16 @@ export default function EditBookingPage() {
       new Date(form.checkOut) <= new Date(form.checkIn)
     ) {
       e.dates = "Дата выезда должна быть позже даты заезда";
+    }
+
+    if (
+      form.checkIn &&
+      form.checkOut &&
+      booking &&
+      hasPastBookingDate(form.checkIn, form.checkOut) &&
+      (form.checkIn !== booking.checkIn || form.checkOut !== booking.checkOut)
+    ) {
+      e.dates = "Нельзя выбрать прошедшие даты";
     }
 
     // occupancy excluding current booking
