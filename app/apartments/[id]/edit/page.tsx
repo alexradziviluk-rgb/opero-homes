@@ -15,6 +15,7 @@ import {
   apartmentToForm,
 } from "@/app/apartments/apartment-utils";
 import ApartmentPhotoManager from "@/components/apartments/apartment-photo-manager";
+import { resolveGoogleMapsAddress } from "@/lib/maps/google-maps";
 import { loadApartmentFromSupabase, saveApartmentToSupabase } from "@/lib/apartments/supabase-apartments";
 
 type AssigneeItem = {
@@ -27,29 +28,6 @@ type AssigneeItem = {
 
 const objectTypes = ["Квартира", "Вилла", "Апарт-отель", "Пентхаус", "Таунхаус"];
 const cities = ["Аланья", "Анталья", "Стамбул", "Другой"];
-
-function isGoogleMapsLink(url: string) {
-  const normalized = url.trim();
-  const pattern = /^(https?:\/\/)?(www\.)?(google\.com\/maps|maps\.google\.com|maps\.app\.goo\.gl)/i;
-  return pattern.test(normalized);
-}
-
-async function resolveGoogleMapsAddress(url: string) {
-  if (!isGoogleMapsLink(url)) {
-    return Promise.reject(new Error("invalid"));
-  }
-  return new Promise<{ city: string; district: string; address: string; latitude: string; longitude: string }>((resolve) => {
-    setTimeout(() => {
-      resolve({
-        city: "Аланья",
-        district: "Махмутлар",
-        address: "Mahmutlar Mahallesi, Atatürk Caddesi No:125, Alanya/Antalya",
-        latitude: "36.4921",
-        longitude: "32.0994",
-      });
-    }, 500);
-  });
-}
 
 export default function EditApartmentPage() {
   const params = useParams();

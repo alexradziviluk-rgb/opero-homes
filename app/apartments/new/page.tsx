@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import ApartmentPhotoManager from "@/components/apartments/apartment-photo-manager";
+import { resolveGoogleMapsAddress } from "@/lib/maps/google-maps";
 import type { ApartmentPhoto } from "@/types/apartment";
 import { buildApartment, getErrorMessage, validateForm } from "@/app/apartments/apartment-utils";
 import { useCallback } from "react";
@@ -98,39 +99,6 @@ type AssigneeItem = {
 const objectTypes = ["Квартира", "Вилла", "Апарт-отель", "Пентхаус", "Таунхаус"];
 const cities = ["Аланья", "Анталья", "Стамбул", "Другой"];
 // Use shared buildApartment, validateForm, and storage helpers from apartment-utils
-
-type AddressResolution = {
-  city: string;
-  district: string;
-  address: string;
-  latitude: string;
-  longitude: string;
-};
-
-function isGoogleMapsLink(url: string) {
-  const normalized = url.trim();
-  const pattern = /^(https?:\/\/)?(www\.)?(google\.com\/maps|maps\.google\.com|maps\.app\.goo\.gl)/i;
-  return pattern.test(normalized);
-}
-
-async function resolveGoogleMapsAddress(url: string): Promise<AddressResolution> {
-  if (!isGoogleMapsLink(url)) {
-    return Promise.reject(new Error("invalid"));
-  }
-
-  // Временный демо-режим. Позже можно заменить на вызов API /api/maps/resolve
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        city: "Аланья",
-        district: "Махмутлар",
-        address: "Mahmutlar Mahallesi, Atatürk Caddesi No:125, Alanya/Antalya",
-        latitude: "36.4921",
-        longitude: "32.0994",
-      });
-    }, 500);
-  });
-}
 
 export default function NewApartmentPage() {
   const [form, setForm] = useState(initialForm);
