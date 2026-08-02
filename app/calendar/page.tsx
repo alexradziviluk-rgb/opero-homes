@@ -85,7 +85,10 @@ export default function CalendarPage() {
   const { currentUser, isAuthLoading } = useCurrentUser();
 
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
+  const [calendarView, setCalendarView] = useState<"week" | "month">("month");
+  const [showDemoTemplate, setShowDemoTemplate] = useState(false);
   const [filterApartment, setFilterApartment] = useState<string>("");
+  const [searchApartment, setSearchApartment] = useState<string>("");
   const [rangeApartmentId, setRangeApartmentId] = useState<string>("");
   const [rangeCheckIn, setRangeCheckIn] = useState<string>("");
   const [rangeCheckOut, setRangeCheckOut] = useState<string>("");
@@ -135,16 +138,16 @@ export default function CalendarPage() {
   }, [version]);
 
   const days = useMemo(() => {
-    const year = cursor.getFullYear();
-    const month = cursor.getMonth();
-    const first = new Date(year, month, 1);
-    const last = new Date(year, month + 1, 0);
+    const first = calendarView === "month"
+      ? startOfMonth(cursor)
+      : addDays(cursor, -((cursor.getDay() + 6) % 7));
+    const dayCount = calendarView === "month" ? new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate() : 7;
     const arr: Date[] = [];
-    for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
-      arr.push(new Date(d));
+    for (let index = 0; index < dayCount; index += 1) {
+      arr.push(addDays(first, index));
     }
     return arr;
-  }, [cursor]);
+  }, [calendarView, cursor]);
 
   function prev() {
     setCursor((c) => addMonths(c, -1));
@@ -159,6 +162,27 @@ export default function CalendarPage() {
     if (filterApartment) return booking.apartmentId === filterApartment;
     return true;
   });
+
+  const visibleApartments = apartments.filter((apartment) => {
+    if (filterApartment && apartment.id !== filterApartment) return false;
+    const query = searchApartment.trim().toLocaleLowerCase();
+    if (!query) return true;
+    return `${apartment.title} ${apartment.city}`.toLocaleLowerCase().includes(query);
+  });
+
+  const calendarStart = toIsoDate(days[0]);
+  const calendarEnd = toIsoDate(addDays(days[days.length - 1], 1));
+  const demoCheckIn = "2026-08-03";
+  const demoCheckOut = "2026-08-07";
+
+  function bookingPosition(booking: Booking) {
+    const startOffset = Math.max(0, Math.round((new Date(`${booking.checkIn}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
+    const endOffset = Math.min(days.length, Math.round((new Date(`${booking.checkOut}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
+    return {
+      left: `${(startOffset / days.length) * 100}%`,
+      width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%`,
+    };
+  }
 
   const selectedBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
 
@@ -331,7 +355,11 @@ export default function CalendarPage() {
                   </button>
                 ) : null}
                 <button type="button" onClick={prev} className="rounded bg-white/5 px-3 py-2">‹</button>
-                <div className="px-4">{cursor.toLocaleString(undefined, { month: "long", year: "numeric" })}</div>
+                <div className="px-4 capitalize">
+                  {calendarView === "month"
+                    ? cursor.toLocaleString("ru-RU", { month: "long", year: "numeric" })
+                    : `${days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "short" })} - ${days[days.length - 1].toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}`}
+                </div>
                 <button type="button" onClick={next} className="rounded bg-white/5 px-3 py-2">›</button>
               </div>
             </div>
@@ -378,8 +406,18 @@ export default function CalendarPage() {
 
             <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <label className="text-sm text-slate-300">Фильтр по объекту</label>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="text-sm text-slate-300">Поиск объекта</label>
+                    <input
+                      value={searchApartment}
+                      onChange={(event) => setSearchApartment(event.target.value)}
+                      placeholder="Название или город"
+                      className="mt-1 block rounded-xl bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-300">Фильтр по объекту</label>
                   <select
                     value={filterApartment}
                     onChange={(event) => setFilterApartment(event.target.value)}
@@ -390,7 +428,30 @@ export default function CalendarPage() {
                       <option key={apartment.id} value={apartment.id}>{apartment.title} - {apartment.city}</option>
                     ))}
                   </select>
+                  </div>
+                  <div>
+                    <span className="text-sm text-slate-300">Период</span>
+                    <div className="mt-1 flex rounded-xl bg-white/5 p-1">
+                      {(["week", "month"] as const).map((view) => (
+                        <button
+                          key={view}
+                          type="button"
+                          onClick={() => setCalendarView(view)}
+                          className={`rounded-lg px-3 py-1.5 text-sm ${calendarView === view ? "bg-cyan-500/20 text-cyan-200" : "text-slate-400"}`}
+                        >
+                          {view === "week" ? "Неделя" : "Месяц"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDemoTemplate((value) => !value)}
+                  className={`rounded-xl border px-3 py-2 text-sm ${showDemoTemplate ? "border-cyan-400/40 bg-cyan-400/15 text-cyan-200" : "border-white/10 bg-white/5 text-slate-300"}`}
+                >
+                  {showDemoTemplate ? "Скрыть тестовый шаблон" : "Показать тестовый шаблон"}
+                </button>
                 <div className="flex flex-wrap gap-3 text-xs text-slate-300">
                   <span className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-white/20" />Свободно</span>
                   <span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-amber-400" />Ожидает подтверждения</span>
@@ -398,65 +459,57 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-2">
-                {["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"].map((dayName) => (
-                  <div key={dayName} className="text-xs text-slate-400">{dayName}</div>
-                ))}
-                {days.map((day) => {
-                  const isoDay = toIsoDate(day);
-                  const isSelectionStart = rangeCheckIn === isoDay;
-                  const isSelectionEnd = rangeCheckOut === isoDay;
-
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      className={`min-h-[100px] rounded border border-white/5 bg-black/10 p-2 text-left ${
-                        isSelectionStart || isSelectionEnd ? "ring-1 ring-cyan-400/80" : ""
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => beginQuickRangeFromDay(day)}
-                        className={`text-sm ${day.toDateString() === new Date().toDateString() ? "font-bold text-emerald-300" : "text-slate-300"}`}
-                      >
-                        {day.getDate()}
-                      </button>
-                      <div className="mt-2 space-y-1">
-                        {visibleBookings.map((booking) => {
-                          const dayStart = isoDay;
-                          const dayEnd = toIsoDate(addDays(day, 1));
-                          if (!bookingsOverlap(dayStart, dayEnd, booking.checkIn, booking.checkOut)) {
-                            return null;
-                          }
-
-                          const apartmentLabel = getApartmentCalendarLabel(booking, apartments);
-                          const statusLabel = getBookingStatusPresentation(booking.status).label;
-                          const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
-
-                          return (
-                            <button
-                              key={booking.id}
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedBookingId(booking.id);
-                                setActionError("");
-                                setActionSuccess("");
-                              }}
-                              title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`}
-                              className={`block w-full rounded px-2 py-1 text-left text-[11px] leading-tight text-slate-900 ${statusColor(booking)}`}
-                            >
-                              <p className="font-semibold">{apartmentLabel}</p>
-                              <p>{periodLabel}</p>
-                              <p className="hidden md:block">{statusLabel}</p>
-                              {canViewClients ? <p className="mt-0.5 hidden lg:block">{booking.guestName}</p> : null}
-                            </button>
-                          );
-                        })}
+              <div className="overflow-hidden rounded-xl border border-white/10">
+                <div className="max-h-[70vh] overflow-auto">
+                  <div className="min-w-[760px]">
+                    <div className="grid border-b border-white/10 bg-black/20" style={{ gridTemplateColumns: "190px minmax(570px, 1fr)" }}>
+                      <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Объект</div>
+                      <div className="grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
+                        {days.map((day) => (
+                          <button key={day.toISOString()} type="button" onClick={() => beginQuickRangeFromDay(day)} className={`border-r border-white/5 px-1 py-3 text-center text-xs ${toIsoDate(day) === toIsoDate(new Date()) ? "font-bold text-emerald-300" : "text-slate-400"}`}>
+                            <span className="block">{day.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "")}</span>
+                            <span className="mt-1 block text-sm text-slate-200">{day.getDate()}</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
+                    {visibleApartments.map((apartment) => {
+                      const apartmentBookings = visibleBookings.filter((booking) => booking.apartmentId === apartment.id && bookingsOverlap(calendarStart, calendarEnd, booking.checkIn, booking.checkOut));
+                      const showDemoOccupancy = showDemoTemplate && bookingsOverlap(calendarStart, calendarEnd, demoCheckIn, demoCheckOut);
+                      return (
+                        <div key={apartment.id} className="grid min-h-[76px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "190px minmax(570px, 1fr)" }}>
+                          <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-3 py-3">
+                            <p className="truncate text-sm font-medium text-white">{apartment.title}</p>
+                            <p className="truncate text-xs text-slate-500">{apartment.city}</p>
+                          </div>
+                          <div className="relative grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
+                            {days.map((day) => {
+                              const isoDay = toIsoDate(day);
+                              return <button key={isoDay} type="button" onClick={() => { setRangeApartmentId(apartment.id); beginQuickRangeFromDay(day); }} className={`border-r border-white/5 ${rangeCheckIn === isoDay || rangeCheckOut === isoDay ? "bg-cyan-400/10" : "hover:bg-white/5"}`} aria-label={`${apartment.title}, ${isoDay}`} />;
+                            })}
+                            <div className="pointer-events-none absolute inset-x-0 top-2 h-12">
+                              {showDemoOccupancy ? (
+                                <div
+                                  className="pointer-events-auto absolute flex h-11 items-center truncate rounded bg-cyan-400 px-2 py-1 text-left text-[11px] font-semibold text-slate-950 shadow-lg"
+                                  style={bookingPosition({ checkIn: demoCheckIn, checkOut: demoCheckOut } as Booking)}
+                                  title="Тестовый шаблон: объект занят с 3 по 7 августа"
+                                >
+                                  Занято · 3-7 августа
+                                </div>
+                              ) : null}
+                              {apartmentBookings.map((booking) => {
+                                const apartmentLabel = getApartmentCalendarLabel(booking, apartments);
+                                const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
+                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto absolute h-11 truncate rounded px-2 py-1 text-left text-[11px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {visibleApartments.length === 0 ? <div className="p-8 text-center text-sm text-slate-400">Объекты не найдены</div> : null}
+                  </div>
+                </div>
               </div>
             </div>
 
