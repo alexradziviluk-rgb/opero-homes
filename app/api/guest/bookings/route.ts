@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import {
   createGuestBooking,
   listGuestBookings,
@@ -67,8 +67,9 @@ export async function POST(request: Request) {
   const currentUser = await getServerCurrentUserContext();
   if (currentUser.currentUserContext) {
     try {
+      const notificationSupabase = createSupabaseServiceRoleClient() ?? supabase;
       await createBookingNotifications({
-        supabase,
+        supabase: notificationSupabase,
         organizationId: result.data.organizationId,
         actorUserId: currentUser.currentUserContext.authUserId,
         request: {
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
       });
 
       await processNotificationQueue({
-        supabase,
+        supabase: notificationSupabase,
         organizationId: result.data.organizationId,
         limit: 10,
       });
