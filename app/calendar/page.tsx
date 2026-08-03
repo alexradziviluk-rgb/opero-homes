@@ -58,6 +58,17 @@ type ApartmentLabelSource = Apartment & {
   name?: string;
 };
 
+type AvailabilityBlock = {
+  id: string;
+  apartment_id: string;
+  start_date: string;
+  end_date: string;
+  reason_code: string | null;
+  private_note: string | null;
+  created_by: string | null;
+  created_by_role: string | null;
+};
+
 function getApartmentCalendarLabel(booking: Booking, apartments: Apartment[]): string {
   const apartment = apartments.find((item) => item.id === booking.apartmentId) as ApartmentLabelSource | undefined;
   if (!apartment) {
@@ -100,6 +111,7 @@ export default function CalendarPage() {
   const [version, setVersion] = useState(0);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
 
   const canViewCalendar = currentUser ? hasEffectivePermission(currentUser, "calendar.view") : false;
   const canViewBookings = currentUser ? hasEffectivePermission(currentUser, "bookings.view") : false;
@@ -127,10 +139,11 @@ export default function CalendarPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchStaffBookings(), loadApartmentsFromSupabase()]).then(([nextBookings, nextApartments]) => {
+    void Promise.all([fetchStaffBookings(), loadApartmentsFromSupabase(), fetch("/api/availability/blocks", { cache: "no-store" }).then((response) => response.json())]).then(([nextBookings, nextApartments, blocksResult]) => {
       if (cancelled) return;
       setBookings(nextBookings);
       setApartments(nextApartments);
+      setAvailabilityBlocks(blocksResult.ok ? (blocksResult.data ?? []) : []);
     }).catch(() => {
       if (!cancelled) setActionError("Не удалось загрузить календарь");
     });
@@ -162,6 +175,7 @@ export default function CalendarPage() {
     if (filterApartment) return booking.apartmentId === filterApartment;
     return true;
   });
+  const visibleBlocks = availabilityBlocks.filter((block) => !filterApartment || block.apartment_id === filterApartment);
 
   const visibleApartments = apartments.filter((apartment) => {
     if (filterApartment && apartment.id !== filterApartment) return false;
@@ -182,6 +196,12 @@ export default function CalendarPage() {
       left: `${(startOffset / days.length) * 100}%`,
       width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%`,
     };
+  }
+
+  function periodPosition(checkIn: string, checkOut: string) {
+    const startOffset = Math.max(0, Math.round((new Date(`${checkIn}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
+    const endOffset = Math.min(days.length, Math.round((new Date(`${checkOut}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
+    return { left: `${(startOffset / days.length) * 100}%`, width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%` };
   }
 
   const selectedBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
@@ -237,6 +257,12 @@ export default function CalendarPage() {
 
     if (conflict) {
       setRangeError("Этот объект уже забронирован на выбранные даты.");
+      return;
+    }
+
+    const blockConflict = visibleBlocks.find((block) => block.apartment_id === rangeApartmentId && bookingsOverlap(rangeCheckIn, rangeCheckOut, block.start_date, block.end_date));
+    if (blockConflict) {
+      setRangeError("Этот объект заблокирован на выбранные даты.");
       return;
     }
 
@@ -456,6 +482,7 @@ export default function CalendarPage() {
                   <span className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-white/20" />Свободно</span>
                   <span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-amber-400" />Ожидает подтверждения</span>
                   <span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-rose-400" />Занято</span>
+                  <span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-violet-400" />Недоступно</span>
                 </div>
               </div>
 
@@ -475,6 +502,7 @@ export default function CalendarPage() {
                     </div>
                     {visibleApartments.map((apartment) => {
                       const apartmentBookings = visibleBookings.filter((booking) => booking.apartmentId === apartment.id && bookingsOverlap(calendarStart, calendarEnd, booking.checkIn, booking.checkOut));
+                      const apartmentBlocks = visibleBlocks.filter((block) => block.apartment_id === apartment.id && bookingsOverlap(calendarStart, calendarEnd, block.start_date, block.end_date));
                       const showDemoOccupancy = showDemoTemplate && bookingsOverlap(calendarStart, calendarEnd, demoCheckIn, demoCheckOut);
                       return (
                         <div key={apartment.id} className="grid min-h-[76px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "190px minmax(570px, 1fr)" }}>
@@ -502,6 +530,7 @@ export default function CalendarPage() {
                                 const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
                                 return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto absolute h-11 truncate rounded px-2 py-1 text-left text-[11px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
                               })}
+                              {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto absolute top-1 h-11 truncate rounded bg-violet-400 px-2 py-1 text-[11px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
                             </div>
                           </div>
                         </div>

@@ -48,6 +48,7 @@ export function isPermissionValue(value: string): value is Permission {
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   "Владелец": ALL_PERMISSIONS,
+  "Собственник квартиры": [],
   "Менеджер": [
     "operations.view",
     "payments.view",

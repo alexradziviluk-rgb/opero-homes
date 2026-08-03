@@ -9,6 +9,7 @@ type ServerAuthState = {
   isAuthenticated: boolean;
   isStaff: boolean;
   isClient: boolean;
+  isPropertyOwner: boolean;
   roleCode: string;
   roleCodes: string[];
   context: CurrentUserContext | null;
@@ -21,6 +22,7 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
       isAuthenticated: false,
       isStaff: false,
       isClient: false,
+      isPropertyOwner: false,
       roleCode: "",
       roleCodes: [],
       context: null,
@@ -36,6 +38,7 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
       isAuthenticated: false,
       isStaff: false,
       isClient: false,
+      isPropertyOwner: false,
       roleCode: "",
       roleCodes: [],
       context: null,
@@ -50,6 +53,7 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
       isAuthenticated: true,
       isStaff: false,
       isClient: true,
+      isPropertyOwner: false,
       roleCode: "",
       roleCodes: [],
       context: null,
@@ -60,14 +64,31 @@ export async function getServerAuthState(): Promise<ServerAuthState> {
   const roleCode = getRoleCodeFromContext(context);
   const roleCodes = [roleCode, ...(context.organizationMember?.additional_role_codes ?? [])];
   const isStaff = hasMembership && roleCodes.some((code) => isStaffRoleCode(code));
+  const { data: hasActiveProperty } = await supabase.rpc("is_active_property_owner_user");
+  const isPropertyOwner = Boolean(hasActiveProperty);
 
   return {
     isAuthenticated: true,
     isStaff,
     isClient: !isStaff,
+    isPropertyOwner,
     roleCode,
     roleCodes,
     context,
+  };
+}
+
+export async function requireServerPropertyOwnerPage(): Promise<CurrentUserContext> {
+  const authState = await getServerAuthState();
+  if (!authState.isAuthenticated) redirect("/guest/login");
+  if (!authState.isPropertyOwner || !authState.context) redirect("/guest");
+  if (authState.context.organization) return authState.context;
+  const supabase = await createSupabaseServerClient();
+  const { data: relation } = await supabase?.from("apartment_owner_access").select("organization_id").eq("user_id", authState.context.authUserId).eq("status", "active").limit(1).maybeSingle() ?? { data: null };
+  if (!relation) redirect("/guest");
+  return {
+    ...authState.context,
+    organization: { id: relation.organization_id, name: "", slug: "", created_at: null, updated_at: null },
   };
 }
 

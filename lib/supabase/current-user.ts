@@ -195,6 +195,8 @@ export async function loadCurrentUserContext(
   }
 
   const profile = profileResult.profile;
+  const profileRole = (profile.role ?? "").trim().toLowerCase();
+  const isClientProfile = profileRole === "guest" || profileRole === "гость" || profileRole === "property_owner" || profileRole === "собственник квартиры";
 
   const { data: memberData, error: memberError } = await supabase
     .from("organization_members")
@@ -202,7 +204,17 @@ export async function loadCurrentUserContext(
     .eq("user_id", authUser.id);
 
   if (memberError) {
-    return { context: null, error: buildQueryError("organization_members", memberError) };
+    if (!isClientProfile) return { context: null, error: buildQueryError("organization_members", memberError) };
+    // Client mode must remain available even when no organization membership is readable.
+    return {
+      context: {
+        authUserId: authUser.id,
+        authEmail: authUser.email ?? profile.email ?? "",
+        profile,
+        organizationMember: null,
+        organization: null,
+      },
+    };
   }
 
   const members = (memberData ?? []) as unknown as OrganizationMember[];
@@ -233,7 +245,16 @@ export async function loadCurrentUserContext(
       .in("id", organizationIds);
 
     if (organizationsError) {
-      return { context: null, error: buildQueryError("organizations", organizationsError) };
+      if (!isClientProfile) return { context: null, error: buildQueryError("organizations", organizationsError) };
+      return {
+        context: {
+          authUserId: authUser.id,
+          authEmail: authUser.email ?? profile.email ?? "",
+          profile,
+          organizationMember: null,
+          organization: null,
+        },
+      };
     }
 
     organizations = (organizationsData ?? []) as unknown as Organization[];

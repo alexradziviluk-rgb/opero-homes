@@ -10,7 +10,7 @@ const items = [
 
 export default function GuestNav() {
   const pathname = usePathname();
-  const { currentUser, logout } = useCurrentUser();
+  const { currentUser, hasPropertyAccess, logout } = useCurrentUser();
   const isGuestUser = currentUser?.role === "Гость";
   const isStaffUser = Boolean(currentUser && !isGuestUser);
 
@@ -78,6 +78,16 @@ export default function GuestNav() {
               className={`rounded-xl px-3 py-2 text-sm ${pathname === "/guest/bookings" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300 hover:bg-white/10"}`}
             >
               Мои бронирования
+            </Link>
+          ) : null}
+          {isGuestUser ? (
+            <Link href="/account" className={`rounded-xl px-3 py-2 text-sm ${pathname === "/account" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300 hover:bg-white/10"}`}>
+              Мой аккаунт
+            </Link>
+          ) : null}
+          {isGuestUser && hasPropertyAccess ? (
+            <Link href="/account/properties" className={`rounded-xl px-3 py-2 text-sm ${pathname.startsWith("/account/properties") ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300 hover:bg-white/10"}`}>
+              Моя недвижимость
             </Link>
           ) : null}
           {isGuestUser ? (

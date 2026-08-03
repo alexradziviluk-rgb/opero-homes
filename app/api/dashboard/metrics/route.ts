@@ -41,6 +41,8 @@ type OperationalTaskRow = {
   due_at: string;
 };
 
+type AvailabilityBlockRow = { apartment_id: string; start_date: string; end_date: string };
+
 function normalize(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
@@ -186,6 +188,13 @@ export async function GET() {
 
   const bookings = (bookingsData ?? []) as unknown as BookingRow[];
 
+  const { data: availabilityBlocksData, error: availabilityBlocksError } = await supabase
+    .from("availability_blocks")
+    .select("apartment_id,start_date,end_date")
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
+  const availabilityBlocks = availabilityBlocksError ? [] : (availabilityBlocksData ?? []) as AvailabilityBlockRow[];
+
   metrics.bookingsTotal = bookings.length;
 
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -200,8 +209,13 @@ export async function GET() {
       .map((booking) => booking.apartment_id)
       .filter((apartmentId): apartmentId is string => Boolean(apartmentId)),
   );
+  const blockedApartmentIds = new Set(
+    availabilityBlocks
+      .filter((block) => block.start_date <= todayIso && block.end_date > todayIso)
+      .map((block) => block.apartment_id),
+  );
   metrics.propertiesOccupied = occupiedApartmentIds.size;
-  metrics.propertiesAvailable = Math.max(0, metrics.propertiesTotal - metrics.propertiesOccupied);
+  metrics.propertiesAvailable = Math.max(0, metrics.propertiesTotal - metrics.propertiesOccupied - blockedApartmentIds.size);
 
   metrics.todayArrivals = nonCancelledBookings
     .filter((booking) => bookingCheckIn(booking) === todayIso)
@@ -233,7 +247,10 @@ export async function GET() {
       return sum + countOverlapNights(bookingCheckIn(booking), bookingCheckOut(booking), monthStart, monthEndExclusive);
     }, 0);
 
-    const totalCapacityNights = metrics.propertiesTotal * daysInMonth;
+    const blockedNights = availabilityBlocks.reduce((sum, block) => {
+      return sum + countOverlapNights(block.start_date, block.end_date, monthStart, monthEndExclusive);
+    }, 0);
+    const totalCapacityNights = Math.max(0, metrics.propertiesTotal * daysInMonth - blockedNights);
     if (bookedNights > 0 && totalCapacityNights > 0) {
       metrics.occupancyPercent = Math.round((bookedNights / totalCapacityNights) * 1000) / 10;
     }

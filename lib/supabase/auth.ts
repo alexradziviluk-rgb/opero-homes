@@ -145,6 +145,10 @@ export async function resolvePostAuthRedirect(nextPath: string | null | undefine
     return getGuestNextPath(nextPath);
   }
 
+  if (resolved.currentUser.role === "Собственник квартиры") {
+    return "/owner";
+  }
+
   const safeAdmin = getAdminNextPath(nextPath);
   const isAdminPath =
     safeAdmin === "/admin" ||
@@ -383,7 +387,7 @@ async function resolveCurrentUserFromAuthUser(authUser: SupabaseAuthUser | null)
   }
 
   const organizationId = loaded.context.organization?.id ?? "";
-  const roleCode = loaded.context.organizationMember?.role_code ?? "guest";
+  const roleCode = loaded.context.organizationMember?.role_code ?? loaded.context.profile.role ?? "guest";
   const additionalRoleCodes = loaded.context.organizationMember?.additional_role_codes ?? [];
   const currentUser = mapProfileToCurrentUser(loaded.context.profile, organizationId, roleCode, additionalRoleCodes);
 

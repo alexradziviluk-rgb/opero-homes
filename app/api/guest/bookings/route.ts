@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createGuestBooking,
   listGuestBookings,
   type GuestBookingInput,
 } from "@/lib/bookings/guest-booking-service";
-import { createBookingNotifications } from "@/lib/notifications/service";
-import { processNotificationQueue } from "@/lib/notifications/queue";
 import { getServerCurrentUserContext } from "@/lib/supabase/server";
 
 function parseGuests(value: unknown): number {
@@ -40,15 +38,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, errorCode: "invalid_dates", errorMessage: "Invalid request body." }, { status: 400 });
   }
 
+  const currentUser = await getServerCurrentUserContext();
+  const authenticatedProfile = currentUser.currentUserContext?.profile;
+  const authenticatedName = authenticatedProfile
+    ? `${authenticatedProfile.first_name ?? ""} ${authenticatedProfile.last_name ?? ""}`.trim()
+    : "";
+
   const input: GuestBookingInput = {
     apartmentId: String(body.apartmentId ?? "").trim(),
     checkIn: String(body.checkIn ?? "").trim(),
     checkOut: String(body.checkOut ?? "").trim(),
     guests: parseGuests(body.guests),
     rentalType: body.rentalType === "weekly" || body.rentalType === "monthly" ? body.rentalType : "daily",
-    guestName: String(body.guestName ?? "").trim(),
-    guestEmail: String(body.guestEmail ?? "").trim(),
-    guestPhone: String(body.guestPhone ?? "").trim(),
+    guestName: authenticatedProfile ? authenticatedName || currentUser.currentUserContext?.authEmail || "Гость" : String(body.guestName ?? "").trim(),
+    guestEmail: authenticatedProfile ? (authenticatedProfile.email ?? currentUser.currentUserContext?.authEmail ?? "").trim() : String(body.guestEmail ?? "").trim(),
+    guestPhone: authenticatedProfile ? (authenticatedProfile.phone ?? "").trim() : String(body.guestPhone ?? "").trim(),
     guestComment: String(body.guestComment ?? "").trim(),
   };
 
@@ -62,51 +66,6 @@ export async function POST(request: Request) {
         : 422;
 
     return NextResponse.json(result, { status });
-  }
-
-  const currentUser = await getServerCurrentUserContext();
-  if (currentUser.currentUserContext) {
-    try {
-      const notificationSupabase = createSupabaseServiceRoleClient() ?? supabase;
-      await createBookingNotifications({
-        supabase: notificationSupabase,
-        organizationId: result.data.organizationId,
-        actorUserId: currentUser.currentUserContext.authUserId,
-        request: {
-          eventType: "booking_created",
-          idempotencyKey: `public-booking-request:${result.data.id}`,
-          bookingId: result.data.id,
-          apartmentId: result.data.apartmentId,
-          payload: {
-            bookingId: result.data.id,
-            apartmentId: result.data.apartmentId,
-            apartmentTitle: result.data.apartmentTitle,
-            clientId: result.data.clientId || undefined,
-            clientUserId: currentUser.currentUserContext.authUserId,
-            guestName: result.data.guestName,
-            guestPhone: result.data.guestPhone,
-            guestEmail: result.data.guestEmail,
-            checkIn: result.data.checkIn,
-            checkOut: result.data.checkOut,
-            guests: result.data.quote.guests,
-            totalAmount: result.data.totalAmount,
-            currency: result.data.quote.currency,
-            bookingStatus: result.data.status,
-            paymentStatus: result.data.paymentStatus ?? "unpaid",
-            notes: input.guestComment,
-            actionUrl: `/bookings/${result.data.id}`,
-          },
-        },
-      });
-
-      await processNotificationQueue({
-        supabase: notificationSupabase,
-        organizationId: result.data.organizationId,
-        limit: 10,
-      });
-    } catch (error) {
-      console.error("Failed to queue public booking email notifications:", error);
-    }
   }
 
   return NextResponse.json(result, { status: 201 });

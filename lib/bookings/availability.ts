@@ -1,8 +1,8 @@
 import type { Booking } from "@/types/booking";
 import { normalizeBookingStatus } from "@/lib/bookings/status-presentation";
 
-export type PublicAvailabilityStatus = "available" | "pending" | "occupied";
-export type AvailabilityBooking = Pick<Booking, "id" | "apartmentId" | "checkIn" | "checkOut" | "status">;
+export type PublicAvailabilityStatus = "available" | "pending" | "occupied" | "unavailable";
+export type AvailabilityBooking = Pick<Booking, "id" | "apartmentId" | "checkIn" | "checkOut"> & { status: Booking["status"] | "blocked" };
 
 function toIsoDate(value: Date): string {
   const year = value.getFullYear();
@@ -36,6 +36,9 @@ export function hasBookingOverlap(
 }
 
 function getBookingImpact(booking: AvailabilityBooking): PublicAvailabilityStatus {
+  if (booking.status === "blocked") {
+    return "unavailable";
+  }
   const status = normalizeBookingStatus(booking.status);
 
   if (status === "confirmed" || status === "checked_in") {
@@ -58,6 +61,11 @@ export function getApartmentDateAvailability(
   const dayEnd = toIsoDate(addDays(date, 1));
 
   const sameApartment = bookings.filter((booking) => booking.apartmentId === apartmentId);
+
+  const hasUnavailable = sameApartment.some((booking) => getBookingImpact(booking) === "unavailable" && hasBookingOverlap(dayStart, dayEnd, booking.checkIn, booking.checkOut));
+  if (hasUnavailable) {
+    return "unavailable";
+  }
 
   const hasOccupied = sameApartment.some((booking) => {
     const impact = getBookingImpact(booking);

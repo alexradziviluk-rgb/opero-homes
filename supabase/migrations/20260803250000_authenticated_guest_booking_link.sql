@@ -1,0 +1,3 @@
+-- Production already models authenticated guests as guests.id = auth.uid().
+-- This migration is intentionally a no-op: no auth_user_id shadow identity,
+-- email-only linking, or replacement booking trigger is introduced locally.

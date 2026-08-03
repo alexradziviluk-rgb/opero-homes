@@ -106,8 +106,8 @@ export async function GET() {
       guestName: booking.guest_name ?? booking.customer_name ?? guest?.name ?? "Гость",
       guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,
       guestEmail: ("guest_email" in booking ? booking.guest_email : null) ?? guest?.email ?? null,
-      checkIn: booking.check_in ?? booking.check_in_date,
-      checkOut: booking.check_out ?? booking.check_out_date,
+      checkIn: booking.check_in_date,
+      checkOut: booking.check_out_date,
       checkInTime: booking.check_in_time ?? null,
       checkOutTime: booking.check_out_time ?? null,
       guests: typeof booking.guests === "number" ? booking.guests : typeof booking.adults === "number" ? booking.adults : 1,
@@ -208,42 +208,46 @@ export async function POST(request: Request) {
   const paidAmount = Math.max(0, Number(body?.paidAmount ?? 0));
   const totalAmount = Math.max(0, accommodationAmount + cleaningFee + deposit - discount);
   const derivedPaymentStatus = paidAmount <= 0 ? "unpaid" : paidAmount < totalAmount ? "partially_paid" : "paid";
-  const modernConflict = await supabase
+  const conflictQuery = await supabase
     .from("bookings")
-    .select("id,check_in,check_out")
+    .select("id,check_in_date,check_out_date")
     .eq("organization_id", organizationId)
     .eq("apartment_id", apartmentId)
     .neq("status", "cancelled")
-    .lt("check_in", checkOut)
-    .gt("check_out", checkIn)
+    .lt("check_in_date", checkOut)
+    .gt("check_out_date", checkIn)
     .limit(1)
     .maybeSingle();
 
-  const usesLegacyDates = modernConflict.error?.code === "42703";
-  const legacyConflict = usesLegacyDates
-    ? await supabase
-        .from("bookings")
-        .select("id,check_in_date,check_out_date")
-        .eq("organization_id", organizationId)
-        .eq("apartment_id", apartmentId)
-        .neq("status", "cancelled")
-        .lt("check_in_date", checkOut)
-        .gt("check_out_date", checkIn)
-        .limit(1)
-        .maybeSingle()
-    : null;
-  const conflict = usesLegacyDates ? legacyConflict?.data : modernConflict.data;
-  const conflictError = usesLegacyDates ? legacyConflict?.error : modernConflict.error;
-
-  if (conflictError) return error(422, conflictError.message, conflictError.code);
+  if (conflictQuery.error) return error(422, conflictQuery.error.message, conflictQuery.error.code);
+  const conflict = conflictQuery.data;
   if (conflict) {
-    const conflictCheckIn = "check_in" in conflict ? conflict.check_in : conflict.check_in_date;
-    const conflictCheckOut = "check_out" in conflict ? conflict.check_out : conflict.check_out_date;
     return NextResponse.json({
       ok: false,
       error: "Booking dates overlap an existing booking",
       code: "booking_conflict",
-      conflict: { id: conflict.id, checkIn: conflictCheckIn, checkOut: conflictCheckOut },
+      conflict: { id: conflict.id, checkIn: conflict.check_in_date, checkOut: conflict.check_out_date },
+    }, { status: 409 });
+  }
+
+  const blockConflict = await supabase
+    .from("availability_blocks")
+    .select("id,start_date,end_date")
+    .eq("organization_id", organizationId)
+    .eq("apartment_id", apartmentId)
+    .eq("status", "active")
+    .lt("start_date", checkOut)
+    .gt("end_date", checkIn)
+    .limit(1)
+    .maybeSingle();
+
+  if (blockConflict.error) return error(422, blockConflict.error.message, blockConflict.error.code);
+  if (blockConflict.data) {
+    return NextResponse.json({
+      ok: false,
+      error: "Booking dates overlap an existing block",
+      code: "booking_conflict",
+      conflict: { id: blockConflict.data.id, checkIn: blockConflict.data.start_date, checkOut: blockConflict.data.end_date },
     }, { status: 409 });
   }
 
@@ -268,54 +272,41 @@ export async function POST(request: Request) {
     guests_count: guests,
     request_status: requestStatus,
   };
-  const bookingRow: Record<string, unknown> = usesLegacyDates
-    ? {
-        id,
-        booking_number: `MAN-${id.slice(0, 8).toUpperCase()}`,
-        organization_id: organizationId,
-        apartment_id: apartmentId,
-        check_in_date: checkIn,
-        check_out_date: checkOut,
-        adults: guests,
-        children: 0,
-        infants: 0,
-        pets: 0,
-        nightly_rate: pricePerPeriod,
-        security_deposit: deposit,
-        taxes_total: 0,
-        discount_total: discount,
-        total_amount: totalAmount,
-        amount_paid: paidAmount,
-        currency: "EUR",
-        metadata: {},
-        status,
-        payment_status: derivedPaymentStatus,
-        source,
-        created_at: now,
-        updated_at: now,
-        ...commercialTerms,
-      }
-    : {
-        id,
-        organization_id: organizationId,
-        apartment_id: apartmentId,
-        check_in: checkIn,
-        check_out: checkOut,
-        guests,
-        total_amount: totalAmount,
-        status,
-        payment_status: derivedPaymentStatus,
-        source,
-        created_at: now,
-        updated_at: now,
-        ...commercialTerms,
-      };
+  const bookingRow: Record<string, unknown> = {
+    id,
+    booking_number: `MAN-${id.slice(0, 8).toUpperCase()}`,
+    organization_id: organizationId,
+    apartment_id: apartmentId,
+    check_in_date: checkIn,
+    check_out_date: checkOut,
+    adults: guests,
+    children: 0,
+    infants: 0,
+    pets: 0,
+    nightly_rate: pricePerPeriod,
+    security_deposit: deposit,
+    taxes_total: 0,
+    discount_total: discount,
+    total_amount: totalAmount,
+    amount_paid: paidAmount,
+    currency: "EUR",
+    metadata: {},
+    status,
+    payment_status: derivedPaymentStatus,
+    source,
+    created_at: now,
+    updated_at: now,
+    ...commercialTerms,
+  };
   const { data, error: insertError } = await supabase
     .from("bookings")
     .insert(bookingRow)
     .select("*")
     .single();
 
-  if (insertError) return error(422, insertError.message, insertError.code);
+  if (insertError) {
+    if (insertError.message.includes("booking_conflict_availability_block")) return error(409, "Booking dates overlap an existing block", "booking_conflict");
+    return error(422, insertError.message, insertError.code);
+  }
   return NextResponse.json({ ok: true, data }, { status: 201 });
 }

@@ -21,6 +21,8 @@ function mapRole(role: string | null): UserRole {
   const normalized = (role ?? "").trim().toLowerCase();
 
   if (normalized === "owner" || normalized === "владелец") return "Владелец";
+  // Property ownership is an optional capability of a client, not a separate login mode.
+  if (normalized === "property_owner" || normalized === "собственник квартиры") return "Гость";
   if (normalized === "manager" || normalized === "менеджер") return "Менеджер";
   if (normalized === "employee" || normalized === "сотрудник") return "Сотрудник";
   if (normalized === "cleaner" || normalized === "уборщик") return "Уборщик";

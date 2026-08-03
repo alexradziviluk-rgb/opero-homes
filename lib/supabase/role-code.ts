@@ -20,6 +20,10 @@ export function isStaffRoleCode(value: string | null | undefined): boolean {
   );
 }
 
+export function isPropertyOwnerRoleCode(value: string | null | undefined): boolean {
+  return normalizeRoleCode(value) === "property_owner";
+}
+
 export function isGuestRoleCode(value: string | null | undefined): boolean {
   const normalized = normalizeRoleCode(value);
   return normalized === "guest" || normalized === "гость";

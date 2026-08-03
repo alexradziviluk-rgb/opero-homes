@@ -105,17 +105,6 @@ type BookingPeriodRow = {
   status: string | null;
 };
 
-type GuestRow = {
-  id: string;
-  organization_id: string | null;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
-
 export type GuestBookingServiceErrorCode =
   | "unauthenticated"
   | "profile_missing"
@@ -289,84 +278,6 @@ async function fetchApartment(supabase: SupabaseClient, apartmentId: string): Pr
   return { ok: true, data: apartment };
 }
 
-async function ensureGuestRecord(params: {
-  supabase: SupabaseClient;
-  organizationId: string;
-  authUserId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-}): Promise<GuestBookingServiceResult<GuestRow>> {
-  const { supabase, organizationId, authUserId, firstName, lastName, email, phone } = params;
-
-  const { data: existingById, error: existingByIdError } = await supabase
-    .from("guests")
-    .select("id,organization_id,first_name,last_name,email,phone,created_at,updated_at")
-    .eq("id", authUserId)
-    .maybeSingle();
-
-  if (existingByIdError) {
-    return {
-      ok: false,
-      errorCode: existingByIdError.code === "42501" ? "permission_denied" : "unexpected",
-      errorMessage: existingByIdError.message,
-      supabaseErrorCode: existingByIdError.code,
-    };
-  }
-
-  if (existingById) {
-    const nextGuest: GuestRow = {
-      ...existingById,
-      organization_id: organizationId,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone,
-    };
-
-    const { error: updateError } = await supabase
-      .from("guests")
-      .update({ organization_id: organizationId, first_name: firstName, last_name: lastName, email, phone, updated_at: new Date().toISOString() })
-      .eq("id", authUserId);
-
-    if (updateError) {
-      return {
-        ok: false,
-        errorCode: updateError.code === "42501" ? "permission_denied" : "unexpected",
-        errorMessage: updateError.message,
-        supabaseErrorCode: updateError.code,
-      };
-    }
-
-    return { ok: true, data: nextGuest };
-  }
-
-  const { data: insertedGuest, error: insertError } = await supabase
-    .from("guests")
-    .insert({
-      id: authUserId,
-      organization_id: organizationId,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone,
-    })
-    .select("id,organization_id,first_name,last_name,email,phone,created_at,updated_at")
-    .single();
-
-  if (insertError || !insertedGuest) {
-    return {
-      ok: false,
-      errorCode: insertError?.code === "42501" ? "permission_denied" : "unexpected",
-      errorMessage: insertError?.message ?? "Failed to create guest record.",
-      supabaseErrorCode: insertError?.code,
-    };
-  }
-
-  return { ok: true, data: insertedGuest as GuestRow };
-}
-
 async function loadBookingsForApartment(supabase: SupabaseClient, apartmentId: string) {
   const { data, error } = await supabase
     .rpc("get_public_apartment_booking_periods", { target_apartment_id: apartmentId });
@@ -492,7 +403,7 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
     return {
       ok: false,
       errorCode: "booking_conflict",
-      errorMessage: "The requested dates overlap with an existing booking.",
+      errorMessage: conflict.status === "blocked" ? "The requested dates are unavailable." : "The requested dates overlap with an existing booking.",
       conflict: {
         checkIn: conflict.check_in,
         checkOut: conflict.check_out,
@@ -540,6 +451,7 @@ export async function createGuestBooking(
   }
 
   const quote = quoteResult.data;
+  const currentUserResult = await getServerCurrentUserContext();
   const { data, error } = await supabase.rpc("create_public_booking_request", {
     requested_apartment_id: quote.apartmentId,
     requested_check_in: quote.checkIn,
@@ -571,7 +483,7 @@ export async function createGuestBooking(
       organizationId: booking.organization_id,
       apartmentId: quote.apartmentId,
       apartmentTitle: quote.apartmentTitle,
-      clientId: "",
+      clientId: currentUserResult.currentUserContext?.authUserId ?? "",
       guestName: input.guestName.trim(),
       guestEmail: input.guestEmail.trim().toLowerCase(),
       guestPhone: input.guestPhone.trim(),

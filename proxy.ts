@@ -17,6 +17,12 @@ export async function proxy(request: NextRequest) {
   const isGuestAuthRoute = pathname === "/guest/login" || pathname === "/guest/register";
   const isAuthRoute = isStaffAuthRoute || isGuestAuthRoute;
 
+  if (pathname === "/owner/invite") {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", pathname);
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   if (!isAuthRoute && isPublicPath(pathname)) {
     return NextResponse.next();
   }

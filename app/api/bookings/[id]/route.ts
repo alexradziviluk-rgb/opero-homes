@@ -131,8 +131,8 @@ export async function GET(
       guestName: booking.guest_name ?? booking.customer_name ?? (`${guest?.first_name ?? ""} ${guest?.last_name ?? ""}`.trim() || "Гость"),
       guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,
       guestEmail: ("guest_email" in booking ? booking.guest_email : null) ?? guest?.email ?? null,
-      checkIn: booking.check_in ?? booking.check_in_date,
-      checkOut: booking.check_out ?? booking.check_out_date,
+      checkIn: booking.check_in_date,
+      checkOut: booking.check_out_date,
       checkInTime: booking.check_in_time ?? "15:00",
       checkOutTime: booking.check_out_time ?? "11:00",
       guests: typeof booking.guests === "number" ? booking.guests : typeof booking.adults === "number" ? booking.adults : 1,
@@ -209,8 +209,8 @@ export async function PATCH(
     const totalAmount = typeof body.totalAmount === "number" && Number.isFinite(body.totalAmount) ? Math.max(0, body.totalAmount) : null;
 
     if (!guestName || !checkIn || !checkOut || checkOut <= checkIn) return error(400, "Invalid booking details");
-    const existingCheckIn = String(existing.check_in_date ?? existing.check_in ?? "");
-    const existingCheckOut = String(existing.check_out_date ?? existing.check_out ?? "");
+    const existingCheckIn = String(existing.check_in_date ?? "");
+    const existingCheckOut = String(existing.check_out_date ?? "");
     if (hasPastBookingDate(checkIn, checkOut) && (checkIn !== existingCheckIn || checkOut !== existingCheckOut)) {
       return error(400, "Нельзя сохранить бронирование на прошедшие даты", "past_booking_date");
     }
@@ -218,18 +218,15 @@ export async function PATCH(
       return error(400, "Invalid check-in or check-out time");
     }
 
-    const dateColumns = "check_in_date" in existing
-      ? { checkIn: "check_in_date", checkOut: "check_out_date" }
-      : { checkIn: "check_in", checkOut: "check_out" };
     const { data: conflict, error: conflictError } = await supabase
       .from("bookings")
-      .select(`id,${dateColumns.checkIn},${dateColumns.checkOut}`)
+      .select("id,check_in_date,check_out_date")
       .eq("organization_id", auth.context.organization.id)
       .eq("apartment_id", existing.apartment_id)
       .neq("id", id)
       .neq("status", "cancelled")
-      .lt(dateColumns.checkIn, checkOut)
-      .gt(dateColumns.checkOut, checkIn)
+      .lt("check_in_date", checkOut)
+      .gt("check_out_date", checkIn)
       .limit(1)
       .maybeSingle();
 
@@ -237,8 +234,8 @@ export async function PATCH(
     if (conflict) return error(409, "Booking dates overlap an existing booking", "booking_conflict");
 
     Object.assign(updateRow, {
-      [dateColumns.checkIn]: checkIn,
-      [dateColumns.checkOut]: checkOut,
+      check_in_date: checkIn,
+      check_out_date: checkOut,
       guest_name: guestName,
       guest_phone: guestPhone,
       guest_email: guestEmail,
@@ -259,7 +256,10 @@ export async function PATCH(
     .select("id,status,request_status,updated_at")
     .maybeSingle();
 
-  if (updateError) return error(422, updateError.message, updateError.code);
+  if (updateError) {
+    if (updateError.message.includes("booking_conflict_availability_block")) return error(409, "Booking dates overlap an existing block", "booking_conflict");
+    return error(422, updateError.message, updateError.code);
+  }
   if (!data) return error(404, "Booking not found");
 
   const eventType = isReject

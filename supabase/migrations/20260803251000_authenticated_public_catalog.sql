@@ -1,0 +1,2 @@
+-- Public catalog visibility is independent from owner access.
+-- The owner portal migration owns the published catalog policy and helper.

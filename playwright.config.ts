@@ -1,5 +1,25 @@
 import { defineConfig, devices } from "@playwright/test";
+import { execFileSync } from "node:child_process";
 
+function loadLocalSupabaseEnv() {
+  const output = execFileSync("cmd.exe", ["/d", "/s", "/c", "supabase status -o env"], { encoding: "utf8" });
+  const values = Object.fromEntries(output.split(/\r?\n/).flatMap((line) => {
+    const match = line.match(/^([A-Z0-9_]+)="(.*)"$/);
+    return match ? [[match[1], match[2]]] : [];
+  }));
+  const localUrl = values.API_URL;
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(localUrl ?? "")) {
+    throw new Error("Local Supabase API URL is unavailable.");
+  }
+  process.env.E2E_LOCAL = "true";
+  process.env.E2E_BASE_URL = "http://localhost:3201";
+  process.env.NEXT_PUBLIC_SUPABASE_URL = localUrl;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = values.ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = values.PUBLISHABLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = values.SERVICE_ROLE_KEY;
+}
+
+loadLocalSupabaseEnv();
 const isLocalE2E = process.env.E2E_LOCAL === "true";
 const localBaseUrl = "http://localhost:3201";
 const configuredBaseUrl = process.env.E2E_BASE_URL ?? localBaseUrl;

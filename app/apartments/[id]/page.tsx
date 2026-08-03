@@ -139,6 +139,9 @@ export default function ApartmentDetailsPage() {
                 <Link href={`/apartments/${apartment.id}/edit`} className="rounded-2xl border border-white/10 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">
                   Редактировать
                 </Link>
+                <Link href={`/apartments/${apartment.id}/owners`} className="rounded-2xl border border-white/10 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
+                  Собственники
+                </Link>
                 <button onClick={handleDelete} className="rounded-2xl border border-white/10 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-300 hover:bg-rose-500/20">
                   Удалить объект
                 </button>

@@ -43,4 +43,10 @@ export function buildEmployeeInvitationUrl(token: string): string {
   return url.toString();
 }
 
+export function buildPropertyOwnerInvitationUrl(token: string): string {
+  const url = new URL("/owner/invite", resolveInvitationOrigin());
+  url.searchParams.set("invite", token);
+  return url.toString();
+}
+
 export { PRODUCTION_SITE_URL };

@@ -37,13 +37,13 @@ export function createSupabaseMiddlewareClient(request: NextRequest) {
 }
 
 export function isProtectedPath(pathname: string) {
-  return ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users", "/notifications", "/settings"].some((route) =>
+  return ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users", "/notifications", "/settings", "/owner"].some((route) =>
     pathname === route || pathname.startsWith(`${route}/`),
   );
 }
 
 export function isClientProtectedPath(pathname: string) {
-  if (pathname === "/guest") {
+  if (pathname === "/guest" || pathname === "/account" || pathname.startsWith("/account/")) {
     return true;
   }
 
@@ -60,6 +60,7 @@ export function isPublicPath(pathname: string) {
     "/guest/login",
     "/guest/register",
     "/invite",
+    "/owner/invite",
     "/auth/callback",
     "/forgot-password",
     "/reset-password",

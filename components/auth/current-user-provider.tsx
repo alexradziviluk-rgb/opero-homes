@@ -13,6 +13,7 @@ import type { User } from "@/types/user";
 type CurrentUserContextValue = {
   currentUser: User | null;
   currentUserContext: CurrentUserContext | null;
+  hasPropertyAccess: boolean;
   isAuthLoading: boolean;
   logout: () => Promise<void>;
 };
@@ -24,6 +25,7 @@ export function getHomeRouteForUser(user: User): string {
 const CurrentUserContext = createContext<CurrentUserContextValue>({
   currentUser: null,
   currentUserContext: null,
+  hasPropertyAccess: false,
   isAuthLoading: true,
   logout: async () => undefined,
 });
@@ -33,6 +35,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentUserContext, setCurrentUserContext] = useState<CurrentUserContext | null>(null);
+  const [hasPropertyAccess, setHasPropertyAccess] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(() => Boolean(createSupabaseClient()));
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
         }
         setCurrentUser(null);
         setCurrentUserContext(null);
+        setHasPropertyAccess(false);
         setIsAuthLoading(false);
         return;
       }
@@ -63,6 +67,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       userRepository.upsert(resolved.currentUser);
       setCurrentUser(resolved.currentUser);
       setCurrentUserContext(resolved.currentUserContext);
+      void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
       setIsAuthLoading(false);
     }
 
@@ -85,6 +90,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
         if (!resolved.currentUser) {
           setCurrentUser(null);
           setCurrentUserContext(null);
+          setHasPropertyAccess(false);
           if (resolved.errorCode === "profile_missing") {
             router.replace("/login?error=profile_missing");
             router.refresh();
@@ -95,6 +101,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
         userRepository.upsert(resolved.currentUser);
         setCurrentUser(resolved.currentUser);
         setCurrentUserContext(resolved.currentUserContext);
+        void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
       });
     });
 
@@ -110,6 +117,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
 
     setCurrentUser(null);
     setCurrentUserContext(null);
+    setHasPropertyAccess(false);
     router.replace(redirectPath);
     router.refresh();
   }, [currentUser?.role, router]);
@@ -156,7 +164,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
 
     const authRoutes = ["/login", "/admin/login", "/guest/login", "/guest/register", "/register", "/forgot-password", "/reset-password"];
     const isAuthRoute = authRoutes.includes(pathname);
-    const internalRoots = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users"];
+    const internalRoots = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users", "/owner", "/account"];
     const isInternalRoute = internalRoots.some((route) => routeMatches(route));
     const guestProtectedRoots = ["/guest/bookings", "/guest/messages"];
     const isGuestProtectedRoute = pathname === "/guest" || guestProtectedRoots.some((route) => routeMatches(route));
@@ -184,7 +192,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       return;
     }
 
-    if (currentUser.role === "Гость" && isInternalRoute) {
+    if (currentUser.role === "Гость" && isInternalRoute && !pathname.startsWith("/account") && !pathname.startsWith("/owner")) {
       router.replace("/guest");
       router.refresh();
       return;
@@ -197,8 +205,8 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   }, [currentUser, isAuthLoading, pathname, router]);
 
   const value = useMemo(
-    () => ({ currentUser, currentUserContext, isAuthLoading, logout }),
-    [currentUser, currentUserContext, isAuthLoading, logout],
+    () => ({ currentUser, currentUserContext, hasPropertyAccess, isAuthLoading, logout }),
+    [currentUser, currentUserContext, hasPropertyAccess, isAuthLoading, logout],
   );
 
   return <CurrentUserContext.Provider value={value}>{children}</CurrentUserContext.Provider>;
