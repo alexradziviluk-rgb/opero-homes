@@ -37,15 +37,23 @@ function toIsoDate(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatPeriod(checkIn: string, checkOut: string): string {
-  const start = new Date(`${checkIn}T00:00:00`);
-  const end = new Date(`${checkOut}T00:00:00`);
-  const startDay = String(start.getDate()).padStart(2, "0");
-  const endDay = String(end.getDate()).padStart(2, "0");
-  const startMonth = start.toLocaleDateString("ru-RU", { month: "long" });
-  const endMonth = end.toLocaleDateString("ru-RU", { month: "long" });
+function dateOffset(fromDate: string, toDate: string): number {
+  const from = fromDate.split("-").map(Number);
+  const to = toDate.split("-").map(Number);
+  return Math.round((Date.UTC(to[0], to[1] - 1, to[2]) - Date.UTC(from[0], from[1] - 1, from[2])) / 86400000);
+}
 
-  if (start.getMonth() === end.getMonth()) {
+function formatPeriod(checkIn: string, checkOut: string): string {
+  const [startYear, startMonthNumber, startDayNumber] = checkIn.split("-").map(Number);
+  const [endYear, endMonthNumber, endDayNumber] = checkOut.split("-").map(Number);
+  const start = new Date(Date.UTC(startYear, startMonthNumber - 1, startDayNumber));
+  const end = new Date(Date.UTC(endYear, endMonthNumber - 1, endDayNumber));
+  const startDay = String(startDayNumber).padStart(2, "0");
+  const endDay = String(endDayNumber).padStart(2, "0");
+  const startMonth = start.toLocaleDateString("ru-RU", { month: "long", timeZone: "UTC" });
+  const endMonth = end.toLocaleDateString("ru-RU", { month: "long", timeZone: "UTC" });
+
+  if (startYear === endYear && startMonthNumber === endMonthNumber) {
     return `${startDay}-${endDay} ${startMonth}`;
   }
 
@@ -190,8 +198,9 @@ export default function CalendarPage() {
   const demoCheckOut = "2026-08-07";
 
   function bookingPosition(booking: Booking) {
-    const startOffset = Math.max(0, Math.round((new Date(`${booking.checkIn}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
-    const endOffset = Math.min(days.length, Math.round((new Date(`${booking.checkOut}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
+    const calendarStartDate = toIsoDate(days[0]);
+    const startOffset = Math.max(0, dateOffset(calendarStartDate, booking.checkIn));
+    const endOffset = Math.min(days.length, dateOffset(calendarStartDate, booking.checkOut));
     return {
       left: `${(startOffset / days.length) * 100}%`,
       width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%`,
@@ -199,8 +208,9 @@ export default function CalendarPage() {
   }
 
   function periodPosition(checkIn: string, checkOut: string) {
-    const startOffset = Math.max(0, Math.round((new Date(`${checkIn}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
-    const endOffset = Math.min(days.length, Math.round((new Date(`${checkOut}T00:00:00`).getTime() - days[0].getTime()) / 86400000));
+    const calendarStartDate = toIsoDate(days[0]);
+    const startOffset = Math.max(0, dateOffset(calendarStartDate, checkIn));
+    const endOffset = Math.min(days.length, dateOffset(calendarStartDate, checkOut));
     return { left: `${(startOffset / days.length) * 100}%`, width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%` };
   }
 
@@ -505,8 +515,8 @@ export default function CalendarPage() {
                       const apartmentBlocks = visibleBlocks.filter((block) => block.apartment_id === apartment.id && bookingsOverlap(calendarStart, calendarEnd, block.start_date, block.end_date));
                       const showDemoOccupancy = showDemoTemplate && bookingsOverlap(calendarStart, calendarEnd, demoCheckIn, demoCheckOut);
                       return (
-                        <div key={apartment.id} className="grid min-h-[76px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "190px minmax(570px, 1fr)" }}>
-                          <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-3 py-3">
+                        <div key={apartment.id} className="grid min-h-[60px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "170px minmax(570px, 1fr)" }}>
+                          <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-2 py-2">
                             <p className="truncate text-sm font-medium text-white">{apartment.title}</p>
                             <p className="truncate text-xs text-slate-500">{apartment.city}</p>
                           </div>
@@ -515,10 +525,10 @@ export default function CalendarPage() {
                               const isoDay = toIsoDate(day);
                               return <button key={isoDay} type="button" onClick={() => { setRangeApartmentId(apartment.id); beginQuickRangeFromDay(day); }} className={`border-r border-white/5 ${rangeCheckIn === isoDay || rangeCheckOut === isoDay ? "bg-cyan-400/10" : "hover:bg-white/5"}`} aria-label={`${apartment.title}, ${isoDay}`} />;
                             })}
-                            <div className="pointer-events-none absolute inset-x-0 top-2 h-12">
+                            <div className="pointer-events-none absolute inset-x-0 top-1 h-10">
                               {showDemoOccupancy ? (
                                 <div
-                                  className="pointer-events-auto absolute flex h-11 items-center truncate rounded bg-cyan-400 px-2 py-1 text-left text-[11px] font-semibold text-slate-950 shadow-lg"
+                                  className="pointer-events-auto absolute flex h-9 items-center truncate rounded bg-cyan-400 px-2 py-1 text-left text-[10px] font-semibold text-slate-950 shadow-lg"
                                   style={bookingPosition({ checkIn: demoCheckIn, checkOut: demoCheckOut } as Booking)}
                                   title="Тестовый шаблон: объект занят с 3 по 7 августа"
                                 >
@@ -528,7 +538,7 @@ export default function CalendarPage() {
                               {apartmentBookings.map((booking) => {
                                 const apartmentLabel = getApartmentCalendarLabel(booking, apartments);
                                 const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
-                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto absolute h-11 truncate rounded px-2 py-1 text-left text-[11px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
+                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto absolute h-9 truncate rounded px-2 py-1 text-left text-[10px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
                               })}
                               {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto absolute top-1 h-11 truncate rounded bg-violet-400 px-2 py-1 text-[11px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
                             </div>
