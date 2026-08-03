@@ -600,7 +600,6 @@ export async function listGuestBookings(
     };
   }
 
-  const authUserId = currentUserResult.currentUserContext.authUserId;
   const guestEmail = (currentUserResult.currentUserContext.profile.email ?? currentUserResult.currentUserContext.authEmail).trim().toLowerCase();
   const { data, error } = await supabase
     .from("bookings")
@@ -617,7 +616,44 @@ export async function listGuestBookings(
     };
   }
 
-  const bookings = (data ?? []) as BookingRow[];
+  let bookings = (data ?? []) as BookingRow[];
+  if (bookings.length === 0) {
+    const { data: guestRecord, error: guestRecordError } = await supabase
+      .from("guests")
+      .select("id")
+      .eq("email", guestEmail)
+      .maybeSingle();
+
+    if (guestRecordError) {
+      return {
+        ok: false,
+        errorCode: guestRecordError.code === "42501" ? "permission_denied" : "unexpected",
+        errorMessage: guestRecordError.message,
+        supabaseErrorCode: guestRecordError.code,
+      };
+    }
+
+    if (!guestRecord) {
+      return { ok: true, data: [] };
+    }
+
+    const { data: linkedBookings, error: linkedBookingsError } = await supabase
+      .from("bookings")
+      .select("id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at")
+      .eq("primary_guest_id", guestRecord.id)
+      .order("created_at", { ascending: false });
+
+    if (linkedBookingsError) {
+      return {
+        ok: false,
+        errorCode: linkedBookingsError.code === "42501" ? "permission_denied" : "unexpected",
+        errorMessage: linkedBookingsError.message,
+        supabaseErrorCode: linkedBookingsError.code,
+      };
+    }
+
+    bookings = (linkedBookings ?? []) as BookingRow[];
+  }
   const context = currentUserResult.currentUserContext;
   const apartmentIds = Array.from(new Set(bookings.map((booking) => booking.apartment_id).filter((value): value is string => Boolean(value))));
 
@@ -640,7 +676,7 @@ export async function listGuestBookings(
       organizationId: booking.organization_id,
       apartmentId: booking.apartment_id,
       apartmentTitle: apartmentTitleById.get(booking.apartment_id) ?? "Объект",
-      clientId: booking.primary_guest_id ?? authUserId,
+      clientId: booking.primary_guest_id ?? guestEmail,
       guestName: formatGuestName(context.profile),
       guestEmail: context?.profile.email ?? currentUserResult.currentUserContext?.authEmail ?? "",
       guestPhone: context?.profile.phone ?? "",
