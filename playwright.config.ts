@@ -42,6 +42,7 @@ if (isLocalE2E) {
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
+  workers: isLocalE2E ? 1 : undefined,
   retries: 0,
   reporter: "line",
   use: {
