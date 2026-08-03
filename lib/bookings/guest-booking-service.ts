@@ -601,10 +601,11 @@ export async function listGuestBookings(
   }
 
   const authUserId = currentUserResult.currentUserContext.authUserId;
+  const guestEmail = (currentUserResult.currentUserContext.profile.email ?? currentUserResult.currentUserContext.authEmail).trim().toLowerCase();
   const { data, error } = await supabase
     .from("bookings")
     .select("id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at")
-    .eq("primary_guest_id", authUserId)
+    .eq("guest_email", guestEmail)
     .order("created_at", { ascending: false });
 
   if (error) {
