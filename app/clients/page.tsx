@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { deleteClient, deleteClientFromSupabase, getClients, loadClientsFromSupabase } from "@/lib/clients/client-repository";
+import { dedupeClients, deleteClient, deleteClientFromSupabase, getClients, loadClientsFromSupabase } from "@/lib/clients/client-repository";
 import type { Client } from "@/types/client";
 
 function formatDate(value: string) {
@@ -29,7 +29,7 @@ export default function ClientsPage() {
         const localOnlyClients = localClients.filter(
           (client) => !remoteKeys.has(client.id) && !remoteKeys.has(client.email.toLowerCase()) && !remoteKeys.has(client.phone),
         );
-        setClients([...remoteClients, ...localOnlyClients]);
+        setClients(dedupeClients([...remoteClients, ...localOnlyClients]));
       })
       .catch(() => undefined);
 

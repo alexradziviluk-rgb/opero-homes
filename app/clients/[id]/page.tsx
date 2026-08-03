@@ -2,25 +2,36 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { deleteClient, getClientById } from "@/lib/clients/client-repository";
-import { getBookings } from "@/lib/bookings/booking-repository";
+import { deleteClient, deleteClientFromSupabase, getClientById, loadClientFromSupabase } from "@/lib/clients/client-repository";
+import { fetchStaffBookings, type StaffBooking } from "@/lib/bookings/staff-bookings";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import type { Client } from "@/types/client";
-import type { Booking } from "@/types/booking";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("ru-RU");
+}
+
+function normalizeName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 export default function ClientDetailsPage() {
   const params = useParams();
   const clientId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
-  const [client] = useState<Client | null>(() => (clientId ? getClientById(clientId) : null));
-  const [bookings] = useState<Booking[]>(() => getBookings());
+  const [client, setClient] = useState<Client | null>(() => (clientId ? getClientById(clientId) : null));
+  const [bookings, setBookings] = useState<StaffBooking[]>([]);
+
+  useEffect(() => {
+    if (!clientId) return;
+    void Promise.all([loadClientFromSupabase(clientId), fetchStaffBookings()]).then(([remoteClient, remoteBookings]) => {
+      if (remoteClient) setClient(remoteClient);
+      setBookings(remoteBookings);
+    }).catch(() => undefined);
+  }, [clientId]);
 
   const relatedBookings = useMemo(() => {
     if (!client) return [];
@@ -28,14 +39,16 @@ export default function ClientDetailsPage() {
     return bookings.filter(
       (booking) =>
         booking.clientId === client.id ||
-        (client.email && booking.guestEmail === client.email) ||
-        (client.phone && booking.guestPhone === client.phone),
+        (client.email && booking.guestEmail?.trim().toLowerCase() === client.email.trim().toLowerCase()) ||
+        (client.phone && booking.guestPhone?.replace(/\D/g, "") === client.phone.replace(/\D/g, "")) ||
+        normalizeName(booking.guestName) === normalizeName(`${client.firstName} ${client.lastName}`),
     );
   }, [bookings, client]);
 
   function handleDelete() {
     if (!client) return;
     if (!confirm("Удалить клиента?")) return;
+    void deleteClientFromSupabase(client.id).catch(() => undefined);
     deleteClient(client.id);
     router.replace("/clients");
   }
@@ -102,7 +115,8 @@ export default function ClientDetailsPage() {
 
                       return (
                         <Link key={booking.id} href={`/bookings/${booking.id}`} className="block rounded-xl border border-white/10 bg-white/5 p-3 text-sm hover:bg-white/10">
-                          <p className="text-white">{formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}</p>
+                          <p className="text-white">{booking.apartmentTitle}</p>
+                          <p className="mt-1 text-slate-300">{formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}</p>
                           <p className="mt-1 text-slate-400">Статус: {status.label}</p>
                         </Link>
                       );

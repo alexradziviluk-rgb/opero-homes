@@ -62,6 +62,23 @@ function mapSupabaseClient(row: { id: string; first_name: string; last_name: str
   });
 }
 
+function clientIdentityKeys(client: Client): string[] {
+  const email = client.email.trim().toLowerCase();
+  const phone = client.phone.replace(/\D/g, "");
+  const name = `${client.firstName} ${client.lastName}`.trim().replace(/\s+/g, " ").toLowerCase();
+  return [email && `email:${email}`, phone && `phone:${phone}`, name && `name:${name}`].filter(Boolean);
+}
+
+export function dedupeClients(clients: Client[]): Client[] {
+  const seen = new Set<string>();
+  return clients.filter((client) => {
+    const keys = clientIdentityKeys(client);
+    if (keys.some((key) => seen.has(key))) return false;
+    keys.forEach((key) => seen.add(key));
+    return true;
+  });
+}
+
 export async function loadClientsFromSupabase(): Promise<Client[]> {
   const supabase = createSupabaseClient();
   if (!supabase) return [];
@@ -72,7 +89,21 @@ export async function loadClientsFromSupabase(): Promise<Client[]> {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => mapSupabaseClient(row));
+  return dedupeClients((data ?? []).map((row) => mapSupabaseClient(row)));
+}
+
+export async function loadClientFromSupabase(id: string): Promise<Client | null> {
+  const supabase = createSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("guests")
+    .select("id,first_name,last_name,email,phone,created_at,updated_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data ? mapSupabaseClient(data) : null;
 }
 
 export async function deleteClientFromSupabase(id: string): Promise<void> {
@@ -81,6 +112,27 @@ export async function deleteClientFromSupabase(id: string): Promise<void> {
 
   const { error } = await supabase.from("guests").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+export async function updateClientInSupabase(client: Client): Promise<Client> {
+  const supabase = createSupabaseClient();
+  if (!supabase) return client;
+
+  const { data, error } = await supabase
+    .from("guests")
+    .update({
+      first_name: client.firstName,
+      last_name: client.lastName,
+      email: client.email,
+      phone: client.phone,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", client.id)
+    .select("id,first_name,last_name,email,phone,created_at,updated_at")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return mapSupabaseClient(data);
 }
 
 export function getClients(): Client[] {
