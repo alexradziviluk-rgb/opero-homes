@@ -499,7 +499,7 @@ export default function CalendarPage() {
               <div className="overflow-hidden rounded-xl border border-white/10">
                 <div className="max-h-[70vh] overflow-auto">
                   <div className="min-w-[760px]">
-                    <div className="grid border-b border-white/10 bg-black/20" style={{ gridTemplateColumns: "190px minmax(570px, 1fr)" }}>
+                    <div className="grid border-b border-white/10 bg-black/20" style={{ gridTemplateColumns: "170px minmax(570px, 1fr)" }}>
                       <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Объект</div>
                       <div className="grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
                         {days.map((day) => (
