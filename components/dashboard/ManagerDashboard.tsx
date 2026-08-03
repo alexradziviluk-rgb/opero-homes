@@ -10,8 +10,8 @@ const ITEMS = [
   { key: "maintenance", label: "Просроченные ремонты", href: "/maintenance", tone: "text-rose-300" },
   { key: "tasks", label: "Задачи на сегодня", href: "/tasks", tone: "text-violet-300" },
   { key: "notifications", label: "Новые уведомления", href: "/notifications", tone: "text-fuchsia-300" },
-  { key: "occupied", label: "Занятые квартиры", href: "/apartments", tone: "text-orange-300" },
-  { key: "available", label: "Свободные квартиры", href: "/apartments", tone: "text-emerald-300" },
+  { key: "occupied", label: "Занятые квартиры", href: "/apartments?availability=occupied", tone: "text-orange-300" },
+  { key: "available", label: "Свободные квартиры", href: "/apartments?availability=available", tone: "text-emerald-300" },
 ] as const;
 
 export default function ManagerDashboard() {

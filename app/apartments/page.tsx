@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
@@ -33,6 +33,16 @@ type TaskSummary = {
   status: string;
 };
 
+type AvailabilityFilter = "all" | "available" | "occupied" | "draft";
+
+function normalizeStatus(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function isCancelledBooking(status: string): boolean {
+  return ["cancelled", "canceled", "rejected", "declined", "expired", "отменено", "отклонено"].includes(normalizeStatus(status));
+}
+
 export default function ApartmentsPage() {
   const router = useRouter();
   const { currentUser } = useCurrentUser();
@@ -44,6 +54,12 @@ export default function ApartmentsPage() {
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [assignees, setAssignees] = useState<Assignee[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>(() => {
+    if (typeof window === "undefined") return "all";
+    const filter = new URLSearchParams(window.location.search).get("availability");
+    return filter === "available" || filter === "occupied" || filter === "draft" ? filter : "all";
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +98,28 @@ export default function ApartmentsPage() {
     };
   }, []);
 
-  const apartments = localApartments;
+  const occupiedApartmentIds = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return new Set(
+      bookings
+        .filter((booking) => !isCancelledBooking(booking.status) && booking.checkIn.slice(0, 10) <= today && booking.checkOut.slice(0, 10) > today)
+        .map((booking) => booking.apartmentId)
+        .filter((apartmentId): apartmentId is string => Boolean(apartmentId)),
+    );
+  }, [bookings]);
+
+  const apartments = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
+    return localApartments.filter((apartment) => {
+      const matchesSearch = !normalizedQuery || [apartment.title, apartment.city, apartment.district, apartment.address].some((value) => value.toLocaleLowerCase("ru-RU").includes(normalizedQuery));
+      const isOccupied = occupiedApartmentIds.has(apartment.id);
+      const matchesFilter = availabilityFilter === "all"
+        || (availabilityFilter === "occupied" && isOccupied)
+        || (availabilityFilter === "available" && !isOccupied && normalizeStatus(apartment.status) !== "черновик")
+        || (availabilityFilter === "draft" && normalizeStatus(apartment.status) === "черновик");
+      return matchesSearch && matchesFilter;
+    });
+  }, [availabilityFilter, localApartments, occupiedApartmentIds, searchQuery]);
 
   async function handleDelete(id: string) {
     await deleteApartmentFromSupabase(id);
@@ -140,7 +177,7 @@ export default function ApartmentsPage() {
                     <circle cx="11" cy="11" r="6" />
                     <path d="m20 20-4.2-4.2" />
                   </svg>
-                  <input placeholder="Поиск объектов..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-500 sm:w-48 sm:flex-none" />
+                  <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Поиск объектов..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-500 sm:w-48 sm:flex-none" />
                 </label>
 
                 {canManagePropertyDefinition ? (
@@ -152,10 +189,11 @@ export default function ApartmentsPage() {
             </div>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm font-medium text-white">Все</button>
-              <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm text-slate-300">Свободные</button>
-              <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm text-slate-300">Занятые</button>
-              <button className="rounded-2xl bg-white/5 px-3 py-1.5 text-sm text-slate-300">Черновики</button>
+              {(["all", "available", "occupied", "draft"] as const).map((filter) => (
+                <button key={filter} type="button" onClick={() => setAvailabilityFilter(filter)} className={`rounded-2xl px-3 py-1.5 text-sm ${availabilityFilter === filter ? "bg-cyan-500/20 font-medium text-cyan-100" : "bg-white/5 text-slate-300"}`}>
+                  {filter === "all" ? "Все" : filter === "available" ? "Свободные" : filter === "occupied" ? "Занятые" : "Черновики"}
+                </button>
+              ))}
             </div>
 
             <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80">
@@ -236,13 +274,13 @@ export default function ApartmentsPage() {
                         <td className="px-4 py-3 text-slate-300">{a.rooms}</td>
                         <td className="px-4 py-3 text-slate-300 whitespace-pre-line">{getRentalCostText(a)}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${a.status === 'Свободно' ? 'bg-emerald-500/20 text-emerald-300' : a.status === 'Занято' ? 'bg-rose-500/20 text-rose-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
-                            {a.status}
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${occupiedApartmentIds.has(a.id) ? 'bg-rose-500/20 text-rose-300' : normalizeStatus(a.status) === 'свободно' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                            {occupiedApartmentIds.has(a.id) ? "Занято" : a.status}
                           </span>
                         </td>
 
                         <td className="px-4 py-3 text-slate-300">{a.availability}</td>
-                        <td className="px-4 py-3 text-slate-300">{bookings.find((booking) => booking.apartmentId === a.id && booking.status === "checked_in")?.guestName ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-300">{bookings.find((booking) => booking.apartmentId === a.id && occupiedApartmentIds.has(a.id) && !isCancelledBooking(booking.status))?.guestName ?? "—"}</td>
                         <td className="px-4 py-3 text-slate-300">{(() => {
                           const now = new Date().toISOString();
                           const next = bookings.filter((booking) => booking.apartmentId === a.id && booking.checkOut >= now && booking.status !== "cancelled").sort((left, right) => left.checkIn.localeCompare(right.checkIn))[0];
