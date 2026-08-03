@@ -7,6 +7,7 @@ type SupabaseProfileRow = {
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
+  address: string | null;
   avatar_url: string | null;
   role: string | null;
   status: string | null;
@@ -77,6 +78,7 @@ export function mapProfileToCurrentUser(
     lastName: profile.last_name ?? "",
     email: profile.email ?? "",
     phone: profile.phone ?? "",
+    address: profile.address ?? "",
     role: primaryRole,
     additionalRoles,
     status: mapStatus(profile.status),

@@ -27,10 +27,10 @@ export default function GuestHomePage() {
           <p className="mt-2 text-sm text-slate-400">Скоро</p>
         </div>
 
-        <div className="rounded-2xl border border-dashed border-white/20 bg-slate-900/60 p-5">
+        <Link href="/guest/profile" className="rounded-2xl border border-white/10 bg-slate-900/80 p-5 hover:border-cyan-300/40">
           <p className="text-lg font-semibold text-white">Профиль</p>
-          <p className="mt-2 text-sm text-slate-400">Скоро</p>
-        </div>
+          <p className="mt-2 text-sm text-slate-400">Имя, контакты и адрес проживания</p>
+        </Link>
       </div>
     </section>
   );

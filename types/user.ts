@@ -59,6 +59,7 @@ export type User = {
   lastName: string;
   email: string;
   phone: string;
+  address: string;
   role: UserRole;
   status: UserStatus;
   avatarUrl: string | null;

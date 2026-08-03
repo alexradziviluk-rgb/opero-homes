@@ -90,7 +90,10 @@ export function countRenderableApartmentPhotos(apartment: Apartment): number {
 }
 
 export function normalizeSearchValue(value: string): string {
-  return value.trim().toLocaleLowerCase("ru-RU");
+  return value
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replace(/алания|аланья/g, "alanya");
 }
 
 function hasLegacyArchivedStatus(apartment: Apartment): boolean {

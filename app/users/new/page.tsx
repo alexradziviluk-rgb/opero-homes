@@ -18,6 +18,7 @@ const initialForm: UserFormValues = {
   lastName: "",
   email: "",
   phone: "",
+  address: "",
   role: "Сотрудник" as UserRole,
   status: "Активен" as UserStatus,
   avatarUrl: null,

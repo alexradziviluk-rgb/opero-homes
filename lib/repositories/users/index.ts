@@ -68,6 +68,7 @@ function normalizeUser(raw: Partial<User>): User {
     lastName: raw.lastName ?? "",
     email: (raw.email ?? "").trim().toLowerCase(),
     phone: normalizePhone(raw.phone ?? ""),
+    address: raw.address ?? "",
     role: raw.role ?? "Сотрудник",
     status: raw.status ?? "Приглашен",
     avatarUrl: raw.avatarUrl ?? null,
