@@ -10,17 +10,25 @@ as $$
     from public.operational_tasks task
     where task.id = target_task_id
       and (
-        task.assigned_user_id = auth.uid()
-        or exists (
-          select 1 from public.operational_task_assignees assignment
-          where assignment.task_id = task.id and assignment.user_id = auth.uid()
-        )
-        or exists (
+        exists (
           select 1 from public.organization_members member
           where member.organization_id = task.organization_id
             and member.user_id = auth.uid()
-            and member.role_code in ('owner', 'manager')
             and member.status = 'active'
+        )
+        and (
+          task.assigned_user_id = auth.uid()
+          or exists (
+            select 1 from public.operational_task_assignees assignment
+            where assignment.task_id = task.id and assignment.user_id = auth.uid()
+          )
+          or exists (
+            select 1 from public.organization_members member
+            where member.organization_id = task.organization_id
+              and member.user_id = auth.uid()
+              and member.role_code in ('owner', 'manager')
+              and member.status = 'active'
+          )
         )
       )
   );

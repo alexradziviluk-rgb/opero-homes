@@ -152,6 +152,15 @@ export async function PUT(request: Request) {
   const field = body?.field?.trim() ?? "";
   if (!bookingId || !BOOLEAN_FIELDS.has(field) || typeof body?.value !== "boolean") return error(400, "Invalid checklist payload");
 
+  const { data: booking, error: bookingError } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("organization_id", auth.context.organization.id)
+    .eq("id", bookingId)
+    .maybeSingle();
+  if (bookingError) return error(422, bookingError.message);
+  if (!booking) return error(404, "Booking not found");
+
   const { data, error: upsertError } = await supabase
     .from("booking_operation_checklists")
     .upsert({

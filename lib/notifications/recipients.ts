@@ -4,6 +4,7 @@ import type { BookingNotificationEventType, NotificationPreferenceRow, Notificat
 type MemberRow = {
   user_id: string;
   role_code: string;
+  status: string;
 };
 
 type ProfileContactRow = {
@@ -106,14 +107,14 @@ async function loadMembers(
 ): Promise<MemberRow[]> {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("user_id,role_code")
+    .select("user_id,role_code,status")
     .eq("organization_id", organizationId);
 
   if (error || !data) {
     return [];
   }
 
-  return data as MemberRow[];
+  return (data as MemberRow[]).filter((member) => member.status === "active");
 }
 
 async function loadProfileContacts(

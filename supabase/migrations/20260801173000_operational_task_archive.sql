@@ -34,7 +34,15 @@ create policy operational_task_archive_select on public.operational_task_archive
         and member.status = 'active'
         and member.role_code in ('owner', 'manager')
     )
-    or assigned_user_id = auth.uid()
+    or (
+      assigned_user_id = auth.uid()
+      and exists (
+        select 1 from public.organization_members member
+        where member.organization_id = operational_task_archive.organization_id
+          and member.user_id = auth.uid()
+          and member.status = 'active'
+      )
+    )
   );
 
 grant select on public.operational_task_archive to authenticated;

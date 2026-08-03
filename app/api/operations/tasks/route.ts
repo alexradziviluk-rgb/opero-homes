@@ -144,6 +144,7 @@ export async function POST(request: Request) {
     .from("organization_members")
     .select("user_id")
     .eq("organization_id", auth.context.organization.id)
+    .eq("status", "active")
     .in("user_id", assignedUserIds);
   if (membersError) return error(422, membersError.message);
   if ((members ?? []).length !== assignedUserIds.length) return error(400, "One or more assignees are not members of this organization");
@@ -236,6 +237,7 @@ export async function PATCH(request: Request) {
       .from("organization_members")
       .select("user_id")
       .eq("organization_id", auth.context.organization.id)
+      .eq("status", "active")
       .in("user_id", assignedUserIds);
     if (membersError) return error(422, membersError.message);
     if ((members ?? []).length !== new Set(assignedUserIds).size) return error(400, "One or more assignees are not members of this organization");

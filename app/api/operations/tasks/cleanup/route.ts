@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
+import { getRoleCodeFromContext, isManagerRoleCode } from "@/lib/supabase/role-code";
 
 function error(status: number, message: string) {
   return NextResponse.json({ ok: false, error: message }, { status });
@@ -11,6 +12,7 @@ export async function POST() {
   if (!supabase) return error(500, "Supabase is not configured");
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
+  if (!isManagerRoleCode(getRoleCodeFromContext(auth.context))) return error(403, "Insufficient permissions");
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data: tasks, error: queryError } = await supabase

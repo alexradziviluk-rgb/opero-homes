@@ -243,8 +243,8 @@ begin
     where booking.apartment_id = requested_apartment_id
       and coalesce(booking.status, 'pending') not in ('cancelled', 'rejected', 'declined', 'expired')
       and coalesce(booking.request_status, booking.status, 'pending') not in ('cancelled', 'rejected')
-      and booking.check_in_date < requested_check_out
-      and booking.check_out_date > requested_check_in
+      and booking.check_in < requested_check_out
+      and booking.check_out > requested_check_in
   ) then
     raise exception using errcode = '23P01', message = 'booking_conflict';
   end if;
@@ -262,18 +262,19 @@ begin
   source_value := coalesce(source_value, 'website');
 
   insert into public.bookings (
-    organization_id, apartment_id, booking_number, check_in_date, check_out_date,
-    adults, guests_count, guest_name, guest_email, guest_phone, guest_comment,
-    rental_type, price_per_period, nightly_rate, accommodation_total, cleaning_fee,
-    deposit, security_deposit, discount, total_amount, currency, status, request_status,
+    organization_id, apartment_id, check_in, check_out,
+    guests_count, guest_name, guest_email, guest_phone, guest_comment,
+    rental_type, price_per_period, accommodation_total, cleaning_fee,
+    deposit, discount, total_amount, status, request_status,
     payment_status, source, created_at, updated_at
   ) values (
-    apartment_row.organization_id, apartment_row.id, 'WEB-' || upper(substr(gen_random_uuid()::text, 1, 8)),
+    apartment_row.organization_id, apartment_row.id,
     requested_check_in, requested_check_out,
-    requested_guests_count, requested_guests_count,
+    requested_guests_count,
     trim(requested_guest_name), lower(trim(requested_guest_email)), trim(requested_guest_phone), coalesce(trim(requested_guest_comment), ''),
-    requested_rental_type, price_per_period, price_per_period, accommodation_total, cleaning_fee_value,
-    deposit_value, deposit_value, 0, total_value, 'EUR', 'pending', 'pending', 'unpaid', source_value, now(), now()
+    requested_rental_type, price_per_period, accommodation_total, cleaning_fee_value,
+    deposit_value, 0, total_value, 'pending', 'pending',
+    'unpaid', source_value, now(), now()
   ) returning * into booking_row;
 
   if to_regclass('public.notification_events') is not null then
@@ -282,14 +283,14 @@ begin
       payload, idempotency_key, created_by_user_id
     ) values (
       booking_row.organization_id, 'booking_created', 'booking', booking_row.id::text, booking_row.id::text, booking_row.apartment_id::text,
-      jsonb_build_object('bookingId', booking_row.id, 'apartmentId', booking_row.apartment_id, 'guestName', booking_row.guest_name, 'guestEmail', booking_row.guest_email, 'checkIn', booking_row.check_in_date, 'checkOut', booking_row.check_out_date, 'totalAmount', booking_row.total_amount, 'currency', booking_row.currency, 'bookingStatus', 'pending', 'paymentStatus', 'unpaid', 'actionUrl', '/bookings/' || booking_row.id),
+      jsonb_build_object('bookingId', booking_row.id, 'apartmentId', booking_row.apartment_id, 'guestName', booking_row.guest_name, 'guestEmail', booking_row.guest_email, 'checkIn', booking_row.check_in, 'checkOut', booking_row.check_out, 'totalAmount', booking_row.total_amount, 'currency', 'EUR', 'bookingStatus', 'pending', 'paymentStatus', 'unpaid', 'actionUrl', '/bookings/' || booking_row.id),
       'public-booking-request:' || booking_row.id, null
     ) returning id into event_id;
 
     insert into public.notifications (organization_id, recipient_user_id, event_id, title, message, action_url)
     select booking_row.organization_id, recipient.user_id, event_id,
       'Новый запрос на бронирование',
-      trim(booking_row.guest_name) || ': ' || booking_row.check_in_date || ' - ' || booking_row.check_out_date,
+      trim(booking_row.guest_name) || ': ' || booking_row.check_in || ' - ' || booking_row.check_out,
       '/bookings/' || booking_row.id
     from (
       select organization_row.owner_id as user_id
@@ -306,7 +307,7 @@ begin
     on conflict (organization_id, event_id, recipient_user_id) do nothing;
   end if;
 
-  return query select booking_row.id, booking_row.organization_id, booking_row.total_amount, coalesce(booking_row.currency, 'EUR');
+  return query select booking_row.id, booking_row.organization_id, booking_row.total_amount, 'EUR'::text;
 end;
 $$;
 

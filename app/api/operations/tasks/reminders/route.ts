@@ -31,6 +31,14 @@ export async function POST() {
   if (managersError) return error(422, managersError.message);
   if (assignmentsError) return error(422, assignmentsError.message);
 
+  const { data: activeMembers, error: activeMembersError } = await supabase
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
+  if (activeMembersError) return error(422, activeMembersError.message);
+  const activeMemberIds = new Set((activeMembers ?? []).map((member) => member.user_id));
+
   let created = 0;
   for (const task of tasks) {
     const due = new Date(task.due_at);
@@ -45,7 +53,7 @@ export async function POST() {
       .maybeSingle();
     if (eventError || !event) continue;
 
-    const recipientIds = new Set<string>([task.assigned_user_id, ...(assignments ?? []).filter((item) => item.task_id === task.id).map((item) => item.user_id), ...(managers ?? []).map((member) => member.user_id)]);
+    const recipientIds = new Set<string>([task.assigned_user_id, ...(assignments ?? []).filter((item) => item.task_id === task.id).map((item) => item.user_id), ...(managers ?? []).map((member) => member.user_id)].filter((userId) => activeMemberIds.has(userId)));
     const message = overdue ? `Задача «${task.title}» просрочена. Требуется контроль.` : `Задача «${task.title}» должна быть выполнена в ближайшие 15 часов.`;
     const { error: notificationError } = await supabase.from("notifications").upsert(Array.from(recipientIds).map((userId) => ({ organization_id: organizationId, recipient_user_id: userId, event_id: event.id, title: overdue ? "Задача просрочена" : "Приближается срок задачи", message, action_url: "/tasks" })), { onConflict: "organization_id,event_id,recipient_user_id", ignoreDuplicates: true });
     if (!notificationError) created += recipientIds.size;
