@@ -140,12 +140,32 @@ export async function POST(request: Request) {
   if (apartmentError) return error(422, apartmentError.message);
   if (!apartment) return error(400, "Apartment is not available in this organization");
 
+  const { data: members, error: membersError } = await supabase
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", auth.context.organization.id)
+    .in("user_id", assignedUserIds);
+  if (membersError) return error(422, membersError.message);
+  if ((members ?? []).length !== assignedUserIds.length) return error(400, "One or more assignees are not members of this organization");
+
+  const bookingId = body?.bookingId?.trim() ?? "";
+  if (bookingId) {
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id,apartment_id")
+      .eq("organization_id", auth.context.organization.id)
+      .eq("id", bookingId)
+      .maybeSingle();
+    if (bookingError) return error(422, bookingError.message);
+    if (!booking || booking.apartment_id !== apartmentId) return error(400, "Booking is not available for this apartment and organization");
+  }
+
   const { data, error: insertError } = await writeSupabase
     .from("operational_tasks")
     .insert({
       organization_id: auth.context.organization.id,
       apartment_id: apartmentId,
-      booking_id: body?.bookingId || null,
+      booking_id: bookingId || null,
       title,
       description: body?.description?.trim() ?? "",
       task_type: taskType,
@@ -210,6 +230,27 @@ export async function PATCH(request: Request) {
   if (payload.priority && isManager && PRIORITIES.has(payload.priority)) changes.priority = payload.priority;
 
   if (payload.checklistItems && (!isManager && existing.assigned_user_id !== auth.context.authUserId)) return error(403, "Insufficient permissions");
+
+  if (assignedUserIds?.length && isManager) {
+    const { data: members, error: membersError } = await supabase
+      .from("organization_members")
+      .select("user_id")
+      .eq("organization_id", auth.context.organization.id)
+      .in("user_id", assignedUserIds);
+    if (membersError) return error(422, membersError.message);
+    if ((members ?? []).length !== new Set(assignedUserIds).size) return error(400, "One or more assignees are not members of this organization");
+  }
+
+  if (payload.apartmentId?.trim() && isManager) {
+    const { data: apartment, error: apartmentError } = await supabase
+      .from("apartments")
+      .select("id")
+      .eq("organization_id", auth.context.organization.id)
+      .eq("id", payload.apartmentId.trim())
+      .maybeSingle();
+    if (apartmentError) return error(422, apartmentError.message);
+    if (!apartment) return error(400, "Apartment is not available in this organization");
+  }
 
   const { data, error: updateError } = Object.keys(changes).length
     ? await writeSupabase

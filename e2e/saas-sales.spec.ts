@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { test, expect, type Page } from "@playwright/test";
 
-const localOnly = Boolean(process.env.E2E_LOCAL);
+const localOnly = Boolean(process.env.E2E_LOCAL && process.env.E2E_SUPABASE_URL && process.env.E2E_SUPABASE_SERVICE_ROLE_KEY);
 const cleanupEmails = new Set<string>();
 
 function adminClient() {
@@ -34,27 +34,26 @@ test.afterEach(async () => {
 
 test("landing and pricing are public", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Управляйте недвижимостью|Manage properties/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Все доступные объекты|All available properties/ })).toBeVisible();
   await page.goto("/pricing");
   await expect(page.getByRole("heading", { name: /Выберите темп роста/ })).toBeVisible();
 });
 
-test("landing language toggle and registration CTA work", async ({ page }) => {
+test("catalog language toggle and partner CTA work", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Switch language" }).click();
-  await expect(page.getByRole("heading", { name: /Manage properties/ })).toBeVisible();
-  await page.getByRole("link", { name: "Start for free" }).first().click();
-  await expect(page).toHaveURL(/\/register/);
+  await page.getByRole("button", { name: "EN", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /All available properties/ })).toBeVisible();
+  await page.getByRole("navigation", { name: "Публичная навигация" }).getByRole("link", { name: "Become a partner" }).click();
+  await expect(page).toHaveURL(/\/business/);
 });
 
-test("mobile landing has working navigation and no horizontal scroll", async ({ page }) => {
+test("mobile catalog has no horizontal scroll and keeps search accessible", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
-  await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(page.getByRole("link", { name: "Тарифы" })).toBeVisible();
-  await page.getByRole("link", { name: "Тарифы" }).click();
-  await expect(page).toHaveURL(/\/pricing/);
+  await page.getByRole("link", { name: "Поиск жилья" }).click();
+  await expect(page.getByRole("heading", { name: "Не нашли подходящий вариант?" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Город, район или адрес" })).toBeVisible();
 });
 
 async function registerOwner(page: Page, plan = "professional") {

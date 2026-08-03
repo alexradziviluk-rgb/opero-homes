@@ -153,6 +153,7 @@ export async function POST(request: Request) {
   const status = body?.status?.trim() ?? "pending";
   const paymentStatus = body?.paymentStatus?.trim() ?? "unpaid";
   const source = body?.source?.trim() ?? "direct";
+  const guests = Math.max(1, Number(body?.guests ?? 1));
 
   if (!id || !apartmentId || !guestName || !checkIn || !checkOut || checkOut <= checkIn) {
     return error(400, "Invalid booking payload");
@@ -163,20 +164,23 @@ export async function POST(request: Request) {
   if (!BOOKING_STATUSES.has(status) || !PAYMENT_STATUSES.has(paymentStatus)) {
     return error(400, "Invalid booking status");
   }
-  if (!RENTAL_TYPES.has(rentalType)) {
+  if (!RENTAL_TYPES.has(rentalType) || !Number.isInteger(guests)) {
     return error(400, "Invalid rental type", "invalid_rental_type");
   }
 
   const organizationId = auth.context.organization.id;
   const { data: apartment, error: apartmentError } = await supabase
     .from("apartments")
-    .select("id,rental_types,daily_price,weekly_price,monthly_price,cleaning_fee,deposit")
+    .select("id,max_guests,rental_types,daily_price,weekly_price,monthly_price,cleaning_fee,deposit")
     .eq("organization_id", organizationId)
     .eq("id", apartmentId)
     .maybeSingle();
 
   if (apartmentError) return error(422, apartmentError.message, apartmentError.code);
   if (!apartment) return error(404, "Apartment not found", "apartment_not_found");
+  if (guests > Number(apartment.max_guests ?? 0)) {
+    return error(400, "Guest count exceeds apartment capacity", "guests_exceed_capacity");
+  }
 
   const rentalTypes = (apartment.rental_types ?? {}) as Record<string, boolean>;
   if (!rentalTypes[rentalType]) {
@@ -261,7 +265,7 @@ export async function POST(request: Request) {
     paid_amount: paidAmount,
     complimentary,
     guest_comment: guestComment,
-    guests_count: Math.max(1, Number(body?.guests ?? 1)),
+    guests_count: guests,
     request_status: requestStatus,
   };
   const bookingRow: Record<string, unknown> = usesLegacyDates
@@ -272,7 +276,7 @@ export async function POST(request: Request) {
         apartment_id: apartmentId,
         check_in_date: checkIn,
         check_out_date: checkOut,
-        adults: Math.max(1, Number(body?.guests ?? 1)),
+        adults: guests,
         children: 0,
         infants: 0,
         pets: 0,
@@ -297,7 +301,7 @@ export async function POST(request: Request) {
         apartment_id: apartmentId,
         check_in: checkIn,
         check_out: checkOut,
-        guests: Math.max(1, Number(body?.guests ?? 1)),
+        guests,
         total_amount: totalAmount,
         status,
         payment_status: derivedPaymentStatus,
