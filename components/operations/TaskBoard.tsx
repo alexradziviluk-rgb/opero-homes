@@ -226,6 +226,21 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     setTasks((current) => current.map((item) => item.id === updated.id ? updated : item));
   }
 
+  async function deleteTask(task: Task) {
+    if (!confirm(`Удалить задачу «${task.title}»?`)) return;
+    const response = await fetch("/api/operations/tasks", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: task.id }),
+    });
+    const payload = (await response.json()) as { ok: boolean; error?: string };
+    if (!response.ok || !payload.ok) {
+      setError(payload.error ?? "Не удалось удалить задачу");
+      return;
+    }
+    setTasks((current) => current.filter((item) => item.id !== task.id));
+  }
+
   return (
     <div className="space-y-4">
       {canManage ? (
@@ -277,8 +292,6 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
               aria-label="Дата и время выполнения"
               value={dueAt}
               onChange={(event) => setDueAt(event.target.value)}
-              onClick={(event) => event.currentTarget.showPicker()}
-              onFocus={(event) => event.currentTarget.showPicker()}
               className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100"
             />
           </label>
@@ -334,7 +347,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
                       {(task.checklist ?? []).map((item) => <label key={item.id} className="flex items-center gap-2 whitespace-nowrap text-xs text-slate-300"><input type="checkbox" checked={item.completed} onChange={(event) => void changeTask(task, { checklist: (task.checklist ?? []).map((current) => current.id === item.id ? { ...current, completed: event.target.checked } : current) })} />{item.title}</label>)}
                     </div>
                   </td>
-                  <td className="px-4 py-3"><button type="button" onClick={() => editTask(task)} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-cyan-200">Редактировать</button></td>
+                  <td className="px-4 py-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => editTask(task)} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-cyan-200">Редактировать</button>{canManage ? <button type="button" onClick={() => void deleteTask(task)} className="rounded-lg border border-rose-400/30 px-2 py-1 text-xs text-rose-200">Удалить</button> : null}</div></td>
                 </tr>
               );
             })}

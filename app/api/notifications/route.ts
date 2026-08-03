@@ -150,3 +150,27 @@ export async function GET(request: Request) {
     },
   });
 }
+
+export async function DELETE(request: Request) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase is not configured" }, { status: 500 });
+
+  const auth = await requireStaffApiAuth();
+  if (!auth.ok) return auth.response;
+
+  const body = (await request.json().catch(() => null)) as { ids?: unknown } | null;
+  const ids = Array.isArray(body?.ids)
+    ? [...new Set(body.ids.filter((id): id is string => typeof id === "string" && Boolean(id.trim())).map((id) => id.trim()))].slice(0, 100)
+    : [];
+  if (ids.length === 0) return NextResponse.json({ ok: false, error: "Выберите уведомления" }, { status: 400 });
+
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("organization_id", auth.context.organization.id)
+    .eq("recipient_user_id", auth.context.authUserId)
+    .in("id", ids);
+
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
+  return NextResponse.json({ ok: true });
+}

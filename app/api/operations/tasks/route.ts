@@ -258,3 +258,27 @@ export async function PATCH(request: Request) {
   }
   return NextResponse.json({ ok: true, data: { ...data, assigned_user_ids: assignedUserIds ?? [data.assigned_user_id] } });
 }
+
+export async function DELETE(request: Request) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return error(500, "Supabase is not configured");
+
+  const auth = await requireStaffApiAuth();
+  if (!auth.ok) return auth.response;
+  const roleCode = normalizeRoleCode(auth.context.organizationMember.role_code);
+  if (!MANAGER_ROLES.has(roleCode)) return error(403, "Insufficient permissions");
+
+  const body = (await request.json().catch(() => null)) as { id?: unknown } | null;
+  const id = typeof body?.id === "string" ? body.id.trim() : "";
+  if (!id) return error(400, "Task id is required");
+
+  const writeSupabase = createSupabaseServiceRoleClient() ?? supabase;
+  const { error: deleteError } = await writeSupabase
+    .from("operational_tasks")
+    .delete()
+    .eq("organization_id", auth.context.organization.id)
+    .eq("id", id);
+
+  if (deleteError) return error(422, deleteError.message);
+  return NextResponse.json({ ok: true });
+}

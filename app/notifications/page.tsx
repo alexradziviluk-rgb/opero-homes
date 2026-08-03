@@ -72,6 +72,8 @@ export default function NotificationsPage() {
     typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("eventType") ?? "",
   );
   const [offset, setOffset] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,6 +154,39 @@ export default function NotificationsPage() {
     window.dispatchEvent(new Event("opero-notifications-changed"));
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((current) => current.length === items.length ? [] : items.map((item) => item.id));
+  }
+
+  async function deleteSelected() {
+    if (selectedIds.length === 0 || !confirm(`Удалить выбранные уведомления (${selectedIds.length})?`)) return;
+    setIsDeleting(true);
+    setError("");
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) {
+        setError(payload.error ?? "Не удалось удалить уведомления");
+        return;
+      }
+      setSelectedIds([]);
+      await load();
+      window.dispatchEvent(new Event("opero-notifications-changed"));
+    } catch {
+      setError("Не удалось удалить уведомления");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   function goPrev() {
     setOffset((current) => Math.max(0, current - PAGE_SIZE));
   }
@@ -180,6 +215,14 @@ export default function NotificationsPage() {
               <div className="flex gap-2">
                 <button
                   type="button"
+                  onClick={() => void deleteSelected()}
+                  disabled={selectedIds.length === 0 || isDeleting}
+                  className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeleting ? "Удаление..." : `Удалить выбранные${selectedIds.length ? ` (${selectedIds.length})` : ""}`}
+                </button>
+                <button
+                  type="button"
                   onClick={() => void markAllAsRead()}
                   className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200"
                 >
@@ -195,6 +238,10 @@ export default function NotificationsPage() {
             {error ? <p className="text-sm text-rose-400">{error}</p> : null}
 
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/80 p-3 text-sm">
+              <label className="flex items-center gap-2 text-slate-300">
+                <input type="checkbox" checked={items.length > 0 && selectedIds.length === items.length} onChange={toggleAllVisible} />
+                Выбрать на странице
+              </label>
               <button
                 type="button"
                 onClick={() => applyReadFilter("all")}
@@ -240,11 +287,14 @@ export default function NotificationsPage() {
               {items.map((item) => (
                 <article key={item.id} className="rounded-2xl border border-white/10 bg-slate-900/80 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} className="mt-1" aria-label={`Выбрать уведомление: ${item.title}`} />
+                      <div>
                       <h2 className="text-base font-semibold text-white">{item.title}</h2>
                       <p className="mt-1 text-xs text-slate-500">{EVENT_LABELS[item.event_type] ?? "Системное событие"}</p>
                       <p className="mt-1 whitespace-pre-line text-sm text-slate-300">{readableNotificationMessage(item.message)}</p>
                       <p className="mt-2 text-xs text-slate-500">{new Date(item.created_at).toLocaleString("ru-RU")}</p>
+                    </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {!item.read_at ? (
