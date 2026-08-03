@@ -214,6 +214,8 @@ export async function POST(request: Request) {
     .eq("organization_id", organizationId)
     .eq("apartment_id", apartmentId)
     .neq("status", "cancelled")
+    .not("status", "in", "(rejected,declined,expired)")
+    .not("request_status", "in", "(cancelled,rejected)")
     .lt("check_in_date", checkOut)
     .gt("check_out_date", checkIn)
     .limit(1)
@@ -306,6 +308,7 @@ export async function POST(request: Request) {
 
   if (insertError) {
     if (insertError.message.includes("booking_conflict_availability_block")) return error(409, "Booking dates overlap an existing block", "booking_conflict");
+    if (insertError.message.includes("booking_conflict")) return error(409, "Booking dates overlap an existing booking", "booking_conflict");
     return error(422, insertError.message, insertError.code);
   }
   return NextResponse.json({ ok: true, data }, { status: 201 });

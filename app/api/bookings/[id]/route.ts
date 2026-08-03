@@ -225,6 +225,8 @@ export async function PATCH(
       .eq("apartment_id", existing.apartment_id)
       .neq("id", id)
       .neq("status", "cancelled")
+      .not("status", "in", "(rejected,declined,expired)")
+      .not("request_status", "in", "(cancelled,rejected)")
       .lt("check_in_date", checkOut)
       .gt("check_out_date", checkIn)
       .limit(1)
@@ -258,6 +260,7 @@ export async function PATCH(
 
   if (updateError) {
     if (updateError.message.includes("booking_conflict_availability_block")) return error(409, "Booking dates overlap an existing block", "booking_conflict");
+    if (updateError.message.includes("booking_conflict")) return error(409, "Booking dates overlap an existing booking", "booking_conflict");
     return error(422, updateError.message, updateError.code);
   }
   if (!data) return error(404, "Booking not found");
