@@ -50,12 +50,11 @@ function writeStorage(clients: Client[]) {
   localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients));
 }
 
-function mapSupabaseClient(row: { id: string; name: string; email?: string | null; phone?: string | null; created_at?: string | null; updated_at?: string | null }): Client {
-  const nameParts = row.name.trim().split(/\s+/).filter(Boolean);
+function mapSupabaseClient(row: { id: string; first_name: string; last_name: string; email?: string | null; phone?: string | null; created_at?: string | null; updated_at?: string | null }): Client {
   return normalizeClient({
     id: row.id,
-    firstName: nameParts.shift() ?? "",
-    lastName: nameParts.join(" "),
+    firstName: row.first_name ?? "",
+    lastName: row.last_name ?? "",
     email: row.email ?? "",
     phone: row.phone ?? "",
     createdAt: row.created_at ?? undefined,
@@ -68,8 +67,8 @@ export async function loadClientsFromSupabase(): Promise<Client[]> {
   if (!supabase) return [];
 
   const { data, error } = await supabase
-    .from("clients")
-    .select("id,name,email,phone,created_at,updated_at")
+    .from("guests")
+    .select("id,first_name,last_name,email,phone,created_at,updated_at")
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -80,7 +79,7 @@ export async function deleteClientFromSupabase(id: string): Promise<void> {
   const supabase = createSupabaseClient();
   if (!supabase) return;
 
-  const { error } = await supabase.from("clients").delete().eq("id", id);
+  const { error } = await supabase.from("guests").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 
