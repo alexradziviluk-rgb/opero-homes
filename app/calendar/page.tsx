@@ -495,10 +495,10 @@ export default function CalendarPage() {
 
               <div className="overflow-hidden rounded-xl border border-white/10">
                 <div className="max-h-[70vh] overflow-auto">
-                  <div className="min-w-[760px]">
-                    <div className="grid border-b border-white/10 bg-black/20" style={{ gridTemplateColumns: "170px minmax(570px, 1fr)" }}>
-                      <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Объект</div>
-                      <div className="grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
+                  <div className="min-w-[680px]">
+                    <div className="grid border-b border-white/10 bg-black/20" style={{ gridTemplateColumns: "150px minmax(992px, 1fr)" }}>
+                      <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Объект</div>
+                      <div className="grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(32px, 1fr))` }}>
                         {days.map((day) => (
                           <button key={day.toISOString()} type="button" onClick={() => beginQuickRangeFromDay(day)} className={`border-r border-white/5 px-1 py-3 text-center text-xs ${toIsoDate(day) === toIsoDate(new Date()) ? "font-bold text-emerald-300" : "text-slate-400"}`}>
                             <span className="block">{day.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "")}</span>
@@ -512,20 +512,20 @@ export default function CalendarPage() {
                       const apartmentBlocks = visibleBlocks.filter((block) => block.apartment_id === apartment.id && bookingsOverlap(calendarStart, calendarEnd, block.start_date, block.end_date));
                       const showDemoOccupancy = showDemoTemplate && bookingsOverlap(calendarStart, calendarEnd, demoCheckIn, demoCheckOut);
                       return (
-                        <div key={apartment.id} className="grid min-h-[60px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "170px minmax(570px, 1fr)" }}>
-                          <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-2 py-2">
-                            <p className="truncate text-sm font-medium text-white">{apartment.title}</p>
-                            <p className="truncate text-xs text-slate-500">{apartment.city}</p>
+                        <div key={apartment.id} className="grid min-h-[52px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "150px minmax(992px, 1fr)" }}>
+                          <div className="sticky left-0 z-10 min-w-0 border-r border-white/10 bg-slate-900/95 px-2 py-1.5">
+                            <p className="truncate text-xs font-medium text-white">{apartment.title}</p>
+                            <p className="truncate text-[10px] text-slate-500">{apartment.city}</p>
                           </div>
-                          <div className="relative grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
+                          <div className="relative grid min-w-0" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(32px, 1fr))` }}>
                             {days.map((day) => {
                               const isoDay = toIsoDate(day);
                               return <button key={isoDay} type="button" onClick={() => { setRangeApartmentId(apartment.id); beginQuickRangeFromDay(day); }} className={`border-r border-white/5 ${rangeCheckIn === isoDay || rangeCheckOut === isoDay ? "bg-cyan-400/10" : "hover:bg-white/5"}`} aria-label={`${apartment.title}, ${isoDay}`} />;
                             })}
-                            <div className="pointer-events-none absolute inset-x-0 top-1 grid h-10" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
+                            <div className="pointer-events-none absolute inset-x-0 top-1 grid h-8" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(32px, 1fr))` }}>
                               {showDemoOccupancy ? (
                                 <div
-                                  className="pointer-events-auto flex h-9 items-center truncate rounded bg-cyan-400 px-2 py-1 text-left text-[10px] font-semibold text-slate-950 shadow-lg"
+                                  className="pointer-events-auto min-w-0 flex h-8 items-center truncate rounded bg-cyan-400 px-1.5 py-1 text-left text-[9px] font-semibold text-slate-950 shadow-lg"
                                   style={bookingPosition({ checkIn: demoCheckIn, checkOut: demoCheckOut } as Booking)}
                                   title="Тестовый шаблон: объект занят с 3 по 7 августа"
                                 >
@@ -535,9 +535,9 @@ export default function CalendarPage() {
                               {apartmentBookings.map((booking) => {
                                 const apartmentLabel = getApartmentCalendarLabel(booking, apartments);
                                 const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
-                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto h-9 truncate rounded px-2 py-1 text-left text-[10px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
+                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto min-w-0 h-8 truncate rounded px-1.5 py-1 text-left text-[9px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
                               })}
-                              {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto h-9 truncate rounded bg-violet-400 px-2 py-1 text-[10px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
+                              {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto min-w-0 h-8 truncate rounded bg-violet-400 px-1.5 py-1 text-[9px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
                             </div>
                           </div>
                         </div>
