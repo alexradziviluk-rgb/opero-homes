@@ -201,17 +201,14 @@ export default function CalendarPage() {
     const calendarStartDate = toIsoDate(days[0]);
     const startOffset = Math.max(0, dateOffset(calendarStartDate, booking.checkIn));
     const endOffset = Math.min(days.length, dateOffset(calendarStartDate, booking.checkOut));
-    return {
-      left: `${(startOffset / days.length) * 100}%`,
-      width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%`,
-    };
+    return { gridColumn: `${startOffset + 1} / ${Math.max(startOffset + 2, endOffset + 1)}`, gridRow: "1" };
   }
 
   function periodPosition(checkIn: string, checkOut: string) {
     const calendarStartDate = toIsoDate(days[0]);
     const startOffset = Math.max(0, dateOffset(calendarStartDate, checkIn));
     const endOffset = Math.min(days.length, dateOffset(calendarStartDate, checkOut));
-    return { left: `${(startOffset / days.length) * 100}%`, width: `${Math.max(4, ((endOffset - startOffset) / days.length) * 100)}%` };
+    return { gridColumn: `${startOffset + 1} / ${Math.max(startOffset + 2, endOffset + 1)}`, gridRow: "1" };
   }
 
   const selectedBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
@@ -525,10 +522,10 @@ export default function CalendarPage() {
                               const isoDay = toIsoDate(day);
                               return <button key={isoDay} type="button" onClick={() => { setRangeApartmentId(apartment.id); beginQuickRangeFromDay(day); }} className={`border-r border-white/5 ${rangeCheckIn === isoDay || rangeCheckOut === isoDay ? "bg-cyan-400/10" : "hover:bg-white/5"}`} aria-label={`${apartment.title}, ${isoDay}`} />;
                             })}
-                            <div className="pointer-events-none absolute inset-x-0 top-1 h-10">
+                            <div className="pointer-events-none absolute inset-x-0 top-1 grid h-10" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(44px, 1fr))` }}>
                               {showDemoOccupancy ? (
                                 <div
-                                  className="pointer-events-auto absolute flex h-9 items-center truncate rounded bg-cyan-400 px-2 py-1 text-left text-[10px] font-semibold text-slate-950 shadow-lg"
+                                  className="pointer-events-auto flex h-9 items-center truncate rounded bg-cyan-400 px-2 py-1 text-left text-[10px] font-semibold text-slate-950 shadow-lg"
                                   style={bookingPosition({ checkIn: demoCheckIn, checkOut: demoCheckOut } as Booking)}
                                   title="Тестовый шаблон: объект занят с 3 по 7 августа"
                                 >
@@ -538,9 +535,9 @@ export default function CalendarPage() {
                               {apartmentBookings.map((booking) => {
                                 const apartmentLabel = getApartmentCalendarLabel(booking, apartments);
                                 const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
-                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto absolute h-9 truncate rounded px-2 py-1 text-left text-[10px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
+                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto h-9 truncate rounded px-2 py-1 text-left text-[10px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
                               })}
-                              {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto absolute top-1 h-11 truncate rounded bg-violet-400 px-2 py-1 text-[11px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
+                              {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto h-9 truncate rounded bg-violet-400 px-2 py-1 text-[10px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
                             </div>
                           </div>
                         </div>
