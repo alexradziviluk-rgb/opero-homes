@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
+import PhoneInput from "@/components/PhoneInput";
 
 type ProfileForm = {
   firstName: string;
@@ -89,7 +90,7 @@ export default function GuestProfilePage() {
           <label className="text-sm text-slate-300">Фамилия<input value={form.lastName} onChange={(event) => update("lastName", event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-300" required /></label>
         </div>
         <label className="block text-sm text-slate-300">Email<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-300" required /></label>
-        <label className="block text-sm text-slate-300">Телефон<input type="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-300" placeholder="+357 ..." /></label>
+        <label className="block text-sm text-slate-300">Телефон<PhoneInput value={form.phone} onChange={(nextValue) => update("phone", nextValue)} className="[&>select]:rounded-xl [&>input]:rounded-xl [&>select]:bg-slate-950/70 [&>input]:bg-slate-950/70" placeholder="Номер телефона" /></label>
         <label className="block text-sm text-slate-300">Адрес проживания<textarea value={form.address} onChange={(event) => update("address", event.target.value)} className="mt-2 min-h-28 w-full resize-y rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-cyan-300" placeholder="Город, улица, дом, квартира" /></label>
 
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}

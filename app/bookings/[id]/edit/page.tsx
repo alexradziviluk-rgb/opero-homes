@@ -9,6 +9,7 @@ import { findBookingConflict, isBlockingBooking } from "@/lib/bookings/booking-c
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
+import PhoneInput from "@/components/PhoneInput";
 
 function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("ru-RU");
@@ -299,7 +300,7 @@ export default function EditBookingPage() {
                 </label>
                 <label>
                   <div className="text-sm text-slate-300">Телефон</div>
-                  <input value={form.guestPhone} onChange={(e) => update("guestPhone", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                  <PhoneInput value={form.guestPhone} onChange={(nextValue) => update("guestPhone", nextValue)} />
                 </label>
                 <label>
                   <div className="text-sm text-slate-300">Заезд</div>

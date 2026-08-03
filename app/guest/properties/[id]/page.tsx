@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ApartmentImage from "@/components/apartments/ApartmentImage";
+import PhoneInput from "@/components/PhoneInput";
 import PublicAvailabilityCalendar from "@/components/booking/PublicAvailabilityCalendar";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
@@ -435,7 +436,7 @@ export default function GuestPropertyDetailsPage() {
               </label>
               <label>
                 <div className="text-sm text-slate-300">Телефон</div>
-                <input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+                <PhoneInput value={phone} onChange={setPhone} />
               </label>
               <label>
                 <div className="text-sm text-slate-300">Email</div>

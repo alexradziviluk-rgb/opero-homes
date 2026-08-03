@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import PhoneInput from "@/components/PhoneInput";
 import type { Apartment, ApartmentPhoto } from "@/types/apartment";
 import {
   ApartmentForm,
@@ -617,7 +618,7 @@ export default function EditApartmentPage() {
                   </label>
                   <label>
                     <div className="text-sm text-slate-300">Телефон</div>
-                    <input value={form.ownerPhone} onChange={(e) => update("ownerPhone", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                    <PhoneInput value={form.ownerPhone} onChange={(nextValue) => update("ownerPhone", nextValue)} />
                   </label>
                   <label>
                     <div className="text-sm text-slate-300">Email</div>

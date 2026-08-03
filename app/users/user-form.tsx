@@ -2,6 +2,7 @@
 
 import type { UserCreateInput, UserRole, UserStatus } from "@/types/user";
 import { useAdminText } from "@/lib/i18n/admin";
+import PhoneInput from "@/components/PhoneInput";
 
 type UserFormValues = Omit<UserCreateInput, "organizationId">;
 
@@ -52,7 +53,7 @@ export default function UserForm({ value, errors, onChange }: UserFormProps) {
 
       <label>
         <div className="text-sm text-slate-300">Телефон</div>
-        <input value={value.phone} onChange={(event) => onChange("phone", event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+        <PhoneInput value={value.phone} onChange={(nextValue) => onChange("phone", nextValue)} />
       </label>
 
       <label>

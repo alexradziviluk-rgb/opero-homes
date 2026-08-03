@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getGuestNextPath } from "@/lib/auth/next-route";
 import { createSupabaseClient } from "@/lib/supabase/client";
+import PhoneInput from "@/components/PhoneInput";
 
 function normalizeSignUpError(message: string | undefined): string {
   if (!message) {
@@ -121,11 +122,7 @@ export default function GuestRegisterPage() {
 
         <label className="block">
           <span className="text-sm text-slate-300">Телефон</span>
-          <input
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
-          />
+          <PhoneInput value={phone} onChange={setPhone} className="[&>select]:rounded-2xl [&>input]:rounded-2xl" />
         </label>
 
         <label className="block">

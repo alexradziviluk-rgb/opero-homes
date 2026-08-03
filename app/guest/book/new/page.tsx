@@ -10,6 +10,7 @@ import {
   isApartmentPublic,
 } from "@/lib/apartments/public-catalog";
 import type { Apartment } from "@/types/apartment";
+import PhoneInput from "@/components/PhoneInput";
 
 type QuoteResult = {
   ok: boolean;
@@ -305,7 +306,7 @@ function GuestBookingForm() {
 
           <label>
             <div className="text-sm text-slate-300">Телефон</div>
-            <input value={guestPhone} onChange={(event) => setGuestPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+            <PhoneInput value={guestPhone} onChange={setGuestPhone} />
           </label>
 
           <label className="sm:col-span-2">

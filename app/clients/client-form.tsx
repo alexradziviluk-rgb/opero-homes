@@ -1,6 +1,7 @@
 "use client";
 
 import type { ClientDraft } from "@/types/client";
+import PhoneInput from "@/components/PhoneInput";
 
 type ClientFormProps = {
   value: ClientDraft;
@@ -40,7 +41,7 @@ export default function ClientForm({ value, errors, onChange }: ClientFormProps)
 
       <label>
         <div className="text-sm text-slate-300">Телефон</div>
-        <input value={value.phone} onChange={(event) => onChange("phone", event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+        <PhoneInput value={value.phone} onChange={(nextValue) => onChange("phone", nextValue)} />
         {errors.phone ? <p className="mt-1 text-sm text-rose-400">{errors.phone}</p> : null}
       </label>
 

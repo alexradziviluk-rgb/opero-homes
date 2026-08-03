@@ -9,6 +9,7 @@ import { useAdminText } from "@/lib/i18n/admin";
 import { getEffectivePermissions, hasPermissionInList } from "@/lib/permissions";
 import type { UserRole } from "@/types/user";
 import { EMPLOYEE_INVITE_ROLE_LABELS, EMPLOYEE_INVITE_ROLE_CODES, mapInviteRoleCodeToUserRoleLabel } from "@/lib/users/invitations";
+import PhoneInput from "@/components/PhoneInput";
 
 const roleOptions = EMPLOYEE_INVITE_ROLE_CODES.map((roleCode) => ({
   value: mapInviteRoleCodeToUserRoleLabel(roleCode) as UserRole,
@@ -147,7 +148,7 @@ export default function InviteUserPage() {
                   </label>
                   <label>
                     <div className="text-sm text-slate-300">Телефон</div>
-                    <input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+                    <PhoneInput value={phone} onChange={setPhone} />
                   </label>
                   <label className="sm:col-span-2">
                     <div className="text-sm text-slate-300">{translate("Роль")}</div>

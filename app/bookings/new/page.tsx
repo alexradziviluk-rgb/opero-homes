@@ -14,6 +14,7 @@ import { createClient, getClients } from "@/lib/clients/client-repository";
 import { userRepository } from "@/lib/repositories/users";
 import { initialClientDraft, type Client, type ClientDraft } from "@/types/client";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
+import PhoneInput from "@/components/PhoneInput";
 
 function nightsBetween(a: string, b: string) {
   const d1 = new Date(a);
@@ -407,7 +408,7 @@ function NewBookingPageContent() {
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         <input placeholder="Имя" value={quickClient.firstName} onChange={(event) => updateQuickClient("firstName", event.target.value)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
                         <input placeholder="Фамилия" value={quickClient.lastName} onChange={(event) => updateQuickClient("lastName", event.target.value)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
-                        <input placeholder="Телефон" value={quickClient.phone} onChange={(event) => updateQuickClient("phone", event.target.value)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+                        <PhoneInput value={quickClient.phone} onChange={(nextValue) => updateQuickClient("phone", nextValue)} className="sm:col-span-2 [&>select]:rounded-lg [&>input]:rounded-lg" placeholder="Телефон" />
                         <input placeholder="Email" value={quickClient.email} onChange={(event) => updateQuickClient("email", event.target.value)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
                         <button type="button" onClick={handleCreateQuickClient} className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 sm:col-span-2">
                           Создать и выбрать
@@ -438,7 +439,7 @@ function NewBookingPageContent() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label>
                       <div className="text-sm text-slate-300">Телефон</div>
-                      <input value={form.guestPhone} onChange={(e) => update("guestPhone", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                      <PhoneInput value={form.guestPhone ?? ""} onChange={(nextValue) => update("guestPhone", nextValue)} />
                     </label>
                     <label>
                       <div className="text-sm text-slate-300">Email</div>
