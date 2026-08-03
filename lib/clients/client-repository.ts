@@ -1,4 +1,5 @@
 import { CLIENTS_STORAGE_KEY, type Client, type ClientDraft } from "@/types/client";
+import { createSupabaseClient } from "@/lib/supabase/client";
 
 function safeParse(json: string | null): unknown {
   try {
@@ -47,6 +48,40 @@ function readStorage(): Client[] {
 function writeStorage(clients: Client[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients));
+}
+
+function mapSupabaseClient(row: { id: string; name: string; email?: string | null; phone?: string | null; created_at?: string | null; updated_at?: string | null }): Client {
+  const nameParts = row.name.trim().split(/\s+/).filter(Boolean);
+  return normalizeClient({
+    id: row.id,
+    firstName: nameParts.shift() ?? "",
+    lastName: nameParts.join(" "),
+    email: row.email ?? "",
+    phone: row.phone ?? "",
+    createdAt: row.created_at ?? undefined,
+    updatedAt: row.updated_at ?? undefined,
+  });
+}
+
+export async function loadClientsFromSupabase(): Promise<Client[]> {
+  const supabase = createSupabaseClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id,name,email,phone,created_at,updated_at")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => mapSupabaseClient(row));
+}
+
+export async function deleteClientFromSupabase(id: string): Promise<void> {
+  const supabase = createSupabaseClient();
+  if (!supabase) return;
+
+  const { error } = await supabase.from("clients").delete().eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export function getClients(): Client[] {

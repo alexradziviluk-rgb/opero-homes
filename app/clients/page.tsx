@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { deleteClient, getClients } from "@/lib/clients/client-repository";
+import { deleteClient, deleteClientFromSupabase, getClients, loadClientsFromSupabase } from "@/lib/clients/client-repository";
 import type { Client } from "@/types/client";
 
 function formatDate(value: string) {
@@ -14,6 +14,29 @@ function formatDate(value: string) {
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>(() => getClients());
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadClientsFromSupabase()
+      .then((remoteClients) => {
+        if (cancelled || remoteClients.length === 0) return;
+
+        const localClients = getClients();
+        const remoteKeys = new Set(
+          remoteClients.flatMap((client) => [client.id, client.email.toLowerCase(), client.phone]),
+        );
+        const localOnlyClients = localClients.filter(
+          (client) => !remoteKeys.has(client.id) && !remoteKeys.has(client.email.toLowerCase()) && !remoteKeys.has(client.phone),
+        );
+        setClients([...remoteClients, ...localOnlyClients]);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredClients = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -29,8 +52,9 @@ export default function ClientsPage() {
     });
   }, [clients, query]);
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     if (!confirm("Удалить клиента?")) return;
+    await deleteClientFromSupabase(id).catch(() => undefined);
     deleteClient(id);
     setClients(getClients());
   }
