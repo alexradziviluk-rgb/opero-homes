@@ -66,6 +66,10 @@ test("manager and employee have staff access but no owner UI or owner API", asyn
     await expect(page).toHaveURL(/\/admin/);
     await page.goto("/bookings");
     await expect(page.getByText(/Confirmed Guest/)).toBeVisible();
+    await page.goto("/apartments");
+    await expect(page.getByRole("link", { name: /Новый объект/ })).toBeVisible();
+    const newApartmentResponse = await page.request.get("/apartments/new");
+    expect(newApartmentResponse.status(), `${role} new apartment page`).toBe(200);
     const bookingsResponse = await page.request.get("/api/bookings");
     expect(bookingsResponse.status(), `${role} bookings API`).toBe(200);
     expect(JSON.stringify(await bookingsResponse.json())).toContain("Confirmed Guest");

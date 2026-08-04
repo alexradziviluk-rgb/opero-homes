@@ -92,6 +92,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "bookings.move",
     "payments.view",
     "properties.view",
+    "apartments.manage",
     "tasks.view",
     "apartments.view",
     "calendar.view",
