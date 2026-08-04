@@ -146,7 +146,6 @@ const navItems: NavItem[] = [
       </svg>
     ),
     requiredPermission: "calendar.view",
-    hiddenForManager: true,
   },
   {
     label: "Клиенты",

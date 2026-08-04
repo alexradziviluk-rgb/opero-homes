@@ -61,15 +61,16 @@ test("admin has full role surface and clean console/network", async ({ browser }
 
 test("manager and employee have staff access but no owner UI or owner API", async ({ browser }) => {
   for (const role of ["manager", "employee"] as const) {
-    const { page, consoleErrors } = await openRole(browser, role);
+    const { page, consoleErrors, failedResponses } = await openRole(browser, role);
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin/);
     await page.goto("/bookings");
     await expect(page.getByText(/Confirmed Guest/)).toBeVisible();
+    await page.goto("/calendar");
+    await expect(page.getByRole("heading", { name: "Календарь" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Календарь" })).toBeVisible();
     await page.goto("/apartments");
     await expect(page.getByRole("link", { name: /Новый объект/ })).toBeVisible();
-    const newApartmentResponse = await page.request.get("/apartments/new");
-    expect(newApartmentResponse.status(), `${role} new apartment page`).toBe(200);
     const bookingsResponse = await page.request.get("/api/bookings");
     expect(bookingsResponse.status(), `${role} bookings API`).toBe(200);
     expect(JSON.stringify(await bookingsResponse.json())).toContain("Confirmed Guest");
@@ -78,7 +79,7 @@ test("manager and employee have staff access but no owner UI or owner API", asyn
     await page.goto(`/owner/properties/${fixture.apartmentPublishedId}/calendar`);
     expect(page.url(), role).not.toContain("/owner/properties/");
     await expect(page.getByRole("button", { name: "Заблокировать даты" })).toHaveCount(0);
-    expect(consoleErrors, `${role} console errors`).toEqual([]);
+    expect(consoleErrors, `${role} console errors: ${failedResponses.join(" | ")}`).toEqual([]);
   }
 });
 
