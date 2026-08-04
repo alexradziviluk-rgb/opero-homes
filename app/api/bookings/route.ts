@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
-import { normalizeRoleCode } from "@/lib/supabase/role-code";
+import { isStaffRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 
 type CreateBookingPayload = {
@@ -28,7 +28,6 @@ type CreateBookingPayload = {
 
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in"]);
 const PAYMENT_STATUSES = new Set(["unpaid", "partially_paid", "paid", "refunded"]);
-const MANAGER_ROLES = new Set(["owner", "manager"]);
 const RENTAL_TYPES = new Set(["daily", "weekly", "monthly"]);
 
 function error(status: number, message: string, code?: string) {
@@ -137,7 +136,7 @@ export async function POST(request: Request) {
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
-  if (!MANAGER_ROLES.has(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+  if (!isStaffRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
     return error(403, "Insufficient permissions");
   }
 

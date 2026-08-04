@@ -87,6 +87,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "bookings.create",
     "bookings.edit",
     "bookings.confirm",
+    "bookings.cancel",
+    "bookings.delete",
     "bookings.move",
     "payments.view",
     "properties.view",

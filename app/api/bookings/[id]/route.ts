@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
-import { normalizeRoleCode } from "@/lib/supabase/role-code";
+import { isStaffRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { processNotificationQueue } from "@/lib/notifications/queue";
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
 const BOOKING_REQUEST_STATUSES = new Set(["pending", "confirmed", "rejected", "cancelled"]);
-const MANAGER_ROLES = new Set(["owner", "manager"]);
 
 function error(status: number, message: string, code?: string) {
   return NextResponse.json({ ok: false, error: message, code }, { status });
@@ -163,7 +162,7 @@ export async function PATCH(
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
-  if (!MANAGER_ROLES.has(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+  if (!isStaffRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
     return error(403, "Insufficient permissions");
   }
 
@@ -291,7 +290,7 @@ export async function DELETE(
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
-  if (!MANAGER_ROLES.has(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+  if (!isStaffRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
     return error(403, "Insufficient permissions");
   }
 
