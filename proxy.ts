@@ -105,8 +105,15 @@ export async function proxy(request: NextRequest) {
   let isGuestUser = false;
   let hasMembership = false;
   let hasAllowedStaffRole = false;
+  let isPropertyOwner = false;
 
   if (user && (isProtectedPath(pathname) || isClientProtectedPath(pathname) || isAuthRoute)) {
+    const isOwnerPortalPath = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
+    if (isOwnerPortalPath) {
+      const { data: ownerAccess } = await supabase.rpc("is_active_property_owner_user");
+      isPropertyOwner = Boolean(ownerAccess);
+    }
+
     const loaded = await loadCurrentUserContext(supabase, user);
 
     if (!loaded.context) {
@@ -121,6 +128,7 @@ export async function proxy(request: NextRequest) {
       }
 
       if (isProtectedPath(pathname)) {
+        if (isPropertyOwner) return response;
         return redirectTo("/login");
       }
 
@@ -138,6 +146,8 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && isProtectedPath(pathname) && !hasAllowedStaffRole) {
+    if (isPropertyOwner) return response;
+
     if (!hasMembership) {
       return redirectTo("/guest");
     }

@@ -31,6 +31,14 @@ test.describe("employee invitation flow", () => {
 
     await expect(page).toHaveURL(/\/auth\/accept-invite\?invite=playwright-token$/);
     await expect(page.getByRole("heading", { name: "Приглашение сотрудника" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Открыть страницу регистрации" })).toHaveAttribute(
+      "href",
+      "/auth/accept-invite?invite=playwright-token&mode=signup",
+    );
+    await expect(page.getByRole("link", { name: "Открыть страницу входа" })).toHaveAttribute(
+      "href",
+      "/auth/accept-invite?invite=playwright-token&mode=login",
+    );
     await expect(page.locator("body")).not.toContainText("localhost");
   });
 

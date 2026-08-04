@@ -14,8 +14,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Opero Homes",
-  description: "Система управления объектами Opero Homes",
+  metadataBase: new URL("https://operohq.netlify.app"),
+  title: {
+    default: "Opero Homes | Управление недвижимостью",
+    template: "%s | Opero Homes",
+  },
+  description: "Публичный каталог недвижимости и рабочее пространство Opero Homes для владельцев и команд.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Opero Homes",
+    title: "Opero Homes | Управление недвижимостью",
+    description: "Публичный каталог недвижимости и рабочее пространство Opero Homes.",
+    url: "/",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { buildPasswordResetUrl } from "@/lib/auth/site-url";
 
-export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
+function ForgotPasswordContent() {
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite")?.trim() ?? "";
+  const [email, setEmail] = useState(() => searchParams.get("email")?.trim() ?? "");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,7 @@ export default function ForgotPasswordPage() {
     }
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: buildPasswordResetUrl(),
+      redirectTo: buildPasswordResetUrl(inviteToken),
     });
     if (resetError) {
       setError(resetError.message);
@@ -69,5 +72,13 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-slate-950" />}>
+      <ForgotPasswordContent />
+    </Suspense>
   );
 }

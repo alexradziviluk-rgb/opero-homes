@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { createSupabaseClient } from "@/lib/supabase/client";
-import { buildInvitationNextPath, mapInviteRoleCodeToUserRoleLabel } from "@/lib/users/invitations";
+import { mapInviteRoleCodeToUserRoleLabel } from "@/lib/users/invitations";
 import type { EmployeeInvitationLookup } from "@/types/invitation";
 
 type InvitationResponse =
@@ -60,7 +60,7 @@ function InvitationPageContent() {
   const [error, setError] = useState<string | null>(hasInviteToken ? null : "Токен приглашения отсутствует.");
   const [accepted, setAccepted] = useState(false);
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
+  const [authMode, setAuthMode] = useState<"signup" | "login">(() => searchParams.get("mode") === "login" ? "login" : "signup");
   const [password, setPassword] = useState("");
   const autoAcceptTriggeredRef = useRef(false);
 
@@ -103,8 +103,6 @@ function InvitationPageContent() {
       cancelled = true;
     };
   }, [inviteToken]);
-
-  const nextPath = useMemo(() => (inviteToken ? buildInvitationNextPath(inviteToken) : "/invite"), [inviteToken]);
 
   const acceptInvitation = useCallback(async () => {
     if (!inviteToken) {
@@ -325,8 +323,16 @@ function InvitationPageContent() {
                 </button>
 
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Link href={`/guest/login?next=${encodeURIComponent(nextPath)}`} className="text-slate-300 hover:text-white">Открыть страницу входа</Link>
-                  <Link href={`/guest/register?next=${encodeURIComponent(nextPath)}&email=${encodeURIComponent(invitation.email)}`} className="text-slate-300 hover:text-white">Открыть страницу регистрации</Link>
+                  <Link href={`/auth/accept-invite?invite=${encodeURIComponent(inviteToken)}&mode=login`} className="text-slate-300 hover:text-white">Открыть страницу входа</Link>
+                {authMode === "login" ? (
+                  <Link
+                    href={`/forgot-password?email=${encodeURIComponent(invitation.email)}&invite=${encodeURIComponent(inviteToken)}`}
+                    className="block text-sm text-cyan-300 hover:text-cyan-200"
+                  >
+                    Забыли пароль? Восстановить доступ
+                  </Link>
+                ) : null}
+                  <Link href={`/auth/accept-invite?invite=${encodeURIComponent(inviteToken)}&mode=signup`} className="text-slate-300 hover:text-white">Открыть страницу регистрации</Link>
                 </div>
               </form>
             ) : null}

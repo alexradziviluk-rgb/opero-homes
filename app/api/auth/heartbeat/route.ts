@@ -8,7 +8,7 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
 
-  const { error } = await supabase.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", user.id);
+  const { error } = await supabase.rpc("touch_profile_last_seen");
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
 
   return NextResponse.json({ ok: true });

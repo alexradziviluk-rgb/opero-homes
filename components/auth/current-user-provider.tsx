@@ -67,7 +67,10 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       userRepository.upsert(resolved.currentUser);
       setCurrentUser(resolved.currentUser);
       setCurrentUserContext(resolved.currentUserContext);
-      void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+      const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
+      if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
+        void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+      }
       setIsAuthLoading(false);
     }
 
@@ -101,7 +104,10 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
         userRepository.upsert(resolved.currentUser);
         setCurrentUser(resolved.currentUser);
         setCurrentUserContext(resolved.currentUserContext);
-        void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+        const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
+        if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
+          void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+        }
       });
     });
 
@@ -109,7 +115,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [pathname, router]);
 
   const logout = useCallback(async () => {
     const redirectPath = currentUser?.role === "Гость" ? "/guest/login" : "/login";
