@@ -249,6 +249,10 @@ export default function EditApartmentPage() {
                     {errors.title ? <p className="mt-1 text-sm text-rose-400">{errors.title}</p> : null}
                   </label>
                   <label className="block">
+                    <div className="text-sm text-slate-300">Номер квартиры</div>
+                    <input value={form.unitNumber} onChange={(e) => update("unitNumber", e.target.value)} placeholder="Например, 12A" className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500" />
+                  </label>
+                  <label className="block">
                     <div className="text-sm text-slate-300">Тип объекта</div>
                     <select value={form.type} onChange={(e) => update("type", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
                       <option value="">Выберите тип</option>

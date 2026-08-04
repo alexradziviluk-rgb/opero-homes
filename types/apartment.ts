@@ -23,6 +23,7 @@ export type Apartment = {
   id: string;
   slug?: string;
   title: string;
+  unitNumber?: string;
   type: string;
   googleLink: string;
   city: string;

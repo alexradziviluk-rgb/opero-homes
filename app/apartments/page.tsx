@@ -111,7 +111,7 @@ export default function ApartmentsPage() {
   const apartments = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
     return localApartments.filter((apartment) => {
-      const matchesSearch = !normalizedQuery || [apartment.title, apartment.city, apartment.district, apartment.address].some((value) => value.toLocaleLowerCase("ru-RU").includes(normalizedQuery));
+      const matchesSearch = !normalizedQuery || [apartment.title, apartment.unitNumber ?? "", apartment.city, apartment.district, apartment.address].some((value) => value.toLocaleLowerCase("ru-RU").includes(normalizedQuery));
       const isOccupied = occupiedApartmentIds.has(apartment.id);
       const matchesFilter = availabilityFilter === "all"
         || (availabilityFilter === "occupied" && isOccupied)
@@ -203,6 +203,7 @@ export default function ApartmentsPage() {
                   <tr>
                     <th className="px-4 py-3 text-left">Фото</th>
                     <th className="px-4 py-3 text-left">Название</th>
+                    <th className="px-4 py-3 text-left">Номер</th>
                     <th className="px-4 py-3 text-left">Город</th>
                     <th className="px-4 py-3 text-left">Комнаты</th>
                     <th className="px-4 py-3 text-left">Стоимость аренды</th>
@@ -220,11 +221,11 @@ export default function ApartmentsPage() {
                   <tbody className="divide-y divide-white/5">
                     {isLoading ? (
                       <tr>
-                        <td className="px-4 py-6 text-slate-400" colSpan={13}>Загрузка...</td>
+                        <td className="px-4 py-6 text-slate-400" colSpan={14}>Загрузка...</td>
                       </tr>
                     ) : apartments.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-6 text-slate-400" colSpan={13}>Пока нет объектов. Создайте первый объект.</td>
+                        <td className="px-4 py-6 text-slate-400" colSpan={14}>Пока нет объектов. Создайте первый объект.</td>
                       </tr>
                     ) : apartments.map((a) => (
                       <tr key={a.id} onClick={() => router.push(`/apartments/${a.id}`)} className="hover:bg-white/2 cursor-pointer">
@@ -270,6 +271,7 @@ export default function ApartmentsPage() {
                             {a.title}
                           </Link>
                         </td>
+                        <td className="px-4 py-3 text-slate-300">{a.unitNumber || "—"}</td>
                         <td className="px-4 py-3 text-slate-300">{a.city}</td>
                         <td className="px-4 py-3 text-slate-300">{a.rooms}</td>
                         <td className="px-4 py-3 text-slate-300 whitespace-pre-line">{getRentalCostText(a)}</td>

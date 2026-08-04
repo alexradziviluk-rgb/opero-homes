@@ -2,6 +2,7 @@ import type { Apartment, ApartmentPhoto, RentalTypes } from "@/types/apartment";
 
 export type ApartmentForm = {
   title: string;
+  unitNumber: string;
   type: string;
   googleLink: string;
   city: string;
@@ -40,6 +41,7 @@ export const STORAGE_KEY = "apartments";
 
 export const initialApartmentForm: ApartmentForm = {
   title: "",
+  unitNumber: "",
   type: "",
   googleLink: "",
   city: "",
@@ -393,6 +395,7 @@ export function buildApartment(form: ApartmentForm, id: string, existingApartmen
     id,
     slug: existingApartment?.slug ?? undefined,
     title: form.title.trim(),
+    unitNumber: form.unitNumber.trim(),
     type: form.type,
     googleLink: form.googleLink,
     city: form.city,
@@ -513,6 +516,7 @@ export function getRentalCostText(apartment: Apartment): string {
 export function apartmentToForm(apartment: Apartment): ApartmentForm {
   return {
     title: apartment.title,
+    unitNumber: apartment.unitNumber ?? "",
     type: apartment.type,
     googleLink: apartment.googleLink || "",
     city: apartment.city,
