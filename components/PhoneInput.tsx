@@ -1,21 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { getCountries, getCountryCallingCode } from "libphonenumber-js";
 
-const countryCodes = [
-  ["+1", "США/Канада и страны Карибского бассейна"], ["+7", "Россия и Казахстан"], ["+20", "Египет"], ["+27", "Южная Африка"], ["+30", "Греция"], ["+31", "Нидерланды"], ["+32", "Бельгия"], ["+33", "Франция"], ["+34", "Испания"], ["+36", "Венгрия"], ["+39", "Италия и Ватикан"], ["+40", "Румыния"], ["+41", "Швейцария"], ["+43", "Австрия"], ["+44", "Великобритания"], ["+45", "Дания"], ["+46", "Швеция"], ["+47", "Норвегия"], ["+48", "Польша"], ["+49", "Германия"], ["+51", "Перу"], ["+52", "Мексика"], ["+53", "Куба"], ["+54", "Аргентина"], ["+55", "Бразилия"], ["+56", "Чили"], ["+57", "Колумбия"], ["+58", "Венесуэла"], ["+60", "Малайзия"], ["+61", "Австралия"], ["+62", "Индонезия"], ["+63", "Филиппины"], ["+64", "Новая Зеландия"], ["+65", "Сингапур"], ["+66", "Таиланд"], ["+81", "Япония"], ["+82", "Южная Корея"], ["+84", "Вьетнам"], ["+86", "Китай"], ["+90", "Турция"], ["+91", "Индия"], ["+92", "Пакистан"], ["+93", "Афганистан"], ["+94", "Шри-Ланка"], ["+95", "Мьянма"], ["+98", "Иран"], ["+211", "Южный Судан"], ["+212", "Марокко"], ["+213", "Алжир"], ["+216", "Тунис"], ["+218", "Ливия"], ["+220", "Гамбия"], ["+221", "Сенегал"], ["+222", "Мавритания"], ["+223", "Мали"], ["+224", "Гвинея"], ["+225", "Кот-д'Ивуар"], ["+226", "Буркина-Фасо"], ["+227", "Нигер"], ["+228", "Того"], ["+229", "Бенин"], ["+230", "Маврикий"], ["+231", "Либерия"], ["+232", "Сьерра-Леоне"], ["+233", "Гана"], ["+234", "Нигерия"], ["+235", "Чад"], ["+236", "Центральноафриканская Республика"], ["+237", "Камерун"], ["+238", "Кабо-Верде"], ["+239", "Сан-Томе и Принсипи"], ["+240", "Экваториальная Гвинея"], ["+241", "Габон"], ["+242", "Республика Конго"], ["+243", "Демократическая Республика Конго"], ["+244", "Ангола"], ["+245", "Гвинея-Бисау"], ["+246", "Британская территория в Индийском океане"], ["+248", "Сейшелы"], ["+249", "Судан"], ["+250", "Руанда"], ["+251", "Эфиопия"], ["+252", "Сомали"], ["+253", "Джибути"], ["+254", "Кения"], ["+255", "Танзания"], ["+256", "Уганда"], ["+257", "Бурунди"], ["+258", "Мозамбик"], ["+260", "Замбия"], ["+261", "Мадагаскар"], ["+262", "Реюньон и Майотта"], ["+263", "Зимбабве"], ["+264", "Намибия"], ["+265", "Малави"], ["+266", "Лесото"], ["+267", "Ботсвана"], ["+268", "Эсватини"], ["+269", "Коморы"], ["+290", "Остров Святой Елены"], ["+291", "Эритрея"], ["+297", "Аруба"], ["+298", "Фарерские острова"], ["+299", "Гренландия"], ["+350", "Гибралтар"], ["+351", "Португалия"], ["+352", "Люксембург"], ["+353", "Ирландия"], ["+354", "Исландия"], ["+355", "Албания"], ["+356", "Мальта"], ["+357", "Кипр"], ["+358", "Финляндия"], ["+359", "Болгария"], ["+370", "Литва"], ["+371", "Латвия"], ["+372", "Эстония"], ["+373", "Молдова"], ["+374", "Армения"], ["+375", "Беларусь"], ["+376", "Андорра"], ["+377", "Монако"], ["+378", "Сан-Марино"], ["+380", "Украина"], ["+381", "Сербия"], ["+382", "Черногория"], ["+383", "Косово"], ["+385", "Хорватия"], ["+386", "Словения"], ["+387", "Босния и Герцеговина"], ["+389", "Северная Македония"], ["+420", "Чехия"], ["+421", "Словакия"], ["+423", "Лихтенштейн"], ["+500", "Фолклендские острова"], ["+501", "Белиз"], ["+502", "Гватемала"], ["+503", "Сальвадор"], ["+504", "Гондурас"], ["+505", "Никарагуа"], ["+506", "Коста-Рика"], ["+507", "Панама"], ["+508", "Сен-Пьер и Микелон"], ["+509", "Гаити"], ["+590", "Гваделупа и Сен-Бартелеми"], ["+591", "Боливия"], ["+592", "Гайана"], ["+593", "Эквадор"], ["+594", "Французская Гвиана"], ["+595", "Парагвай"], ["+596", "Мартиника"], ["+597", "Суринам"], ["+598", "Уругвай"], ["+599", "Карибские Нидерланды и Кюрасао"], ["+670", "Тимор-Лешти"], ["+672", "Австралийские внешние территории"], ["+673", "Бруней"], ["+674", "Науру"], ["+675", "Папуа — Новая Гвинея"], ["+676", "Тонга"], ["+677", "Соломоновы Острова"], ["+678", "Вануату"], ["+679", "Фиджи"], ["+680", "Палау"], ["+681", "Уоллис и Футуна"], ["+682", "Острова Кука"], ["+683", "Ниуэ"], ["+685", "Самоа"], ["+686", "Кирибати"], ["+687", "Новая Каледония"], ["+688", "Тувалу"], ["+689", "Французская Полинезия"], ["+690", "Токелау"], ["+691", "Микронезия"], ["+692", "Маршалловы Острова"], ["+850", "Северная Корея"], ["+852", "Гонконг"], ["+853", "Макао"], ["+855", "Камбоджа"], ["+856", "Лаос"], ["+880", "Бангладеш"], ["+886", "Тайвань"], ["+960", "Мальдивы"], ["+961", "Ливан"], ["+962", "Иордания"], ["+963", "Сирия"], ["+964", "Ирак"], ["+965", "Кувейт"], ["+966", "Саудовская Аравия"], ["+967", "Йемен"], ["+968", "Оман"], ["+970", "Палестина"], ["+971", "ОАЭ"], ["+972", "Израиль"], ["+973", "Бахрейн"], ["+974", "Катар"], ["+975", "Бутан"], ["+976", "Монголия"], ["+977", "Непал"], ["+992", "Таджикистан"], ["+993", "Туркменистан"], ["+994", "Азербайджан"], ["+995", "Грузия"], ["+996", "Кыргызстан"], ["+998", "Узбекистан"],
-].map(([code, label]) => ({ code, label: `${label} (${code})` }));
+type CountryOption = {
+  code: string;
+  label: string;
+};
+
+const regionNames = new Intl.DisplayNames(["ru"], { type: "region" });
+
+const countryCodes: CountryOption[] = (() => {
+  const labelsByCode = new Map<string, string[]>();
+
+  getCountries().forEach((country) => {
+    const code = `+${getCountryCallingCode(country)}`;
+    const name = regionNames.of(country) ?? country;
+    const names = labelsByCode.get(code) ?? [];
+    names.push(name);
+    labelsByCode.set(code, names);
+  });
+
+  return [...labelsByCode.entries()]
+    .map(([code, names]) => ({
+      code,
+      label: `${names.sort((a, b) => a.localeCompare(b, "ru")).join(" / ")} (${code})`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+})();
 
 const countryCodesByLength = [...countryCodes].sort((a, b) => b.code.length - a.code.length);
 
 function getPhoneParts(value: string): { countryCode: string; localNumber: string } {
   const normalized = value.trim().replace(/[\s()-]/g, "");
-  const countryCode = countryCodesByLength.find((item) => normalized.startsWith(item.code));
-  if (countryCode) {
-    return { countryCode: countryCode.code, localNumber: normalized.slice(countryCode.code.length).replace(/\D/g, "") };
+  const knownCountryCode = countryCodesByLength.find((item) => normalized.startsWith(item.code));
+  if (knownCountryCode) {
+    return { countryCode: knownCountryCode.code, localNumber: normalized.slice(knownCountryCode.code.length).replace(/\D/g, "") };
   }
 
-  return { countryCode: "+357", localNumber: normalized.replace(/\D/g, "") };
+  const manualCountryCode = normalized.match(/^\+\d{1,4}/)?.[0];
+  if (manualCountryCode) {
+    return { countryCode: manualCountryCode, localNumber: normalized.slice(manualCountryCode.length).replace(/\D/g, "") };
+  }
+
+  return { countryCode: "+", localNumber: normalized.replace(/\D/g, "") };
 }
 
 type PhoneInputProps = {
@@ -27,12 +54,16 @@ type PhoneInputProps = {
 };
 
 export default function PhoneInput({ value, onChange, className = "", placeholder = "Номер телефона", required }: PhoneInputProps) {
-  const [countryCode, setCountryCode] = useState(() => getPhoneParts(value).countryCode);
   const parsed = getPhoneParts(value);
-  const selectedCode = countryCodes.some((item) => item.code === countryCode) ? countryCode : parsed.countryCode;
+  const countryCode = parsed.countryCode;
+  const selectedCode = countryCodes.some((item) => item.code === countryCode) ? countryCode : "";
 
   function updateCountryCode(nextCountryCode: string) {
-    setCountryCode(nextCountryCode);
+    onChange(`${nextCountryCode} ${parsed.localNumber}`.trim());
+  }
+
+  function updateManualCountryCode(nextValue: string) {
+    const nextCountryCode = nextValue.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
     onChange(`${nextCountryCode} ${parsed.localNumber}`.trim());
   }
 
@@ -41,25 +72,34 @@ export default function PhoneInput({ value, onChange, className = "", placeholde
     const pastedCountryCode = countryCodesByLength.find((item) => pastedValue.startsWith(item.code));
     if (pastedCountryCode) {
       const localNumber = nextLocalNumber.slice(nextLocalNumber.indexOf(pastedCountryCode.code) + pastedCountryCode.code.length).trim();
-      setCountryCode(pastedCountryCode.code);
-      onChange(`${pastedCountryCode.code} ${localNumber}`.trim());
+      onChange(`${pastedCountryCode.code} ${localNumber.replace(/\D/g, "")}`.trim());
       return;
     }
 
     const localNumber = nextLocalNumber.replace(/\D/g, "");
-    onChange(`${selectedCode} ${localNumber}`.trim());
+    onChange(`${countryCode} ${localNumber}`.trim());
   }
 
   return (
-    <div className={`mt-1 flex gap-2 ${className}`}>
+    <div className={`mt-1 flex flex-wrap gap-2 ${className}`}>
       <select
         aria-label="Код страны"
         value={selectedCode}
         onChange={(event) => updateCountryCode(event.target.value)}
         className="w-40 shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
       >
+        <option value="" className="bg-slate-900">Выберите страну</option>
         {countryCodes.map((item) => <option key={item.code} value={item.code} className="bg-slate-900">{item.label}</option>)}
       </select>
+      <input
+        type="tel"
+        inputMode="tel"
+        aria-label="Код телефона вручную"
+        value={countryCode}
+        onChange={(event) => updateManualCountryCode(event.target.value)}
+        placeholder="+90"
+        className="w-20 shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
+      />
       <input
         type="tel"
         inputMode="tel"
@@ -69,7 +109,7 @@ export default function PhoneInput({ value, onChange, className = "", placeholde
         onChange={(event) => updateLocalNumber(event.target.value)}
         placeholder={placeholder}
         required={required}
-        className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
+        className="min-w-[10rem] flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
       />
     </div>
   );
