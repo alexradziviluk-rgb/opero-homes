@@ -40,8 +40,8 @@ function ResultCard({ result }: { result: AIToolResult }) {
     <div className="mt-3 space-y-2">
       {items.map((item, index) => {
         const title = String(item.title ?? item.apartmentTitle ?? item.name ?? `Запись ${index + 1}`);
-        const id = typeof item.id === "string" ? item.id : "";
-        const link = item.apartmentId && typeof item.apartmentId === "string" ? `/guest/properties/${item.apartmentId}` : null;
+        const id = typeof item.bookingNumber === "string" || typeof item.taskNumber === "string" ? String(item.bookingNumber ?? item.taskNumber) : "";
+        const link = typeof item.publicRoute === "string" ? item.publicRoute : null;
         return (
           <div key={`${result.tool}-${id}-${index}`} className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
             {link ? <Link href={link} className="font-medium text-cyan-200 hover:text-cyan-100">{title}</Link> : <p className="font-medium text-slate-100">{title}</p>}

@@ -16,6 +16,7 @@ import {
   getPublicAvailability,
   searchPublishedProperties,
 } from "./tools/read";
+import { sanitizeAiToolResultForClient } from "./sanitize";
 import type { AIChatResponse, AIContext, AIToolResult } from "./types";
 
 function languageOf(message: string): "ru" | "en" | "tr" {
@@ -108,6 +109,7 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
     return { ok: true, message: formatRoleMessage(context, message) + (context.role === "anonymous" ? " Укажите город, даты и количество гостей, чтобы начать поиск." : " Выберите один из быстрых запросов или уточните, что нужно найти."), role: context.role, tools: [], results: [], suggestions: suggestions(context) };
   }
 
+  const publicResults = results.map((result) => sanitizeAiToolResultForClient(context.role, result));
   const language = languageOf(message);
   const first = results[0]?.data as Record<string, unknown> | undefined;
   const count = Array.isArray(first?.properties) ? first.properties.length : Array.isArray(first) ? first.length : null;
@@ -117,5 +119,5 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
     ? count !== null ? `${count} yayınlanmış konut buldum. Yalnızca herkese açık katalog verileri gösteriliyor.` : "Rolünüz için mevcut son veriler burada."
     : count !== null ? `Нашёл объектов: ${count}. Показаны только опубликованные объекты публичного каталога.` : "Вот актуальные данные, доступные вашей роли.";
 
-  return { ok: true, message: messageText, role: context.role, tools: results.map((result) => result.tool), results, suggestions: suggestions(context) };
+  return { ok: true, message: messageText, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context) };
 }

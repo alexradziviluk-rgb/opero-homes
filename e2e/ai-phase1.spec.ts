@@ -15,7 +15,7 @@ test.describe("Opero AI Phase 1", () => {
           message: "Нашёл объектов: 1. Показаны только опубликованные объекты публичного каталога.",
           role: "anonymous",
           tools: ["searchPublishedProperties"],
-          results: [{ tool: "searchPublishedProperties", source: "Публичный каталог Opero Homes", data: { properties: [{ id: "property-1", title: "Balkan Tower", city: "Alanya", maxGuests: 3, dailyPrice: 100 }] } }],
+          results: [{ tool: "searchPublishedProperties", source: "Публичный каталог Opero Homes", data: { properties: [{ publicRoute: "/properties/property-1", title: "Balkan Tower", city: "Alanya", maxGuests: 3, dailyPrice: 100 }] } }],
           suggestions: ["Проверить свободные даты"],
         }),
       });
@@ -27,6 +27,7 @@ test.describe("Opero AI Phase 1", () => {
     await page.getByRole("textbox", { name: "Сообщение Opero AI" }).fill("Найти жильё");
     await page.getByRole("button", { name: "Отправить" }).click();
     await expect(page.getByText("Balkan Tower", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Balkan Tower", exact: true })).toHaveAttribute("href", "/properties/property-1");
     await expect(page.locator("main")).not.toContainText("organization_id");
   });
 
@@ -52,7 +53,7 @@ test.describe("Opero AI Phase 1", () => {
     const payload = await response.json() as Record<string, unknown>;
     expect(payload.ok).toBe(true);
     expect(payload.role).toBe("anonymous");
-    expect(JSON.stringify(payload)).not.toMatch(/service_role|api_key|access_token|organization_id/i);
+    expect(JSON.stringify(payload)).not.toMatch(/service_role|api_key|access_token|organizationId|organization_id|apartmentId|apartment_id|userId|user_id|guestId|guest_id/i);
   });
 
   test("rejects oversized input and ignores prompt-injection text as data", async ({ page }) => {
