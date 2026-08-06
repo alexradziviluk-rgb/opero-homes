@@ -1,0 +1,51 @@
+export type SupportStatus = "pending_confirmation" | "open" | "assigned" | "in_progress" | "waiting_for_client" | "resolved" | "closed" | "cancelled";
+export type SupportPriority = "normal" | "high" | "urgent";
+export type SupportCategory = "general" | "booking" | "payment" | "refund" | "complaint" | "maintenance" | "cleaning" | "checkin" | "legal";
+
+export type SupportTicket = {
+  id: string;
+  public_number: string;
+  organization_id: string | null;
+  apartment_id: string | null;
+  booking_id: string | null;
+  requester_user_id: string | null;
+  requester_name: string | null;
+  requester_email: string | null;
+  requester_phone: string | null;
+  requester_language: string;
+  category: SupportCategory;
+  priority: SupportPriority;
+  status: SupportStatus;
+  subject: string;
+  customer_message: string;
+  ai_summary: string;
+  assigned_to: string | null;
+  idempotency_scope: string;
+  idempotency_key_hash: string;
+  confirmation_action_id: string;
+  confirmation_expires_at: string;
+  telegram_delivery_key: string;
+  telegram_action_token: string;
+  telegram_chat_id: string | null;
+  telegram_message_id: string | null;
+  delivery_status: "pending" | "sent" | "failed" | "retrying";
+  delivery_attempt_count?: number;
+  last_attempted_at?: string | null;
+  sent_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  closed_at: string | null;
+};
+
+export type SupportHandoff = {
+  offered: boolean;
+  requiresConfirmation: boolean;
+  critical: boolean;
+  category: SupportCategory;
+  priority: SupportPriority;
+  subject: string;
+  summary: string;
+  actionId: string;
+  expiresAt: string;
+};

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAIContext } from "@/lib/ai/context";
 import { answerWithTools } from "@/lib/ai/assistant";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { createSupportTicket } from "@/lib/support/service";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
@@ -32,5 +34,17 @@ export async function POST(request: Request) {
   const rateKey = context.userId ? `user:${context.userId}` : `ip:${ip}`;
   if (!allowedByRateLimit(rateKey)) return NextResponse.json({ ok: false, error: "Слишком много запросов. Повторите позже." }, { status: 429 });
   const response = await answerWithTools(context, message);
+  if (response.handoff?.critical) {
+    const supabase = createSupabaseServiceRoleClient();
+    if (supabase) {
+      try {
+        const ticket = await createSupportTicket({ supabase, context, message, route: context.route, handoff: response.handoff, idempotencyKey: response.handoff.actionId });
+        response.message = `Внимание: создано срочное обращение ${ticket.ticket.public_number}. Если безопасно, оставайтесь на связи с сотрудником Opero Homes.`;
+        response.handoff = { ...response.handoff, offered: false, requiresConfirmation: false };
+      } catch {
+        response.message = "Внимание: зафиксирована критическая проблема. Сервис обращений временно недоступен; свяжитесь с сотрудником Opero Homes напрямую.";
+      }
+    }
+  }
   return NextResponse.json(response, { headers: { "Cache-Control": "no-store" } });
 }

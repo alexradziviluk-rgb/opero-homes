@@ -18,6 +18,7 @@ import {
 } from "./tools/read";
 import { sanitizeAiToolResultForClient } from "./sanitize";
 import type { AIChatResponse, AIContext, AIToolResult } from "./types";
+import { buildHandoff } from "@/lib/support/service";
 
 function languageOf(message: string): "ru" | "en" | "tr" {
   if (/[ğüşçıöİı]/i.test(message) || /\b(merhaba|ev|misafir|rezervasyon|müsait)/i.test(message)) return "tr";
@@ -106,7 +107,8 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
   }
 
   if (results.length === 0) {
-    return { ok: true, message: formatRoleMessage(context, message) + (context.role === "anonymous" ? " Укажите город, даты и количество гостей, чтобы начать поиск." : " Выберите один из быстрых запросов или уточните, что нужно найти."), role: context.role, tools: [], results: [], suggestions: suggestions(context) };
+    const handoff = buildHandoff(context, message, false, true);
+    return { ok: true, message: handoff.offered ? "Я не могу решить этот вопрос автоматически. Передать его менеджеру?" : formatRoleMessage(context, message) + (context.role === "anonymous" ? " Укажите город, даты и количество гостей, чтобы начать поиск." : " Выберите один из быстрых запросов или уточните, что нужно найти."), role: context.role, tools: [], results: [], suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
   }
 
   const publicResults = results.map((result) => sanitizeAiToolResultForClient(context.role, result));
@@ -119,5 +121,7 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
     ? count !== null ? `${count} yayınlanmış konut buldum. Yalnızca herkese açık katalog verileri gösteriliyor.` : "Rolünüz için mevcut son veriler burada."
     : count !== null ? `Нашёл объектов: ${count}. Показаны только опубликованные объекты публичного каталога.` : "Вот актуальные данные, доступные вашей роли.";
 
-  return { ok: true, message: messageText, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context) };
+  const hasToolError = results.some((result) => Boolean((result.data as Record<string, unknown> | null)?.error));
+  const handoff = buildHandoff(context, message, hasToolError, publicResults.length === 0);
+  return { ok: true, message: handoff.offered ? "Я не могу решить этот вопрос автоматически. Передать его менеджеру?" : messageText, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
 }
