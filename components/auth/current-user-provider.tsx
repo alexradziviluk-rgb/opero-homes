@@ -192,7 +192,8 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       return;
     }
 
-    if (isAuthRoute) {
+    const isGuestLoginRoute = pathname === "/guest/login";
+    if (isAuthRoute && !isGuestLoginRoute) {
       router.replace(getHomeRouteForUser(currentUser));
       router.refresh();
       return;

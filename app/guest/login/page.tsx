@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { getGuestNextPath } from "@/lib/auth/next-route";
 import { login, requestGuestOtpSignIn, verifyGuestEmailOtp } from "@/lib/supabase/auth";
@@ -66,14 +66,11 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-export default function GuestLoginPage() {
+function GuestLoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentUser, isAuthLoading } = useCurrentUser();
-  const [nextPath] = useState(() => {
-    if (typeof window === "undefined") return "/guest";
-    const params = new URLSearchParams(window.location.search);
-    return getGuestNextPath(params.get("next"));
-  });
+  const nextPath = getGuestNextPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -330,5 +327,13 @@ export default function GuestLoginPage() {
         </Link>
       </div>
     </section>
+  );
+}
+
+export default function GuestLoginPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-slate-300">Загрузка...</div>}>
+      <GuestLoginPageContent />
+    </Suspense>
   );
 }
