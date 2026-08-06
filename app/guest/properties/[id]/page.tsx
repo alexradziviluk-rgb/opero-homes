@@ -9,7 +9,6 @@ import PhoneInput from "@/components/PhoneInput";
 import PublicAvailabilityCalendar from "@/components/booking/PublicAvailabilityCalendar";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
-import { getClientById } from "@/lib/clients/client-repository";
 import { getRangeAvailability, getRequestedBookingOutcome, type AvailabilityBooking, type PublicAvailabilityStatus } from "@/lib/bookings/availability";
 import {
   formatApartmentPrice,
@@ -60,7 +59,7 @@ function getMinimumStayText(apartment: {
 
 export default function GuestPropertyDetailsPage() {
   const router = useRouter();
-  const { currentUser } = useCurrentUser();
+  const { currentUser, isAuthLoading } = useCurrentUser();
   const searchParams = useSearchParams();
   const params = useParams<{ id: string }>();
   const apartmentId = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -84,6 +83,13 @@ export default function GuestPropertyDetailsPage() {
 
   const [apartments, setApartments] = useState<Apartment[]>([]);
   const [bookings, setBookings] = useState<AvailabilityBooking[]>([]);
+
+  useEffect(() => {
+    if (isAuthLoading || searchParams.get("openBooking") !== "1" || currentUser) return;
+
+    const nextPath = `${window.location.pathname}${window.location.search}`;
+    router.replace(`/guest/login?next=${encodeURIComponent(nextPath)}`);
+  }, [currentUser, isAuthLoading, router, searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,11 +126,10 @@ export default function GuestPropertyDetailsPage() {
     if (!currentUser) return;
 
     const profileLoadId = window.setTimeout(() => {
-      const client = currentUser.clientId ? getClientById(currentUser.clientId) : null;
-      if (!firstName) setFirstName(client?.firstName || currentUser.firstName || "");
-      if (!lastName) setLastName(client?.lastName || currentUser.lastName || "");
-      if (!phone) setPhone(client?.phone || currentUser.phone || "");
-      if (!email) setEmail(client?.email || currentUser.email || "");
+      if (!firstName) setFirstName(currentUser.firstName || "");
+      if (!lastName) setLastName(currentUser.lastName || "");
+      if (!phone) setPhone(currentUser.phone || "");
+      if (!email) setEmail(currentUser.email || "");
     }, 0);
 
     return () => {
@@ -210,6 +215,15 @@ export default function GuestPropertyDetailsPage() {
   const requiresManagerConfirmation = priceInfo?.period === "month";
 
   function openBookingPanel() {
+    if (isAuthLoading) return;
+
+    if (!currentUser) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("openBooking", "1");
+      router.push(`/guest/login?next=${encodeURIComponent(`${nextUrl.pathname}${nextUrl.search}`)}`);
+      return;
+    }
+
     setIsBookingPanelOpen(true);
     bookingPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }

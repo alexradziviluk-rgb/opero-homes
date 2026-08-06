@@ -39,6 +39,13 @@ export async function POST(request: Request) {
   }
 
   const currentUser = await getServerCurrentUserContext();
+  if (!currentUser.currentUserContext) {
+    return NextResponse.json(
+      { ok: false, errorCode: "session_expired", errorMessage: "Войдите в аккаунт, чтобы отправить запрос на бронирование." },
+      { status: 401 },
+    );
+  }
+
   const authenticatedProfile = currentUser.currentUserContext?.profile;
   const authenticatedName = authenticatedProfile
     ? `${authenticatedProfile.first_name ?? ""} ${authenticatedProfile.last_name ?? ""}`.trim()

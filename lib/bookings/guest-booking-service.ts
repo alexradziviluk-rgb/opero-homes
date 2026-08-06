@@ -513,59 +513,28 @@ export async function listGuestBookings(
   }
 
   const guestEmail = (currentUserResult.currentUserContext.profile.email ?? currentUserResult.currentUserContext.authEmail).trim().toLowerCase();
-  const { data, error } = await supabase
-    .from("bookings")
-    .select("id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at")
-    .eq("guest_email", guestEmail)
-    .order("created_at", { ascending: false });
+  const bookingFields = "id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at";
+  const authUserId = currentUserResult.currentUserContext.authUserId;
+  const [emailResult, identityResult] = await Promise.all([
+    supabase.from("bookings").select(bookingFields).eq("guest_email", guestEmail).order("created_at", { ascending: false }),
+    supabase.from("bookings").select(bookingFields).eq("primary_guest_id", authUserId).order("created_at", { ascending: false }),
+  ]);
 
-  if (error) {
+  const queryError = emailResult.error ?? identityResult.error;
+  if (queryError) {
     return {
       ok: false,
-      errorCode: error.code === "42501" ? "permission_denied" : "unexpected",
-      errorMessage: error.message,
-      supabaseErrorCode: error.code,
+      errorCode: queryError.code === "42501" ? "permission_denied" : "unexpected",
+      errorMessage: queryError.message,
+      supabaseErrorCode: queryError.code,
     };
   }
 
-  let bookings = (data ?? []) as BookingRow[];
-  if (bookings.length === 0) {
-    const { data: guestRecord, error: guestRecordError } = await supabase
-      .from("guests")
-      .select("id")
-      .eq("email", guestEmail)
-      .maybeSingle();
-
-    if (guestRecordError) {
-      return {
-        ok: false,
-        errorCode: guestRecordError.code === "42501" ? "permission_denied" : "unexpected",
-        errorMessage: guestRecordError.message,
-        supabaseErrorCode: guestRecordError.code,
-      };
-    }
-
-    if (!guestRecord) {
-      return { ok: true, data: [] };
-    }
-
-    const { data: linkedBookings, error: linkedBookingsError } = await supabase
-      .from("bookings")
-      .select("id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at")
-      .eq("primary_guest_id", guestRecord.id)
-      .order("created_at", { ascending: false });
-
-    if (linkedBookingsError) {
-      return {
-        ok: false,
-        errorCode: linkedBookingsError.code === "42501" ? "permission_denied" : "unexpected",
-        errorMessage: linkedBookingsError.message,
-        supabaseErrorCode: linkedBookingsError.code,
-      };
-    }
-
-    bookings = (linkedBookings ?? []) as BookingRow[];
-  }
+  const bookings = Array.from(
+    new Map(
+      [...((emailResult.data ?? []) as BookingRow[]), ...((identityResult.data ?? []) as BookingRow[])].map((booking) => [booking.id, booking]),
+    ).values(),
+  ).sort((first, second) => second.created_at.localeCompare(first.created_at));
   const context = currentUserResult.currentUserContext;
   const apartmentIds = Array.from(new Set(bookings.map((booking) => booking.apartment_id).filter((value): value is string => Boolean(value))));
 

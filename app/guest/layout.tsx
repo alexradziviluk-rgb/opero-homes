@@ -11,10 +11,7 @@ export default function GuestLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const { currentUser, isAuthLoading } = useCurrentUser();
 
-  const isPublicGuestRoute =
-    pathname === "/guest/login" ||
-    pathname === "/guest/register" ||
-    pathname === "/guest/book/new";
+  const isPublicGuestRoute = pathname === "/guest/login" || pathname === "/guest/register";
 
   useEffect(() => {
     if (isAuthLoading) {
@@ -26,7 +23,8 @@ export default function GuestLayout({ children }: { children: React.ReactNode })
     }
 
     if (!currentUser) {
-      router.replace("/guest/login");
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      router.replace(`/guest/login?next=${encodeURIComponent(nextPath)}`);
       return;
     }
 

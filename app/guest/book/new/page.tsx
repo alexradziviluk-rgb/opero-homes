@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import {
   formatApartmentPrice,
@@ -60,6 +60,7 @@ function formatDate(value: string): string {
 }
 
 function GuestBookingForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const apartmentIdFromUrl = searchParams.get("apartmentId") ?? "";
@@ -84,6 +85,37 @@ function GuestBookingForm() {
   const [success, setSuccess] = useState("");
   const [quote, setQuote] = useState<QuoteResult["data"] | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+
+  function updateBookingUrl(updates: { apartmentId?: string; checkIn?: string; checkOut?: string; guests?: string }) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) nextParams.set(key, value);
+      else nextParams.delete(key);
+    });
+    router.replace(`/guest/book/new?${nextParams.toString()}`, { scroll: false });
+  }
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadProfile() {
+      try {
+        const response = await fetch("/api/guest/profile", { signal: controller.signal });
+        if (!response.ok) return;
+        const payload = (await response.json()) as { ok?: boolean; data?: { firstName?: string; lastName?: string; email?: string; phone?: string } };
+        if (!payload.ok || !payload.data) return;
+
+        setGuestName([payload.data.firstName, payload.data.lastName].filter(Boolean).join(" "));
+        setGuestPhone(payload.data.phone ?? "");
+        setGuestEmail(payload.data.email ?? "");
+      } catch {
+        // Anonymous booking remains available when no guest session exists.
+      }
+    }
+
+    void loadProfile();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,6 +269,7 @@ function GuestBookingForm() {
       }
 
       setSuccess(`Запрос отправлен. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
+      window.setTimeout(() => router.push("/guest/bookings"), 700);
     } finally {
       setIsSubmitting(false);
     }
@@ -253,7 +286,10 @@ function GuestBookingForm() {
             <div className="text-sm text-slate-300">Выберите объект</div>
             <select
               value={apartmentId}
-              onChange={(event) => setApartmentId(event.target.value)}
+              onChange={(event) => {
+                setApartmentId(event.target.value);
+                updateBookingUrl({ apartmentId: event.target.value });
+              }}
               className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
             >
               <option value="">Выберите объект</option>
@@ -265,17 +301,17 @@ function GuestBookingForm() {
 
           <label>
             <div className="text-sm text-slate-300">Дата заезда</div>
-            <input type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+            <input type="date" value={checkIn} onChange={(event) => { setCheckIn(event.target.value); updateBookingUrl({ checkIn: event.target.value }); }} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
           </label>
 
           <label>
             <div className="text-sm text-slate-300">Дата выезда</div>
-            <input type="date" value={checkOut} onChange={(event) => setCheckOut(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+            <input type="date" value={checkOut} onChange={(event) => { setCheckOut(event.target.value); updateBookingUrl({ checkOut: event.target.value }); }} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
           </label>
 
           <label>
             <div className="text-sm text-slate-300">Количество гостей</div>
-            <input type="number" min={1} value={guests} onChange={(event) => setGuests(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+            <input type="number" min={1} value={guests} onChange={(event) => { setGuests(event.target.value); updateBookingUrl({ guests: event.target.value }); }} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
           </label>
 
           <label>

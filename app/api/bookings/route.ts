@@ -35,10 +35,29 @@ function error(status: number, message: string, code?: string) {
 }
 
 async function loadBookingsForOrganization(supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>, organizationId: string) {
-  return supabase
+  const directResult = await supabase
     .from("bookings")
     .select("*")
     .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (directResult.error || (directResult.data ?? []).length > 0) {
+    return directResult;
+  }
+
+  const { data: organizationApartments, error: apartmentsError } = await supabase
+    .from("apartments")
+    .select("id")
+    .eq("organization_id", organizationId);
+
+  if (apartmentsError || !organizationApartments?.length) {
+    return directResult;
+  }
+
+  return supabase
+    .from("bookings")
+    .select("*")
+    .in("apartment_id", organizationApartments.map((apartment) => apartment.id))
     .order("created_at", { ascending: false });
 }
 
@@ -105,11 +124,17 @@ export async function GET() {
       guestName: booking.guest_name ?? booking.customer_name ?? guest?.name ?? "Гость",
       guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,
       guestEmail: ("guest_email" in booking ? booking.guest_email : null) ?? guest?.email ?? null,
-      checkIn: booking.check_in_date,
-      checkOut: booking.check_out_date,
+      checkIn: booking.check_in_date ?? booking.check_in,
+      checkOut: booking.check_out_date ?? booking.check_out,
       checkInTime: booking.check_in_time ?? null,
       checkOutTime: booking.check_out_time ?? null,
-      guests: typeof booking.guests === "number" ? booking.guests : typeof booking.adults === "number" ? booking.adults : 1,
+      guests: typeof booking.guests === "number"
+        ? booking.guests
+        : typeof booking.guests_count === "number"
+        ? booking.guests_count
+        : typeof booking.adults === "number"
+        ? booking.adults
+        : 1,
       rentalType: booking.rental_type ?? null,
       pricePerPeriod: booking.price_per_period ?? booking.nightly_rate ?? null,
       accommodationAmount: booking.accommodation_amount ?? booking.accommodation_total ?? null,

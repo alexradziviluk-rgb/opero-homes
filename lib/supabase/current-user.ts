@@ -104,6 +104,7 @@ async function loadProfileByIdOrUserId(
     .from("profiles")
     .select(profileSelect)
     .eq("id", authUserId)
+    .limit(1)
     .maybeSingle();
 
   if (profileByIdError) {
@@ -118,6 +119,8 @@ async function loadProfileByIdOrUserId(
     .from("profiles")
     .select(profileFallbackSelect)
     .eq("user_id", authUserId)
+    .order("created_at", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   if (profileByUserIdError) {

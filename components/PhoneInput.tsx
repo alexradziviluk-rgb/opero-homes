@@ -72,7 +72,7 @@ export default function PhoneInput({ value, onChange, className = "", placeholde
     const pastedCountryCode = countryCodesByLength.find((item) => pastedValue.startsWith(item.code));
     if (pastedCountryCode) {
       const localNumber = nextLocalNumber.slice(nextLocalNumber.indexOf(pastedCountryCode.code) + pastedCountryCode.code.length).trim();
-      onChange(`${pastedCountryCode.code} ${localNumber.replace(/\D/g, "")}`.trim());
+      onChange(`${pastedCountryCode.code} ${localNumber}`.trim());
       return;
     }
 
@@ -89,12 +89,12 @@ export default function PhoneInput({ value, onChange, className = "", placeholde
         className="w-40 shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
       >
         <option value="" className="bg-slate-900">Выберите страну</option>
-        {countryCodes.map((item) => <option key={item.code} value={item.code} className="bg-slate-900">{item.label}</option>)}
+        {countryCodes.map((item) => <option key={item.code} value={item.code} className="bg-slate-900" suppressHydrationWarning>{item.label}</option>)}
       </select>
       <input
         type="tel"
         inputMode="tel"
-        aria-label="Код телефона вручную"
+        aria-label="Код страны вручную"
         value={countryCode}
         onChange={(event) => updateManualCountryCode(event.target.value)}
         placeholder="+90"

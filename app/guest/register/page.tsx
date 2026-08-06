@@ -43,8 +43,10 @@ export default function GuestRegisterPage() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -89,9 +91,42 @@ export default function GuestRegisterPage() {
         return;
       }
 
-      setSuccess("Аккаунт создан. Если вход не выполнился автоматически, войдите с указанным email и паролем.");
+      const normalizedEmail = email.trim().toLowerCase();
+      setConfirmationEmail(normalizedEmail);
+      setSuccess(`Аккаунт создан. Подтвердите email ${normalizedEmail}, чтобы войти.`);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    if (!confirmationEmail) return;
+
+    setError(null);
+    setIsResending(true);
+    try {
+      const supabase = createSupabaseClient();
+      if (!supabase) {
+        setError("Повторная отправка недоступна: проверьте переменные окружения Supabase.");
+        return;
+      }
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email: confirmationEmail,
+        options: {
+          emailRedirectTo: new URL(`/auth/callback?next=${encodeURIComponent(nextPath)}`, window.location.origin).toString(),
+        },
+      });
+
+      if (resendError) {
+        setError(resendError.message);
+        return;
+      }
+
+      setSuccess(`Письмо с подтверждением отправлено на ${confirmationEmail}.`);
+    } finally {
+      setIsResending(false);
     }
   }
 
@@ -158,6 +193,14 @@ export default function GuestRegisterPage() {
 
       {error ? <p className="mt-4 text-sm text-rose-300">{error}</p> : null}
       {success ? <p className="mt-4 text-sm text-emerald-300">{success}</p> : null}
+      {confirmationEmail ? (
+        <div className="mt-4 space-y-2 text-sm text-slate-300">
+          <p>Проверьте также папку «Спам».</p>
+          <button type="button" onClick={() => void resendConfirmation()} disabled={isResending} className="text-cyan-300 hover:text-cyan-200 disabled:opacity-60">
+            {isResending ? "Отправляем..." : "Отправить письмо повторно"}
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-6 text-sm">
         <Link href="/guest/login" className="text-cyan-300 hover:text-cyan-200">

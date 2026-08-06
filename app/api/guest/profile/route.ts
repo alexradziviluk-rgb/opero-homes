@@ -11,10 +11,6 @@ function getText(value: unknown): string | null {
   return typeof value === "string" ? value.trim() : null;
 }
 
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
 async function authorizeGuest() {
   const authState = await getServerAuthState();
   if (!authState.isAuthenticated) {
@@ -52,6 +48,8 @@ export async function GET() {
       email: auth.profile.email ?? auth.user.email ?? "",
       phone: auth.profile.phone ?? "",
       address: auth.profile.address ?? "",
+      registrationDate: auth.profile.created_at,
+      emailConfirmed: Boolean(auth.user.email_confirmed_at),
     },
   });
 }
@@ -63,24 +61,15 @@ export async function PATCH(request: NextRequest) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const firstName = getText(body?.firstName);
   const lastName = getText(body?.lastName);
-  const email = getText(body?.email)?.toLowerCase() ?? null;
   const phone = getText(body?.phone) ?? "";
   const address = getText(body?.address) ?? "";
 
-  if (!firstName || !lastName || !email || !isValidEmail(email)) {
-    return NextResponse.json({ ok: false, error: "Укажите имя, фамилию и корректный email" }, { status: 400 });
+  if (!firstName || !lastName) {
+    return NextResponse.json({ ok: false, error: "Укажите имя и фамилию" }, { status: 400 });
   }
 
-  if (firstName.length > 100 || lastName.length > 100 || email.length > 255 || phone.length > 50 || address.length > 500) {
+  if (firstName.length > 100 || lastName.length > 100 || phone.length > 50 || address.length > 500) {
     return NextResponse.json({ ok: false, error: "Проверьте длину введённых данных" }, { status: 400 });
-  }
-
-  const currentEmail = (auth.user.email ?? auth.profile.email ?? "").trim().toLowerCase();
-  if (email !== currentEmail) {
-    const { error } = await auth.supabase.auth.updateUser({ email });
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
-    }
   }
 
   const { data, error } = await auth.supabase
@@ -88,7 +77,6 @@ export async function PATCH(request: NextRequest) {
     .update({
       first_name: firstName,
       last_name: lastName,
-      email,
       phone,
       address,
       updated_at: new Date().toISOString(),
@@ -106,10 +94,9 @@ export async function PATCH(request: NextRequest) {
     data: {
       firstName: data.first_name ?? "",
       lastName: data.last_name ?? "",
-      email: data.email ?? email,
+      email: data.email ?? auth.user.email ?? "",
       phone: data.phone ?? "",
       address: data.address ?? "",
     },
-    emailConfirmationRequired: email !== currentEmail,
   });
 }
