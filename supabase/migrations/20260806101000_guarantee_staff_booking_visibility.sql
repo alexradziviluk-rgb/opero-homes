@@ -12,8 +12,8 @@ create policy bookings_staff_workspace_select on public.bookings
       where member.organization_id = bookings.organization_id
         and member.user_id = auth.uid()
         and member.status = 'active'
-        and lower(trim(coalesce(member.role_code, member.role, ''))) in (
-          'owner', 'manager', 'employee', 'cleaner', 'maintenance', 'admin'
+        and lower(trim(coalesce(member.role_code, ''))) in (
+          'owner', 'manager', 'employee'
         )
     )
   );
