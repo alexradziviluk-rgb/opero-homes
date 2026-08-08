@@ -80,6 +80,8 @@ function GuestBookingForm() {
   const [guestEmail, setGuestEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -99,6 +101,8 @@ function GuestBookingForm() {
     const controller = new AbortController();
 
     async function loadProfile() {
+      setIsLoadingProfile(true);
+      setProfileError(null);
       try {
         const response = await fetch("/api/guest/profile", { signal: controller.signal });
         if (response.status === 401) {
@@ -106,15 +110,28 @@ function GuestBookingForm() {
           window.location.replace(`/guest/login?next=${encodeURIComponent(next)}`);
           return;
         }
-        if (!response.ok) return;
+        if (!response.ok) {
+          setProfileError("Не удалось загрузить профиль. Обновите страницу и попробуйте снова.");
+          return;
+        }
         const payload = (await response.json()) as { ok?: boolean; data?: { firstName?: string; lastName?: string; email?: string; phone?: string } };
-        if (!payload.ok || !payload.data) return;
+        if (!payload.ok || !payload.data) {
+          setProfileError("Не удалось загрузить профиль. Обновите страницу и попробуйте снова.");
+          return;
+        }
 
         setGuestName([payload.data.firstName, payload.data.lastName].filter(Boolean).join(" "));
         setGuestPhone(payload.data.phone ?? "");
         setGuestEmail(payload.data.email ?? "");
+        setProfileError(null);
       } catch {
-        // Anonymous booking remains available when no guest session exists.
+        if (!controller.signal.aborted) {
+          setProfileError("Не удалось загрузить профиль. Проверьте соединение и попробуйте снова.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingProfile(false);
+        }
       }
     }
 
@@ -340,6 +357,9 @@ function GuestBookingForm() {
             {quoteError ? <p className="mt-1 text-xs text-rose-300">{quoteError}</p> : null}
           </div>
 
+          {isLoadingProfile ? <p className="sm:col-span-2 text-sm text-slate-400">Загружаем данные профиля...</p> : null}
+          {profileError ? <p className="sm:col-span-2 text-sm text-rose-300">{profileError}</p> : null}
+
           <label>
             <div className="text-sm text-slate-300">Ваше имя</div>
             <input value={guestName} onChange={(event) => setGuestName(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
@@ -368,7 +388,7 @@ function GuestBookingForm() {
           <button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={isSubmitting || isLoadingQuote || !quote}
+            disabled={isSubmitting || isLoadingProfile || Boolean(profileError) || isLoadingQuote || !quote}
             className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Отправляем..." : "Отправить запрос на бронирование"}

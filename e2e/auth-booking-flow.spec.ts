@@ -113,6 +113,25 @@ test("expired guest session returns from booking to login", async ({ page }) => 
   expect(loginUrl.searchParams.get("next")).toBe(bookingPath());
 });
 
+test("profile load failure blocks booking submission with a visible error", async ({ page }) => {
+  await signInFromBookingRedirect(page);
+  await page.route("**/api/guest/profile", (route) => route.fulfill({
+    status: 500,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: false, error: "Temporary failure" }),
+  }));
+  await page.route("**/api/guest/bookings/quote", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, data: { apartmentTitle: "Published Apartment", nights: 2, guests: 2, currency: "EUR", pricePeriod: "night", pricePerPeriod: 100, accommodationAmount: 200, cleaningFee: 0, deposit: 0, discount: 0, totalAmount: 200, rentalType: "daily", maxGuests: 4, minimumStay: 1 } }),
+  }));
+
+  await page.goto(bookingPath());
+
+  await expect(page.getByText("Не удалось загрузить профиль. Обновите страницу и попробуйте снова.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Отправить запрос на бронирование" })).toBeDisabled();
+});
+
 test("booking submission uses the authenticated profile and ignores repeated submit", async ({ page }) => {
   await signInFromBookingRedirect(page);
   await page.route("**/api/guest/profile", (route) => route.fulfill({
