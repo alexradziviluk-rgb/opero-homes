@@ -3,6 +3,7 @@ import { getAIContext } from "@/lib/ai/context";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { createSupportTicket, buildHandoff } from "@/lib/support/service";
 import { checkAnonymousRateLimit, rateLimitResponse } from "@/lib/support/anonymous-security";
+import { isLiveConversationT2Enabled } from "@/lib/support/feature-flags";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
 export async function GET() {
   const context = await getAIContext("/account/support");
   if (!context.userId) return NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 });
+  if (!isLiveConversationT2Enabled()) return NextResponse.json({ ok: true, data: [] }, { headers: { "Cache-Control": "no-store" } });
   const supabase = createSupabaseServiceRoleClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Сервис обращений временно недоступен." }, { status: 503 });
   const { data, error } = await supabase.from("support_tickets").select("public_number,status,conversation_state,conversation_summary,priority,subject,created_at,updated_at,support_messages(sender_type,message,message_type,source,created_at)").eq("requester_user_id", context.userId).eq("support_messages.is_internal", false).order("created_at", { ascending: false });
