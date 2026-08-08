@@ -202,10 +202,10 @@ export default function GuestPropertyDetailsPage() {
     : true;
   const coordinates = getApartmentCoordinates(apartment);
 
-  const nights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0;
-  const weeklyPeriods = Math.max(1, Math.ceil(nights / 7));
-  const monthlyPeriods = Math.max(1, Math.ceil(nights / 30));
-  const estimatedTotal = priceInfo
+  const nights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : null;
+  const weeklyPeriods = nights === null ? 0 : Math.max(1, Math.ceil(nights / 7));
+  const monthlyPeriods = nights === null ? 0 : Math.max(1, Math.ceil(nights / 30));
+  const estimatedTotal = priceInfo && nights !== null
     ? priceInfo.period === "night"
       ? Math.max(0, priceInfo.amount * nights + (apartment.cleaningFee ?? 0) + (apartment.deposit ?? 0))
       : priceInfo.period === "week"
@@ -319,11 +319,13 @@ export default function GuestPropertyDetailsPage() {
             </label>
 
             <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-300">
-              <p>Ночей: {nights}</p>
+              <p>Ночей: {nights ?? "—"}</p>
               {requiresManagerConfirmation ? (
                 <p>Итог будет подтверждён менеджером</p>
+              ) : nights === null ? (
+                <p>Выберите даты для расчёта стоимости</p>
               ) : (
-                <p>Итоговая стоимость: {estimatedTotal.toLocaleString("ru-RU")} €</p>
+                <p>Итоговая стоимость: {estimatedTotal?.toLocaleString("ru-RU")} €</p>
               )}
             </div>
 

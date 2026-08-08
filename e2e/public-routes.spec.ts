@@ -61,6 +61,8 @@ test.describe("public catalog routing", () => {
     await expect(page).toHaveURL(/\/properties\/[^/]+$/);
     await expect(page.getByRole("heading", { name: "Календарь доступности и бронирование" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Открыть календарь" })).toBeVisible();
+    await expect(page.getByText("Выберите даты для расчёта стоимости")).toBeVisible();
+    await expect(page.getByText("Итоговая стоимость: 260 €")).toHaveCount(0);
     await expect(page).not.toHaveURL(/\/login/);
   });
 
