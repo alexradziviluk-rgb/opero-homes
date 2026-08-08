@@ -337,79 +337,6 @@ export default function NewApartmentPage() {
                     </select>
                     {errors.type ? <p className="mt-1 text-sm text-rose-400">{errors.type}</p> : null}
                   </label>
-                  <div className="sm:col-span-2">
-                    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                      <label className="block">
-                        <div className="text-sm text-slate-300">Ссылка Google Maps</div>
-                        <input
-                          value={form.googleLink}
-                          onChange={(e) => update("googleLink", e.target.value)}
-                          placeholder="https://maps.google.com/..."
-                          className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"
-                        />
-                      </label>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <button
-                          type="button"
-                          onClick={handleResolveAddress}
-                          disabled={mapsLoading}
-                          className="rounded-2xl border border-white/10 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Получить адрес
-                        </button>
-                        <p className={`text-sm ${mapsError ? "text-rose-400" : mapsStatus ? "text-emerald-300" : "text-slate-300"}`}>
-                          {mapsLoading ? "Загрузка..." : mapsError || mapsStatus || ""}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <label className="block">
-                    <div className="text-sm text-slate-300">Страна</div>
-                    <input value={form.country} onChange={(e) => update("country", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
-                  </label>
-                  <label className="block">
-                    <div className="text-sm text-slate-300">Город</div>
-                    <select value={form.city} onChange={(e) => update("city", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
-                      <option value="">Выберите город</option>
-                      {cities.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                    {errors.city ? <p className="mt-1 text-sm text-rose-400">{errors.city}</p> : null}
-                  </label>
-                  <label className="block">
-                    <div className="text-sm text-slate-300">Район</div>
-                    <input value={form.district} onChange={(e) => update("district", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
-                    {errors.district ? <p className="mt-1 text-sm text-rose-400">{errors.district}</p> : null}
-                  </label>
-                  <label className="sm:col-span-2 block">
-                    <div className="text-sm text-slate-300">Полный адрес</div>
-                    <input value={form.address} onChange={(e) => update("address", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
-                    {errors.address ? <p className="mt-1 text-sm text-rose-400">{errors.address}</p> : null}
-                  </label>
-                  <label className="block">
-                    <div className="text-sm text-slate-300">Широта</div>
-                    <input
-                      value={form.latitude}
-                      onChange={(e) => update("latitude", e.target.value)}
-                      placeholder="36.5444"
-                      inputMode="decimal"
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"
-                    />
-                    {errors.latitude ? <p className="mt-1 text-sm text-rose-400">{errors.latitude}</p> : null}
-                  </label>
-                  <label className="block">
-                    <div className="text-sm text-slate-300">Долгота</div>
-                    <input
-                      value={form.longitude}
-                      onChange={(e) => update("longitude", e.target.value)}
-                      placeholder="32.0058"
-                      inputMode="decimal"
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"
-                    />
-                    {errors.longitude ? <p className="mt-1 text-sm text-rose-400">{errors.longitude}</p> : null}
-                  </label>
-                  <p className="sm:col-span-2 text-xs text-slate-500">Координаты можно скопировать из Google Maps или OpenStreetMap.</p>
                   <label className="sm:col-span-2 block">
                     <div className="text-sm text-slate-300">Краткое описание</div>
                     <textarea value={form.shortDesc} onChange={(e) => update("shortDesc", e.target.value)} className="mt-1 h-24 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
@@ -418,6 +345,31 @@ export default function NewApartmentPage() {
               </section>
 
               <section className="order-2 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white">Адрес</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                      <label className="block">
+                        <div className="text-sm text-slate-300">Ссылка Google Maps</div>
+                        <input value={form.googleLink} onChange={(e) => update("googleLink", e.target.value)} placeholder="https://maps.google.com/..." className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                      </label>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <button type="button" onClick={handleResolveAddress} disabled={mapsLoading} className="rounded-2xl border border-white/10 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50">Получить адрес</button>
+                        <p className={`text-sm ${mapsError ? "text-rose-400" : mapsStatus ? "text-emerald-300" : "text-slate-300"}`}>{mapsLoading ? "Загрузка..." : mapsError || mapsStatus || ""}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <label className="block"><div className="text-sm text-slate-300">Страна</div><input value={form.country} onChange={(e) => update("country", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" /></label>
+                  <label className="block"><div className="text-sm text-slate-300">Город</div><select value={form.city} onChange={(e) => update("city", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"><option value="">Выберите город</option>{cities.map((option) => <option key={option} value={option}>{option}</option>)}</select>{errors.city ? <p className="mt-1 text-sm text-rose-400">{errors.city}</p> : null}</label>
+                  <label className="block"><div className="text-sm text-slate-300">Район</div><input value={form.district} onChange={(e) => update("district", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />{errors.district ? <p className="mt-1 text-sm text-rose-400">{errors.district}</p> : null}</label>
+                  <label className="sm:col-span-2 block"><div className="text-sm text-slate-300">Полный адрес</div><input value={form.address} onChange={(e) => update("address", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />{errors.address ? <p className="mt-1 text-sm text-rose-400">{errors.address}</p> : null}</label>
+                  <label className="block"><div className="text-sm text-slate-300">Широта</div><input value={form.latitude} onChange={(e) => update("latitude", e.target.value)} placeholder="36.5444" inputMode="decimal" className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />{errors.latitude ? <p className="mt-1 text-sm text-rose-400">{errors.latitude}</p> : null}</label>
+                  <label className="block"><div className="text-sm text-slate-300">Долгота</div><input value={form.longitude} onChange={(e) => update("longitude", e.target.value)} placeholder="32.0058" inputMode="decimal" className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />{errors.longitude ? <p className="mt-1 text-sm text-rose-400">{errors.longitude}</p> : null}</label>
+                  <p className="sm:col-span-2 text-xs text-slate-500">Координаты можно скопировать из Google Maps или OpenStreetMap.</p>
+                </div>
+              </section>
+
+              <section className="order-3 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Характеристики</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
@@ -496,8 +448,8 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-3 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-                <h2 className="text-lg font-semibold text-white">Условия аренды</h2>
+              <section className="order-4 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white">Цена</h2>
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <label className="inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
@@ -652,7 +604,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-7 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-5 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Фотографии</h2>
                   <p className="mt-1 text-sm text-slate-400">Фотографии можно загрузить в любой момент. Если обязательные поля ещё не заполнены, они сохранятся после заполнения и сохранения объекта.</p>
                 <div className="mt-4">
@@ -660,7 +612,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-8 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-6 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Удобства</h2>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {["Wi-Fi", "Бассейн", "Парковка", "Кондиционер", "Кухня", "Стиральная машина", "Балкон", "Лифт"].map((amenity) => (
@@ -672,7 +624,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-9 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-7 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Правила проживания</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label><div className="text-sm text-slate-300">Животные</div><select aria-label="Животные" value={form.pets} onChange={(e) => update("pets", e.target.value as ApartmentForm["pets"])} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white"><option value="negotiable">По согласованию</option><option value="allowed">Разрешены</option><option value="not_allowed">Запрещены</option></select></label>
@@ -683,7 +635,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-4 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-8 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Ответственные за уведомления</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label>
@@ -719,7 +671,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-5 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-9 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Владелец <span className="text-sm font-normal text-slate-400">(необязательно)</span></h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
@@ -737,7 +689,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="order-6 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-10 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Статус</h2>
                 <div className="mt-4 space-y-4">
                   <div>
@@ -761,7 +713,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <div className="order-10 flex items-center justify-end gap-3">
+              <div className="order-11 flex items-center justify-end gap-3">
                 <button type="button" onClick={saveDraft} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Сохранить черновик</button>
                 <button type="button" onClick={() => void create()} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">Создать объект</button>
               </div>

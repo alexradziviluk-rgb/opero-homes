@@ -27,6 +27,18 @@ test.afterAll(async () => {
 test("creates and reloads one linked internal lifecycle apartment", async ({ page }) => {
   await signInManager(page);
   await page.goto("/apartments/new", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("form > section h2").evaluateAll((headings) => headings.map((heading) => heading.textContent?.trim()))).resolves.toEqual([
+    "Основная информация",
+    "Адрес",
+    "Характеристики",
+    "Цена",
+    "Фотографии",
+    "Удобства",
+    "Правила проживания",
+    "Ответственные за уведомления",
+    "Владелец (необязательно)",
+    "Статус",
+  ]);
 
   const title = `${fixture.prefix} Lifecycle Apartment`;
   const googleMapsUrl = "https://www.google.com/maps/place/Yekta+Homes/@36.4972455,32.0843866,496m/data=!3m2!1e3!4b1!4m6!3m5!1s0x14dc987b2e4361eb:0x7db5e430eea3587b!8m2!3d36.4972412!4d32.0869615!16s%2Fg%2F1pv0dvhwr!18m1!1e1?entry=ttu";
