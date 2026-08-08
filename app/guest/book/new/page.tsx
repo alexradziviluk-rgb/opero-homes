@@ -11,6 +11,7 @@ import {
 } from "@/lib/apartments/public-catalog";
 import type { Apartment } from "@/types/apartment";
 import PhoneInput from "@/components/PhoneInput";
+import { formatBookingReference } from "@/lib/bookings/booking-reference";
 
 type QuoteResult = {
   ok: boolean;
@@ -290,8 +291,7 @@ function GuestBookingForm() {
         return;
       }
 
-      setSuccess(`Запрос отправлен. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
-      window.setTimeout(() => router.push("/guest/bookings"), 700);
+      setSuccess(`Запрос отправлен. Номер заявки: ${formatBookingReference(payload.data.id)}. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -382,7 +382,14 @@ function GuestBookingForm() {
         </div>
 
         {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
-        {success ? <p className="mt-3 text-sm text-emerald-300">{success}</p> : null}
+        {success ? (
+          <div className="mt-3 space-y-2 text-sm text-emerald-300">
+            <p>{success}</p>
+            <Link href="/guest/bookings" className="inline-flex rounded-xl border border-emerald-400/30 px-3 py-2 text-emerald-200 hover:bg-emerald-500/10">
+              Открыть мои бронирования
+            </Link>
+          </div>
+        ) : null}
 
         <div className="mt-4 flex gap-2">
           <button

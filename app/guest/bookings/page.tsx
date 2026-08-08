@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { formatBookingReference } from "@/lib/bookings/booking-reference";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 
 type GuestBookingRecord = {
@@ -106,6 +107,7 @@ export default function GuestBookingsPage() {
             return (
               <article key={booking.id} className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
                 <h2 className="text-lg font-semibold text-white">{booking.apartmentTitle}</h2>
+                <p className="mt-1 text-sm text-cyan-200">Номер заявки: {formatBookingReference(booking.id)}</p>
                 <p className="mt-1 text-sm text-slate-400">{formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}</p>
                 <p className="mt-2 text-sm text-slate-300">Статус бронирования: {status.label}</p>
                 {booking.paymentStatus ? <p className="text-sm text-slate-300">Статус оплаты: {booking.paymentStatus}</p> : null}

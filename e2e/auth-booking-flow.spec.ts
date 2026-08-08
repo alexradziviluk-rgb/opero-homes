@@ -149,7 +149,7 @@ test("booking submission uses the authenticated profile and ignores repeated sub
   await page.route("**/api/guest/bookings", async (route) => {
     submissions += 1;
     submitted = route.request().postDataJSON() as Record<string, unknown>;
-    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, data: { id: "booking-1", quote: { currency: "EUR" } } }) });
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, data: { id: "12345678-90ab-cdef-1234-567890abcdef", quote: { currency: "EUR" } } }) });
   });
 
   await page.reload();
@@ -158,6 +158,9 @@ test("booking submission uses the authenticated profile and ignores repeated sub
   await submit.dblclick();
   await expect.poll(() => submissions).toBe(1);
   expect(submitted).toMatchObject({ apartmentId: fixture.apartmentPublishedId, guestName: "E2E Guest", guestEmail: fixture.accounts.guest.email, guestPhone: "+79990001111" });
+  await expect(page.getByText("Номер заявки: Бронь 12345678")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Открыть мои бронирования" })).toHaveAttribute("href", "/guest/bookings");
+  await expect(page).toHaveURL(new RegExp(`/guest/book/new\\?apartmentId=${fixture.apartmentPublishedId}`));
 });
 
 test("an already authenticated guest can revisit login and return without re-entering profile data", async ({ page }) => {
