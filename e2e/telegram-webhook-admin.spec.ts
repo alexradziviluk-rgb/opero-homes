@@ -13,9 +13,9 @@ test.describe("Telegram webhook admin controls", () => {
   });
 
   test("safe status strips token, secret, certificate, and unknown fields", () => {
-    const status = sanitizeWebhookInfo({ ok: true, result: { url: TELEGRAM_WEBHOOK_URL, pending_update_count: 2, last_error_date: 10, last_error_message: "temporary error", max_connections: 40, allowed_updates: ["callback_query"], token: "bot-token", secret_token: "webhook-secret", certificate: "certificate" } as never });
+    const status = sanitizeWebhookInfo({ ok: true, result: { url: TELEGRAM_WEBHOOK_URL, pending_update_count: 2, last_error_date: 10, last_error_message: "temporary error", max_connections: 40, allowed_updates: ["callback_query", "message"], token: "bot-token", secret_token: "webhook-secret", certificate: "certificate" } as never });
     const serialized = JSON.stringify(status);
-    expect(status).toMatchObject({ configured: true, pending_update_count: 2, allowed_updates: ["callback_query"] });
+    expect(status).toMatchObject({ configured: true, pending_update_count: 2, allowed_updates: ["callback_query", "message"] });
     expect(serialized).not.toContain("bot-token");
     expect(serialized).not.toContain("webhook-secret");
     expect(serialized).not.toContain("certificate");
@@ -60,11 +60,11 @@ test.describe("Telegram webhook admin controls", () => {
     }
   });
 
-  test("uses production callback-only webhook and rejects localhost", () => {
+  test("uses the controlled rollout webhook update set and rejects localhost", () => {
     expect(TELEGRAM_WEBHOOK_URL).toBe("https://operohq.netlify.app/api/telegram/webhook");
     expect(TELEGRAM_WEBHOOK_URL).not.toMatch(/localhost|127\.0\.0\.1/i);
-    expect(isWebhookCompatible(sanitizeWebhookInfo({ ok: true, result: { url: TELEGRAM_WEBHOOK_URL, allowed_updates: ["callback_query"] } }))).toBe(true);
-    expect(buildSetWebhookPayload("mock-webhook-secret").allowed_updates).toEqual(["callback_query"]);
+    expect(isWebhookCompatible(sanitizeWebhookInfo({ ok: true, result: { url: TELEGRAM_WEBHOOK_URL, allowed_updates: ["callback_query", "message"] } }))).toBe(true);
+    expect(buildSetWebhookPayload("mock-webhook-secret").allowed_updates).toEqual(["callback_query", "message"]);
   });
 
   test("requires the separate setup secret without exposing it", () => {

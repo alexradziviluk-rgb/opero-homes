@@ -26,11 +26,19 @@ function allowedByRateLimit(key: string): boolean {
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const body = (await request.json().catch(() => null)) as { message?: unknown; route?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { message?: unknown; route?: unknown; conversationId?: unknown } | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   if (!message || message.length > MAX_MESSAGE_LENGTH) return NextResponse.json({ ok: false, error: "Сообщение должно содержать от 1 до 2000 символов." }, { status: 400 });
 
   const context = await getAIContext(typeof body?.route === "string" ? body.route : "/");
+  const conversationId = typeof body?.conversationId === "string" ? body.conversationId.trim() : "";
+  if (conversationId && context.userId) {
+    const supabase = createSupabaseServiceRoleClient();
+    const { data: conversation } = supabase ? await supabase.from("support_tickets").select("conversation_state").eq("public_number", conversationId).eq("requester_user_id", context.userId).maybeSingle() : { data: null };
+    if (conversation?.conversation_state === "waiting_manager") return NextResponse.json({ ok: true, message: "Менеджер скоро подключится.", role: context.role, tools: [], results: [], suggestions: [], conversationState: "waiting_manager" }, { headers: { "Cache-Control": "no-store" } });
+    if (conversation?.conversation_state === "manager_active") return NextResponse.json({ ok: true, message: "Чат с менеджером уже активен.", role: context.role, tools: [], results: [], suggestions: [], conversationState: "manager_active" }, { headers: { "Cache-Control": "no-store" } });
+    if (conversation?.conversation_state === "resolved" || conversation?.conversation_state === "closed") return NextResponse.json({ ok: true, message: "Диалог закрыт. Вы можете вернуться к Opero AI.", role: context.role, tools: [], results: [], suggestions: [], conversationState: conversation.conversation_state }, { headers: { "Cache-Control": "no-store" } });
+  }
   const rateKey = context.userId ? `user:${context.userId}` : `ip:${ip}`;
   if (!allowedByRateLimit(rateKey)) return NextResponse.json({ ok: false, error: "Слишком много запросов. Повторите позже." }, { status: 429 });
   const response = await answerWithTools(context, message);

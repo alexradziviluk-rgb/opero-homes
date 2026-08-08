@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 export const TELEGRAM_WEBHOOK_URL = "https://operohq.netlify.app/api/telegram/webhook";
-export const TELEGRAM_ALLOWED_UPDATES = ["callback_query"] as const;
+export const TELEGRAM_ALLOWED_UPDATES = ["callback_query", "message"] as const;
 
 type TelegramWebhookInfoPayload = {
   ok?: boolean;

@@ -35,3 +35,11 @@ export async function sendSupportTelegram(ticket: SupportTicket, apartmentTitle?
   if (!response.ok || !payload?.ok) return { ok: false, chatId, messageId: null, error: payload?.description || "Telegram request failed" };
   return { ok: true, chatId, messageId: payload.result?.message_id ? String(payload.result.message_id) : null };
 }
+
+export async function sendTelegramText(chatId: string, text: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId || !text) return false;
+  const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text: sanitizeSupportText(text, 4000), disable_web_page_preview: true }) });
+  const payload = await response.json().catch(() => null) as { ok?: boolean } | null;
+  return Boolean(response.ok && payload?.ok);
+}

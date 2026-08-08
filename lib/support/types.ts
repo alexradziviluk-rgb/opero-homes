@@ -1,4 +1,6 @@
 export type SupportStatus = "pending_confirmation" | "open" | "assigned" | "in_progress" | "waiting_for_client" | "resolved" | "closed" | "cancelled";
+export type SupportMessageType = "text" | "image" | "pdf" | "voice" | "system" | "telegram" | "internal_note";
+export type SupportMessageSource = "web" | "telegram" | "system";
 export type SupportPriority = "normal" | "high" | "urgent";
 export type SupportCategory = "general" | "booking" | "payment" | "refund" | "complaint" | "maintenance" | "cleaning" | "checkin" | "legal";
 
@@ -28,7 +30,7 @@ export type SupportTicket = {
   telegram_action_token: string;
   telegram_chat_id: string | null;
   telegram_message_id: string | null;
-  delivery_status: "pending" | "sent" | "failed" | "retrying";
+  delivery_status: "pending" | "sent" | "failed" | "retrying" | "partially_sent" | "all_failed" | "no_recipients";
   delivery_attempt_count?: number;
   last_attempted_at?: string | null;
   sent_at?: string | null;
@@ -36,6 +38,12 @@ export type SupportTicket = {
   updated_at: string;
   resolved_at: string | null;
   closed_at: string | null;
+  conversation_state?: "bot_active" | "waiting_manager" | "manager_active" | "resolved" | "closed";
+  conversation_summary?: string;
+  manager_joined_at?: string | null;
+  first_response_at?: string | null;
+  last_seen_at?: string | null;
+  last_typing_at?: string | null;
 };
 
 export type SupportHandoff = {
