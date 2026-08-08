@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { getCurrentUser as getCurrentUserAuth, logout as logoutAuth } from "@/lib/supabase/auth";
@@ -15,6 +15,8 @@ type CurrentUserContextValue = {
   currentUserContext: CurrentUserContext | null;
   hasPropertyAccess: boolean;
   isAuthLoading: boolean;
+  authStatus: "loading" | "anonymous" | "authenticated";
+  setAuthenticatedUser: (user: User, context: CurrentUserContext | null) => void;
   logout: () => Promise<void>;
 };
 
@@ -27,6 +29,8 @@ const CurrentUserContext = createContext<CurrentUserContextValue>({
   currentUserContext: null,
   hasPropertyAccess: false,
   isAuthLoading: true,
+  authStatus: "loading",
+  setAuthenticatedUser: () => undefined,
   logout: async () => undefined,
 });
 
@@ -36,7 +40,9 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentUserContext, setCurrentUserContext] = useState<CurrentUserContext | null>(null);
   const [hasPropertyAccess, setHasPropertyAccess] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(() => Boolean(createSupabaseClient()));
+  const [authStatus, setAuthStatus] = useState<"loading" | "anonymous" | "authenticated">(() => createSupabaseClient() ? "loading" : "anonymous");
+  const authGeneration = useRef(0);
+  const isAuthLoading = authStatus === "loading";
 
   useEffect(() => {
     const supabase = createSupabaseClient();
@@ -45,33 +51,37 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     }
 
     let isMounted = true;
+    let bootstrapSettled = false;
     const supabaseClient = supabase;
 
     async function bootstrapAuth() {
+      const generation = authGeneration.current;
       const resolved = await getCurrentUserAuth();
-      if (!isMounted) {
+      if (!isMounted || generation !== authGeneration.current) {
         return;
       }
 
       if (!resolved.currentUser) {
+        bootstrapSettled = true;
         if (resolved.errorCode === "profile_missing") {
           router.replace("/login?error=profile_missing");
         }
         setCurrentUser(null);
         setCurrentUserContext(null);
         setHasPropertyAccess(false);
-        setIsAuthLoading(false);
+        setAuthStatus("anonymous");
         return;
       }
 
       userRepository.upsert(resolved.currentUser);
+      bootstrapSettled = true;
       setCurrentUser(resolved.currentUser);
       setCurrentUserContext(resolved.currentUserContext);
       const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
       if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
         void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
       }
-      setIsAuthLoading(false);
+      setAuthStatus("authenticated");
     }
 
     void bootstrapAuth();
@@ -82,32 +92,36 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       if (!session?.user) {
         setCurrentUser(null);
         setCurrentUserContext(null);
+        setHasPropertyAccess(false);
+        if (bootstrapSettled) {
+          authGeneration.current += 1;
+          setAuthStatus("anonymous");
+        }
         return;
       }
 
-      void getCurrentUserAuth().then((resolved) => {
-        if (!isMounted) {
-          return;
-        }
-
-        if (!resolved.currentUser) {
-          setCurrentUser(null);
-          setCurrentUserContext(null);
-          setHasPropertyAccess(false);
-          if (resolved.errorCode === "profile_missing") {
-            router.replace("/login?error=profile_missing");
-            router.refresh();
+      authGeneration.current += 1;
+      const generation = authGeneration.current;
+      queueMicrotask(() => {
+        void getCurrentUserAuth().then((resolved) => {
+          if (!isMounted || generation !== authGeneration.current) {
+            return;
           }
-          return;
-        }
 
-        userRepository.upsert(resolved.currentUser);
-        setCurrentUser(resolved.currentUser);
-        setCurrentUserContext(resolved.currentUserContext);
-        const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
-        if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
-          void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
-        }
+          if (!resolved.currentUser) {
+            setAuthStatus("loading");
+            return;
+          }
+
+          userRepository.upsert(resolved.currentUser);
+          setCurrentUser(resolved.currentUser);
+          setCurrentUserContext(resolved.currentUserContext);
+          const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
+          if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
+            void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+          }
+          setAuthStatus("authenticated");
+        });
       });
     });
 
@@ -116,6 +130,14 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       subscription.unsubscribe();
     };
   }, [pathname, router]);
+
+  const setAuthenticatedUser = useCallback((user: User, context: CurrentUserContext | null) => {
+    authGeneration.current += 1;
+    userRepository.upsert(user);
+    setCurrentUser(user);
+    setCurrentUserContext(context);
+    setAuthStatus("authenticated");
+  }, []);
 
   const logout = useCallback(async () => {
     const redirectPath = currentUser?.role === "Гость" ? "/guest/login" : "/login";
@@ -175,20 +197,20 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     const guestProtectedRoots = ["/guest/bookings", "/guest/messages"];
     const isGuestProtectedRoute = pathname === "/guest" || guestProtectedRoots.some((route) => routeMatches(route));
 
-    if (!currentUser && isInternalRoute && !isAuthRoute) {
+    if (authStatus === "anonymous" && !currentUser && isInternalRoute && !isAuthRoute) {
       router.replace("/login");
       router.refresh();
       return;
     }
 
-    if (!currentUser && isGuestProtectedRoute && !isAuthRoute) {
+    if (authStatus === "anonymous" && !currentUser && isGuestProtectedRoute && !isAuthRoute) {
       const next = encodeURIComponent(pathname);
       router.replace(`/guest/login?next=${next}`);
       router.refresh();
       return;
     }
 
-    if (!currentUser) {
+    if (authStatus !== "authenticated" || !currentUser) {
       return;
     }
 
@@ -209,11 +231,11 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       router.replace("/admin");
       router.refresh();
     }
-  }, [currentUser, isAuthLoading, pathname, router]);
+  }, [authStatus, currentUser, isAuthLoading, pathname, router]);
 
   const value = useMemo(
-    () => ({ currentUser, currentUserContext, hasPropertyAccess, isAuthLoading, logout }),
-    [currentUser, currentUserContext, hasPropertyAccess, isAuthLoading, logout],
+    () => ({ currentUser, currentUserContext, hasPropertyAccess, isAuthLoading, authStatus, setAuthenticatedUser, logout }),
+    [currentUser, currentUserContext, hasPropertyAccess, isAuthLoading, authStatus, setAuthenticatedUser, logout],
   );
 
   return <CurrentUserContext.Provider value={value}>{children}</CurrentUserContext.Provider>;

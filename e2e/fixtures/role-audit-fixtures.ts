@@ -26,6 +26,7 @@ export type RoleAuditFixture = {
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
+const CLEANUP_TIMEOUT_MS = 15_000;
 
 export function assertRoleAuditLocalEnv() {
   if (process.env.E2E_LOCAL !== "true" || !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)) {
@@ -36,14 +37,27 @@ export function assertRoleAuditLocalEnv() {
 
 function adminClient(): SupabaseClient {
   assertRoleAuditLocalEnv();
-  return createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      fetch: async (input, init) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), CLEANUP_TIMEOUT_MS);
+        try {
+          return await fetch(input, { ...init, signal: controller.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+      },
+    },
+  });
 }
 
 function runLocalSql(statement: string) {
   const file = join(tmpdir(), `role-audit-sql-${randomUUID()}.sql`);
   writeFileSync(file, statement, "utf8");
   try {
-    execFileSync("cmd.exe", ["/d", "/s", "/c", `supabase db query --local --file ${file}`], { encoding: "utf8", stdio: "pipe" });
+    execFileSync("cmd.exe", ["/d", "/s", "/c", `supabase db query --local --file ${file}`], { encoding: "utf8", stdio: "pipe", timeout: CLEANUP_TIMEOUT_MS, killSignal: "SIGTERM" });
   } finally {
     unlinkSync(file);
   }
@@ -58,6 +72,7 @@ async function createAccount(admin: SupabaseClient, prefix: string, role: AuditR
   const password = `${randomBytes(18).toString("base64url")}A1!`;
   const result = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { first_name: firstName, last_name: "E2E Role Audit", role: authRole, e2e_prefix: prefix } });
   if (result.error || !result.data.user) throw new Error(`Unable to create local ${role}: ${result.error?.message ?? email}`);
+  console.info("[role-audit-fixture]", { event: "auth-created", role, fixture: prefix, userPresent: Boolean(result.data.user), at: new Date().toISOString() });
   return { role, email, password, id: result.data.user.id };
 }
 
@@ -89,6 +104,7 @@ export async function seedRoleAuditFixtures(): Promise<RoleAuditFixture> {
   runLocalSql("grant select, update on public.profiles to authenticated;");
   runLocalSql("grant select on public.bookings, public.clients, public.notifications, public.notification_events to authenticated;");
   const prefix = `E2E-ROLE-AUDIT-${Date.now()}`;
+  console.info("[role-audit-fixture]", { event: "seed-start", fixture: prefix, at: new Date().toISOString() });
   const roleSpecs: Array<[AuditRole, string, string]> = [
     ["admin", "E2E Admin", "owner"],
     ["manager", "E2E Manager", "manager"],
@@ -138,7 +154,9 @@ export async function seedRoleAuditFixtures(): Promise<RoleAuditFixture> {
   await insertOrThrow(admin, "notification_events", { id: eventId, organization_id: organizationId, event_type: "booking_created", entity_type: "booking", entity_id: pendingBookingId, booking_id: pendingBookingId, apartment_id: apartmentPublishedId, payload: { prefix }, idempotency_key: `${prefix}-notification`, created_by_user_id: accounts.admin.id });
   await insertOrThrow(admin, "notifications", roleSpecs.slice(0, 5).map(([role]) => ({ organization_id: organizationId, recipient_user_id: accounts[role].id, event_id: eventId, title: `${prefix} Notification`, message: `${prefix} notification`, action_url: `/bookings/${pendingBookingId}` })));
 
-  return { prefix, organizationId, apartmentPublishedId, apartmentDraftId, clientId, confirmedBookingId, pendingBookingId, cleaningTaskId, maintenanceTaskId, ownerBlockId, accounts, storagePaths: [] };
+  const fixture = { prefix, organizationId, apartmentPublishedId, apartmentDraftId, clientId, confirmedBookingId, pendingBookingId, cleaningTaskId, maintenanceTaskId, ownerBlockId, accounts, storagePaths: [] };
+  console.info("[role-audit-fixture]", { event: "seed-finish", fixture: prefix, recordsSeeded: true, at: new Date().toISOString() });
+  return fixture;
 }
 
 export async function signInRole(account: AuditAccount) {
@@ -149,15 +167,44 @@ export async function signInRole(account: AuditAccount) {
   return result.data.session;
 }
 
-export async function cleanupRoleAuditFixtures(fixture: RoleAuditFixture) {
-  const admin = adminClient();
-  void admin;
-  runLocalSql(`delete from public.organizations where id = '${fixture.organizationId}';`);
-  for (const account of Object.values(fixture.accounts)) {
-    const result = await admin.auth.admin.deleteUser(account.id);
-    if (result.error && result.error.status !== 404) throw new Error(`Unable to cleanup ${account.role}: ${result.error.message}`);
+function cleanupLog(event: "start" | "finish" | "timeout" | "error", step: string, detail?: string) {
+  console.info("[role-audit-cleanup]", { event, step, at: new Date().toISOString(), ...(detail ? { detail } : {}) });
+}
+
+async function cleanupStep(step: string, action: () => Promise<void>) {
+  cleanupLog("start", step);
+  try {
+    await Promise.race([
+      action(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`cleanup timeout after ${CLEANUP_TIMEOUT_MS}ms`)), CLEANUP_TIMEOUT_MS)),
+    ]);
+    cleanupLog("finish", step);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    cleanupLog(detail.includes("timeout") ? "timeout" : "error", step, detail);
   }
-  for (const storagePath of fixture.storagePaths) rmSync(storagePath, { force: true });
+}
+
+export async function cleanupRoleAuditFixtures(fixture?: RoleAuditFixture) {
+  cleanupLog("start", "cleanup");
+  if (!fixture) {
+    cleanupLog("finish", "cleanup", "no fixture");
+    return;
+  }
+  const admin = adminClient();
+  await cleanupStep("organization", async () => {
+    runLocalSql(`delete from public.organizations where id = '${fixture.organizationId}';`);
+  });
+  for (const account of Object.values(fixture.accounts)) {
+    await cleanupStep(`auth:${account.role}`, async () => {
+      const result = await admin.auth.admin.deleteUser(account.id);
+      if (result.error && result.error.status !== 404) throw new Error(`Unable to cleanup ${account.role}: ${result.error.message}`);
+    });
+  }
+  await cleanupStep("storage", async () => {
+    for (const storagePath of fixture.storagePaths) rmSync(storagePath, { force: true });
+  });
+  cleanupLog("finish", "cleanup");
 }
 
 export function storagePath(prefix: string, role: AuditRole) { return join(tmpdir(), `${prefix}-${role}-storage.json`); }

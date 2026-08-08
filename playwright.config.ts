@@ -49,6 +49,7 @@ export default defineConfig({
     baseURL: configuredBaseUrl,
     storageState: process.env.E2E_STORAGE_STATE || undefined,
     trace: "retain-on-failure",
+    serviceWorkers: "block",
     ...devices["Desktop Chrome"],
   },
   webServer: process.env.E2E_BASE_URL && !isLocalE2E

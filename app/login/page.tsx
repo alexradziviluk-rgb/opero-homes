@@ -85,7 +85,7 @@ function formatLoginError(
 
 export function StaffLoginPage() {
   const router = useRouter();
-  const { currentUser, isAuthLoading } = useCurrentUser();
+  const { currentUser, isAuthLoading, setAuthenticatedUser } = useCurrentUser();
   const [nextPath] = useState(() => {
     if (typeof window === "undefined") return "/admin";
     const params = new URLSearchParams(window.location.search);
@@ -130,6 +130,7 @@ export function StaffLoginPage() {
       }
 
       setError(null);
+      setAuthenticatedUser(result.currentUser, result.currentUserContext);
 
       try {
         router.replace(result.currentUser.role === "Гость" ? getHomeRouteForUser(result.currentUser) : nextPath);
@@ -157,7 +158,12 @@ export function StaffLoginPage() {
           Для менеджеров, уборщиков и другого персонала. После принятия приглашения входите по email и созданному паролю.
         </p>
 
-        <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+        <form
+          className="mt-8 space-y-4"
+          onSubmit={handleSubmit}
+          data-auth-ready={!isAuthLoading && !isSubmitting ? "true" : "false"}
+          data-auth-status={isAuthLoading ? "loading" : "ready"}
+        >
           <label className="block">
             <span className="text-sm text-slate-300">Email</span>
             <input

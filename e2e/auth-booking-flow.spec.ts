@@ -3,26 +3,57 @@ import { cleanupRoleAuditFixtures, seedRoleAuditFixtures, type RoleAuditFixture 
 
 let fixture: RoleAuditFixture;
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const bookingPath = () => `/guest/book/new?apartmentId=${fixture.apartmentPublishedId}&checkIn=2030-01-10&checkOut=2030-01-12&guests=2`;
 
 async function signInFromBookingRedirect(page: Page) {
+  console.info("[auth-booking]", { event: "login-start", fixture: fixture.prefix, at: new Date().toISOString() });
   await page.goto(bookingPath());
   await expect(page).toHaveURL(/\/guest\/login\?next=/);
   const next = new URL(page.url()).searchParams.get("next");
   expect(next).toBe(bookingPath());
 
-  await page.getByLabel("Email").first().fill(fixture.accounts.guest.email);
-  await page.getByLabel("Пароль").fill(fixture.accounts.guest.password);
-  await page.getByRole("button", { name: "Войти" }).click();
+  const emailInput = page.locator('form').first().locator('input[type="email"]');
+  const passwordInput = page.locator('form').first().locator('input[type="password"]');
+  const submit = page.getByRole("button", { name: "Войти" });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0) {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 15_000 });
+    }
+    await emailInput.fill(fixture.accounts.guest.email);
+    await passwordInput.fill(fixture.accounts.guest.password);
+    try {
+      await expect(emailInput).toHaveValue(fixture.accounts.guest.email, { timeout: 2_000 });
+      await expect(passwordInput).toHaveValue(fixture.accounts.guest.password, { timeout: 2_000 });
+    } catch (error) {
+      if (attempt === 2) throw error;
+      continue;
+    }
+    await expect(submit).toBeEnabled({ timeout: 15_000 });
+    await submit.click();
+    if (!page.url().includes("/login")) break;
+    await expect(page.locator("p.text-rose-300")).toHaveCount(0, { timeout: 2_000 }).catch(() => undefined);
+    break;
+  }
   await expect(page).toHaveURL(new RegExp(`/guest/book/new\\?apartmentId=${fixture.apartmentPublishedId}`));
+  await expect(page.locator("text=Загрузка профиля...")).toHaveCount(0, { timeout: 15_000 });
+  console.info("[auth-booking]", { event: "login-success", fixture: fixture.prefix, url: page.url(), at: new Date().toISOString() });
 }
 
 test.beforeAll(async () => {
   fixture = await seedRoleAuditFixtures();
+  console.info("[auth-booking]", { event: "fixture-ready", fixture: fixture.prefix, at: new Date().toISOString() });
 });
 
 test.afterAll(async () => {
+  console.info("[auth-booking]", { event: "cleanup-start", fixture: fixture?.prefix ?? "", at: new Date().toISOString() });
   await cleanupRoleAuditFixtures(fixture);
+  console.info("[auth-booking]", { event: "cleanup-finish", fixture: fixture?.prefix ?? "", at: new Date().toISOString() });
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  console.info("[auth-booking]", { event: "test-end", test: testInfo.title, status: testInfo.status, url: page.url(), at: new Date().toISOString() });
 });
 
 test("anonymous booking request is rejected by the API", async ({ request }) => {
