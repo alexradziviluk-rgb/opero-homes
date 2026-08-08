@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const status =
       result.errorCode === "permission_denied"
         ? 403
-        : result.errorCode === "booking_conflict"
+        : result.errorCode === "booking_conflict" || result.errorCode === "apartment_unavailable"
         ? 409
         : 422;
 

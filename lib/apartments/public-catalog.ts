@@ -134,6 +134,12 @@ export function isApartmentPublic(apartment: Apartment): boolean {
   return apartment.publicationStatus === "published";
 }
 
+export function isApartmentManuallyUnavailable(apartment: Apartment): boolean {
+  const status = normalizeSearchValue(String(apartment.status ?? ""));
+  const availability = normalizeSearchValue(String(apartment.availability ?? ""));
+  return status === "занято" || availability === "занят";
+}
+
 export function matchesApartmentLocation(apartment: Apartment, query: string): boolean {
   const normalizedQuery = normalizeSearchValue(query);
   if (!normalizedQuery) {

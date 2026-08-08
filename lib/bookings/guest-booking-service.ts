@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getApartmentPriceInfo, isApartmentPublic } from "@/lib/apartments/public-catalog";
+import { getApartmentPriceInfo, isApartmentManuallyUnavailable, isApartmentPublic } from "@/lib/apartments/public-catalog";
 import { getServerCurrentUserContext } from "@/lib/supabase/server";
 import type { Apartment } from "@/types/apartment";
 
@@ -202,7 +202,10 @@ function toApartment(row: ApartmentRow): ServerApartment {
 }
 
 function isBookableApartment(apartment: Apartment): boolean {
-  return isApartmentPublic(apartment) && normalize(apartment.availability) !== "на обслуживании" && normalize(apartment.status) !== "черновик";
+  return isApartmentPublic(apartment)
+    && !isApartmentManuallyUnavailable(apartment)
+    && normalize(apartment.availability) !== "на обслуживании"
+    && normalize(apartment.status) !== "черновик";
 }
 
 function parsePriceAmount(apartment: Apartment, rentalType: GuestBookingInput["rentalType"]): { amount: number; currency: string; period: "night" | "week" | "month" } | null {

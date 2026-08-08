@@ -199,7 +199,7 @@ function GuestBookingForm() {
         const payload = (await response.json()) as QuoteResult;
         if (!response.ok || !payload.ok || !payload.data) {
           setQuote(null);
-          setQuoteError(payload.errorCode === "booking_conflict" ? "Выбранные даты уже заняты." : payload.errorMessage ?? "Не удалось рассчитать стоимость.");
+          setQuoteError(payload.errorCode === "booking_conflict" ? "Выбранные даты уже заняты." : payload.errorCode === "apartment_unavailable" ? "На данный момент бронирование этого объекта невозможно: объект занят." : payload.errorMessage ?? "Не удалось рассчитать стоимость.");
           return;
         }
 

@@ -17,6 +17,7 @@ import {
   getApartmentPriceInfo,
   getApartmentCoordinates,
   getApartmentPublicLocation,
+  isApartmentManuallyUnavailable,
   isApartmentPublic,
 } from "@/lib/apartments/public-catalog";
 import type { ApartmentPhoto } from "@/types/apartment";
@@ -188,6 +189,7 @@ export default function GuestPropertyDetailsPage() {
   const safeIndex = Math.min(activePhotoIndex, Math.max(0, renderableGallery.length - 1));
   const activePhoto = renderableGallery[safeIndex];
   const priceInfo = getApartmentPriceInfo(apartment);
+  const manuallyUnavailable = isApartmentManuallyUnavailable(apartment);
   const occupiedRanges = bookings.filter(
     (booking) => booking.apartmentId === apartment.id && (booking.status === "confirmed" || booking.status === "checked_in"),
   );
@@ -215,6 +217,7 @@ export default function GuestPropertyDetailsPage() {
   const requiresManagerConfirmation = priceInfo?.period === "month";
 
   function openBookingPanel() {
+    if (manuallyUnavailable) return;
     if (isAuthLoading) return;
 
     if (!currentUser) {
@@ -336,9 +339,10 @@ export default function GuestPropertyDetailsPage() {
             <button
               type="button"
               onClick={openBookingPanel}
+              disabled={manuallyUnavailable}
               className="mt-2 inline-flex w-full justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20"
             >
-              Забронировать
+              {manuallyUnavailable ? "Бронирование временно недоступно" : "Забронировать"}
             </button>
           </div>
         </aside>
@@ -398,14 +402,20 @@ export default function GuestPropertyDetailsPage() {
           </button>
         ) : (
           <div className="mt-4 space-y-4">
-            <PublicAvailabilityCalendar
-              apartmentId={apartment.id}
-              bookings={bookings}
-              checkIn={checkIn}
-              checkOut={checkOut}
-              onChange={handleCalendarChange}
-              onInvalidRange={(message) => setCalendarError(message)}
-            />
+            {manuallyUnavailable ? (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                На данный момент бронирование этого объекта невозможно: объект занят.
+              </div>
+            ) : (
+              <PublicAvailabilityCalendar
+                apartmentId={apartment.id}
+                bookings={bookings}
+                checkIn={checkIn}
+                checkOut={checkOut}
+                onChange={handleCalendarChange}
+                onInvalidRange={(message) => setCalendarError(message)}
+              />
+            )}
 
             {calendarError ? (
               <p className="rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{calendarError}</p>

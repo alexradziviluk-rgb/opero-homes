@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   const result = await buildGuestBookingQuote(supabase, input);
   if (!result.ok) {
-    const status = result.errorCode === "apartment_not_found" ? 404 : result.errorCode === "booking_conflict" ? 409 : 422;
+    const status = result.errorCode === "apartment_not_found" ? 404 : result.errorCode === "booking_conflict" || result.errorCode === "apartment_unavailable" ? 409 : 422;
     return NextResponse.json(result, { status });
   }
 
