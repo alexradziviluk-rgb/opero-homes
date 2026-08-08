@@ -145,8 +145,19 @@ test("booking submission uses the authenticated profile and ignores repeated sub
     body: JSON.stringify({ ok: true, data: { apartmentTitle: "Published Apartment", nights: 2, guests: 2, currency: "EUR", pricePeriod: "night", pricePerPeriod: 100, accommodationAmount: 200, cleaningFee: 0, deposit: 0, discount: 0, totalAmount: 200, rentalType: "daily", maxGuests: 4, minimumStay: 1 } }),
   }));
   let submissions = 0;
+  let accountLoads = 0;
   let submitted: Record<string, unknown> | null = null;
   await page.route("**/api/guest/bookings", async (route) => {
+    if (route.request().method() === "GET") {
+      accountLoads += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, data: [{ id: "12345678-90ab-cdef-1234-567890abcdef", apartmentTitle: "Published Apartment", checkIn: "2030-01-10", checkOut: "2030-01-12", totalAmount: 200, status: "pending", paymentStatus: "unpaid", source: "public_website", createdAt: "2030-01-01T00:00:00.000Z" }] }),
+      });
+      return;
+    }
+
     submissions += 1;
     submitted = route.request().postDataJSON() as Record<string, unknown>;
     await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, data: { id: "12345678-90ab-cdef-1234-567890abcdef", quote: { currency: "EUR" } } }) });
@@ -159,8 +170,15 @@ test("booking submission uses the authenticated profile and ignores repeated sub
   await expect.poll(() => submissions).toBe(1);
   expect(submitted).toMatchObject({ apartmentId: fixture.apartmentPublishedId, guestName: "E2E Guest", guestEmail: fixture.accounts.guest.email, guestPhone: "+79990001111" });
   await expect(page.getByText("Номер заявки: Бронь 12345678")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Открыть мои бронирования" })).toHaveAttribute("href", "/guest/bookings");
-  await expect(page).toHaveURL(new RegExp(`/guest/book/new\\?apartmentId=${fixture.apartmentPublishedId}`));
+  await page.getByRole("link", { name: "Открыть мои бронирования" }).click();
+  await expect(page).toHaveURL(/\/guest\/bookings$/);
+  await expect(page.getByRole("heading", { name: "Мои бронирования" })).toBeVisible();
+  await expect(page.getByText("Номер заявки: Бронь 12345678")).toBeVisible();
+  const accountLoadsBeforeRefresh = accountLoads;
+  await page.reload();
+  await expect(page.getByText("Номер заявки: Бронь 12345678")).toBeVisible();
+  expect(accountLoads).toBeGreaterThan(accountLoadsBeforeRefresh);
+  expect(submissions).toBe(1);
 });
 
 test("an already authenticated guest can revisit login and return without re-entering profile data", async ({ page }) => {
