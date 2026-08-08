@@ -131,8 +131,32 @@ export default function NewApartmentPage() {
   const [responsibleOptions, setResponsibleOptions] = useState<AssigneeItem[]>([]);
   const [backupOptions, setBackupOptions] = useState<AssigneeItem[]>([]);
   const router = useRouter();
-  const requiredFieldErrors = validateForm(form);
-  const canUploadPhotos = Object.keys(requiredFieldErrors).length === 0;
+
+  function getValidationSummary(validationErrors: Record<string, string>) {
+    const labels: Record<string, string> = {
+      title: "Название объекта",
+      type: "Тип объекта",
+      city: "Город",
+      district: "Район",
+      address: "Полный адрес",
+      rooms: "Комнаты",
+      bedrooms: "Спальни",
+      beds: "Кровати",
+      bathrooms: "Ванные комнаты",
+      maxGuests: "Максимум гостей",
+      latitude: "Широта",
+      longitude: "Долгота",
+      rentalTypes: "Тип аренды",
+      dailyPrice: "Цена за сутки",
+      minimumNights: "Минимум ночей",
+      weeklyPrice: "Цена за неделю",
+      minimumWeeks: "Минимум недель",
+      monthlyPrice: "Цена за месяц",
+      minimumMonths: "Минимум месяцев",
+    };
+
+    return Object.keys(validationErrors).map((key) => labels[key] ?? key).join(", ");
+  }
 
   useEffect(() => {
     async function loadAssignees() {
@@ -163,7 +187,7 @@ export default function NewApartmentPage() {
     const validationErrors = validateForm(form);
     if (Object.keys(validationErrors).length) {
       setErrors(validationErrors);
-      throw new Error("Сначала заполните обязательные поля выше.");
+      return;
     }
 
     const draft = buildApartment({ ...form, publicationStatus: "draft" }, apartmentId);
@@ -202,7 +226,7 @@ export default function NewApartmentPage() {
     const validationErrors = validateForm(form);
     if (Object.keys(validationErrors).length) {
       setErrors(validationErrors);
-      showToast("Пожалуйста, заполните обязательные поля");
+      showToast(`Не заполнены поля: ${getValidationSummary(validationErrors)}`);
       return;
     }
 
@@ -253,7 +277,7 @@ export default function NewApartmentPage() {
     const validationErrors = validateForm(form);
     if (Object.keys(validationErrors).length) {
       setErrors(validationErrors);
-      showToast("Пожалуйста, заполните обязательные поля");
+      showToast(`Не заполнены поля: ${getValidationSummary(validationErrors)}`);
       return;
     }
 
@@ -636,9 +660,9 @@ export default function NewApartmentPage() {
 
               <section className="order-7 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Фотографии</h2>
-                <p className="mt-1 text-sm text-slate-400">После заполнения обязательных полей фотографии загрузятся в этот же объект автоматически.</p>
+                  <p className="mt-1 text-sm text-slate-400">Фотографии можно загрузить в любой момент. Если обязательные поля ещё не заполнены, они сохранятся после заполнения и сохранения объекта.</p>
                 <div className="mt-4">
-                  <ApartmentPhotoManager apartmentId={apartmentId} photos={photos} onChange={handlePhotosChange} onBeforeUpload={prepareApartmentForPhotos} disabled={!canUploadPhotos} />
+                  <ApartmentPhotoManager apartmentId={apartmentId} photos={photos} onChange={handlePhotosChange} onBeforeUpload={prepareApartmentForPhotos} />
                 </div>
               </section>
 
