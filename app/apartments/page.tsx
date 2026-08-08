@@ -47,8 +47,8 @@ export default function ApartmentsPage() {
   const router = useRouter();
   const { currentUser } = useCurrentUser();
   const [localApartments, setLocalApartments] = useState<Apartment[]>([]);
+  const canManagePublication = currentUser ? hasEffectivePermission(currentUser, "properties.manage") : false;
   const canManagePropertyDefinition = currentUser ? hasEffectivePermission(currentUser, "apartments.manage") : false;
-  const canManagePublication = currentUser ? hasEffectivePermission(currentUser, "properties.manage") || canManagePropertyDefinition : false;
   const canDeleteProperty = currentUser ? hasEffectivePermission(currentUser, "apartments.manage") : false;
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
@@ -140,6 +140,20 @@ export default function ApartmentsPage() {
     });
 
     setLocalApartments((items) => items.map((item) => (item.id === id ? updated : item)));
+  }
+
+  async function handleAvailabilityStatus(apartment: Apartment) {
+    if (!canManagePropertyDefinition || normalizeStatus(apartment.status) === "черновик") return;
+
+    const isOccupied = normalizeStatus(apartment.status) === "занято";
+    const updated = await saveApartmentToSupabase({
+      ...apartment,
+      status: isOccupied ? "Свободно" : "Занято",
+      availability: isOccupied ? "Свободен" : "Занят",
+      updatedAt: new Date().toISOString(),
+    });
+
+    setLocalApartments((items) => items.map((item) => (item.id === apartment.id ? updated : item)));
   }
 
   async function handleResponsibleUser(apartment: Apartment, responsibleUserId: string) {
@@ -276,9 +290,15 @@ export default function ApartmentsPage() {
                         <td className="px-4 py-3 text-slate-300">{a.rooms}</td>
                         <td className="px-4 py-3 text-slate-300 whitespace-pre-line">{getRentalCostText(a)}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${occupiedApartmentIds.has(a.id) ? 'bg-rose-500/20 text-rose-300' : normalizeStatus(a.status) === 'свободно' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
-                            {occupiedApartmentIds.has(a.id) ? "Занято" : a.status}
-                          </span>
+                          <button
+                            type="button"
+                            title="Быстро изменить статус объекта"
+                            disabled={!canManagePropertyDefinition || normalizeStatus(a.status) === "черновик"}
+                            onClick={(event) => { event.stopPropagation(); void handleAvailabilityStatus(a); }}
+                            className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${occupiedApartmentIds.has(a.id) || normalizeStatus(a.status) === "занято" ? "bg-rose-500/20 text-rose-300 hover:bg-rose-500/30" : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"}`}
+                          >
+                            {occupiedApartmentIds.has(a.id) ? "Занято по брони" : a.status}
+                          </button>
                         </td>
 
                         <td className="px-4 py-3 text-slate-300">{a.availability}</td>
