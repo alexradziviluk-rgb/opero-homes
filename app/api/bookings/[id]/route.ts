@@ -5,6 +5,7 @@ import { isStaffRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { processNotificationQueue } from "@/lib/notifications/queue";
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
+import { formatBookingReference } from "@/lib/bookings/booking-reference";
 
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
 const BOOKING_REQUEST_STATUSES = new Set(["pending", "confirmed", "rejected", "cancelled"]);
@@ -123,7 +124,7 @@ export async function GET(
     ok: true,
     data: {
       id: booking.id,
-      bookingNumber: booking.booking_number ?? `Бронь ${String(booking.id).slice(0, 8)}`,
+      bookingNumber: booking.booking_number ?? formatBookingReference(String(booking.id)),
       apartmentId: booking.apartment_id,
       apartmentTitle: apartment?.title ?? "Объект",
       clientId: booking.client_id ?? null,
