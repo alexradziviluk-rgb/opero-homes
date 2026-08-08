@@ -10,7 +10,7 @@ import {
 import { logServerAuthError } from "@/lib/supabase/server-auth-log";
 import { getRoleCodeFromContext, isStaffRoleCode } from "@/lib/supabase/role-code";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const currentPathWithSearch = `${pathname}${request.nextUrl.search}`;
   const isStaffAuthRoute = pathname === "/staff/login";
