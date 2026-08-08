@@ -19,6 +19,7 @@ export type RoleAuditFixture = {
   cleaningTaskId: string;
   maintenanceTaskId: string;
   ownerBlockId: string;
+  lifecycleApartmentIds: string[];
   accounts: Record<AuditRole, AuditAccount>;
   storagePaths: string[];
 };
@@ -156,7 +157,7 @@ export async function seedRoleAuditFixtures(): Promise<RoleAuditFixture> {
   await insertOrThrow(admin, "notification_events", { id: eventId, organization_id: organizationId, event_type: "booking_created", entity_type: "booking", entity_id: pendingBookingId, booking_id: pendingBookingId, apartment_id: apartmentPublishedId, payload: { prefix }, idempotency_key: `${prefix}-notification`, created_by_user_id: accounts.admin.id });
   await insertOrThrow(admin, "notifications", roleSpecs.slice(0, 5).map(([role]) => ({ organization_id: organizationId, recipient_user_id: accounts[role].id, event_id: eventId, title: `${prefix} Notification`, message: `${prefix} notification`, action_url: `/bookings/${pendingBookingId}` })));
 
-  const fixture = { prefix, organizationId, apartmentPublishedId, apartmentDraftId, clientId, confirmedBookingId, pendingBookingId, cleaningTaskId, maintenanceTaskId, ownerBlockId, accounts, storagePaths: [] };
+  const fixture = { prefix, organizationId, apartmentPublishedId, apartmentDraftId, clientId, confirmedBookingId, pendingBookingId, cleaningTaskId, maintenanceTaskId, ownerBlockId, lifecycleApartmentIds: [], accounts, storagePaths: [] };
   console.info("[role-audit-fixture]", { event: "seed-finish", fixture: prefix, recordsSeeded: true, at: new Date().toISOString() });
   return fixture;
 }
@@ -205,6 +206,30 @@ export async function readBookingForAudit(bookingId: string) {
   return result.data;
 }
 
+export async function readApartmentForAuditByTitle(title: string) {
+  const admin = adminClient();
+  const result = await admin
+    .from("apartments")
+    .select("id,organization_id,name,publication_status,daily_price,rental_types")
+    .eq("name", title)
+    .maybeSingle();
+
+  if (result.error) throw new Error(`Unable to read apartment audit row: ${result.error.message}`);
+  return result.data ? { ...result.data, title: result.data.name } : null;
+}
+
+export async function readApartmentForAuditById(apartmentId: string) {
+  const admin = adminClient();
+  const result = await admin
+    .from("apartments")
+    .select("id,organization_id,name,publication_status,daily_price,rental_types")
+    .eq("id", apartmentId)
+    .maybeSingle();
+
+  if (result.error) throw new Error(`Unable to read apartment audit row: ${result.error.message}`);
+  return result.data ? { ...result.data, title: result.data.name } : null;
+}
+
 function cleanupLog(event: "start" | "finish" | "timeout" | "error", step: string, detail?: string) {
   console.info("[role-audit-cleanup]", { event, step, at: new Date().toISOString(), ...(detail ? { detail } : {}) });
 }
@@ -231,7 +256,7 @@ export async function cleanupRoleAuditFixtures(fixture?: RoleAuditFixture) {
   }
   const admin = adminClient();
   await cleanupStep("organization", async () => {
-    for (const apartmentId of [fixture.apartmentPublishedId, fixture.apartmentDraftId]) {
+    for (const apartmentId of [fixture.apartmentPublishedId, fixture.apartmentDraftId, ...fixture.lifecycleApartmentIds]) {
       const prefix = `organizations/${fixture.organizationId}/apartments/${apartmentId}`;
       const listed = await admin.storage.from("apartment-photos").list(prefix, { limit: 1000 });
       if (listed.error) throw new Error(`Unable to list photo objects: ${listed.error.message}`);

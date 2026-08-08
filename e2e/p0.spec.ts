@@ -153,7 +153,8 @@ test("task is created through apartment selection", async ({ page }) => {
   await expect(page.getByLabel("Ответственный").locator("option").nth(1)).toBeAttached();
   await page.getByLabel("Ответственный").selectOption({ index: 1 });
   await expect(page.getByLabel("Ответственный")).not.toHaveValue("");
-  await page.locator('input[type="datetime-local"]').fill("2027-01-10T12:00");
+  await page.getByLabel("Дата выполнения").fill("2027-01-10");
+  await page.getByLabel("Время выполнения").selectOption("12:00");
   await page.locator("form button[type=submit]").click();
   await expect.poll(() => taskPayload?.apartmentId).toBe(fixture.apartmentA);
   await expect(page.getByText("Таур Fixture A").last()).toBeVisible();
