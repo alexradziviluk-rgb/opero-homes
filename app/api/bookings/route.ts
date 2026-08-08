@@ -196,13 +196,16 @@ export async function POST(request: Request) {
   const organizationId = auth.context.organization.id;
   const { data: apartment, error: apartmentError } = await supabase
     .from("apartments")
-    .select("id,max_guests,rental_types,daily_price,weekly_price,monthly_price,cleaning_fee,deposit")
+    .select("id,status,availability,max_guests,rental_types,daily_price,weekly_price,monthly_price,cleaning_fee,deposit")
     .eq("organization_id", organizationId)
     .eq("id", apartmentId)
     .maybeSingle();
 
   if (apartmentError) return error(422, apartmentError.message, apartmentError.code);
   if (!apartment) return error(404, "Apartment not found", "apartment_not_found");
+  if (apartment.status === "Занято" || apartment.availability === "Занят") {
+    return error(409, "На данный момент бронирование этого объекта невозможно: объект занят", "apartment_unavailable");
+  }
   if (guests > Number(apartment.max_guests ?? 0)) {
     return error(400, "Guest count exceeds apartment capacity", "guests_exceed_capacity");
   }
@@ -306,6 +309,8 @@ export async function POST(request: Request) {
     apartment_id: apartmentId,
     check_in_date: checkIn,
     check_out_date: checkOut,
+    check_in: checkIn,
+    check_out: checkOut,
     adults: guests,
     children: 0,
     infants: 0,

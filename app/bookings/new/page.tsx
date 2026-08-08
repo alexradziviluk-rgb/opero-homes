@@ -100,6 +100,7 @@ function NewBookingPageContent() {
   }, []);
 
   const selectedApartment = apartments.find((apartment) => apartment.id === form.apartmentId);
+  const selectedApartmentUnavailable = selectedApartment?.status === "Занято" || selectedApartment?.availability === "Занят";
   const allowedRentalTypes = selectedApartment
     ? (["daily", "weekly", "monthly"] as const).filter((type) => selectedApartment.rentalTypes[type])
     : [];
@@ -198,6 +199,7 @@ function NewBookingPageContent() {
     const todayIso = new Date().toISOString().slice(0, 10);
 
     if (!form.apartmentId) e.apartmentId = "Выберите объект";
+    if (selectedApartmentUnavailable) e.apartmentId = "На данный момент бронирование этого объекта невозможно: объект занят";
     if (!form.guestName?.trim()) e.guestName = "Имя гостя обязательно";
     if (!form.checkIn) e.checkIn = "Дата заезда обязательна";
     if (!form.checkOut) e.checkOut = "Дата выезда обязательна";
@@ -332,7 +334,9 @@ function NewBookingPageContent() {
 
     if (!response.ok || !payload?.ok) {
       setIsSaving(false);
-      if (payload?.code === "booking_conflict" && payload.conflict) {
+      if (payload?.code === "apartment_unavailable") {
+        setErrors((previous) => ({ ...previous, apartmentId: payload.error ?? "На данный момент бронирование этого объекта невозможно" }));
+      } else if (payload?.code === "booking_conflict" && payload.conflict) {
         setErrors((previous) => ({
           ...previous,
           dates: `Объект уже забронирован с ${formatDate(payload.conflict!.checkIn)} по ${formatDate(payload.conflict!.checkOut)}`,
@@ -427,6 +431,7 @@ function NewBookingPageContent() {
                         <option key={a.id} value={a.id}>{a.title} — {a.city}</option>
                       ))}
                     </select>
+                    {selectedApartmentUnavailable ? <p className="mt-1 text-sm text-amber-300">На данный момент бронирование этого объекта невозможно: объект занят</p> : null}
                     {errors.apartmentId ? <p className="text-rose-400 text-sm">{errors.apartmentId}</p> : null}
                   </label>
 
