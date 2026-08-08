@@ -264,8 +264,8 @@ export default function NewApartmentPage() {
       update("latitude", result.latitude);
       update("longitude", result.longitude);
       setMapsStatus("Адрес успешно определён");
-    } catch {
-      setMapsError("Вставьте корректную ссылку Google Maps");
+    } catch (error) {
+      setMapsError(error instanceof Error && error.message === "invalid" ? "Вставьте ссылку Google Maps" : "Не удалось определить адрес по этой ссылке");
       setMapsStatus("");
     } finally {
       setMapsLoading(false);

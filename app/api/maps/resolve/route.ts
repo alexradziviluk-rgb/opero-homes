@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
+import { isGoogleMapsLink, normalizeGoogleMapsUrl } from "@/lib/maps/google-maps";
 
 export const runtime = "nodejs";
 
@@ -28,13 +29,7 @@ type NominatimResult = {
 };
 
 function isAllowedMapsUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return ["google.com", "www.google.com", "maps.google.com", "maps.app.goo.gl", "goo.gl"].includes(url.hostname)
-      && (url.hostname === "maps.google.com" || url.hostname === "maps.app.goo.gl" || url.hostname === "goo.gl" || url.pathname.startsWith("/maps"));
-  } catch {
-    return false;
-  }
+  return isGoogleMapsLink(value);
 }
 
 function coordinatesFromText(value: string) {
@@ -93,11 +88,12 @@ async function nominatimRequest(endpoint: "search" | "reverse", params: Record<s
 }
 
 async function resolveAddress(value: string) {
-  let resolvedUrl = value;
-  const parsed = new URL(value);
+  const normalizedUrl = normalizeGoogleMapsUrl(value);
+  let resolvedUrl = normalizedUrl;
+  const parsed = new URL(normalizedUrl);
   if (parsed.hostname === "maps.app.goo.gl" || parsed.hostname === "goo.gl") {
-    const response = await fetch(value, { redirect: "follow", signal: AbortSignal.timeout(10_000) });
-    resolvedUrl = response.url || value;
+    const response = await fetch(normalizedUrl, { redirect: "follow", signal: AbortSignal.timeout(10_000) });
+    resolvedUrl = response.url || normalizedUrl;
   }
 
   const coordinates = coordinatesFromText(resolvedUrl);
