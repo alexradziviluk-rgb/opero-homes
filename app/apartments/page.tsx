@@ -47,8 +47,8 @@ export default function ApartmentsPage() {
   const router = useRouter();
   const { currentUser } = useCurrentUser();
   const [localApartments, setLocalApartments] = useState<Apartment[]>([]);
-  const canManagePublication = currentUser ? hasEffectivePermission(currentUser, "properties.manage") : false;
   const canManagePropertyDefinition = currentUser ? hasEffectivePermission(currentUser, "apartments.manage") : false;
+  const canManagePublication = currentUser ? hasEffectivePermission(currentUser, "properties.manage") || canManagePropertyDefinition : false;
   const canDeleteProperty = currentUser ? hasEffectivePermission(currentUser, "apartments.manage") : false;
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
