@@ -2,6 +2,7 @@ import type { Apartment } from "@/types/apartment";
 import type { ApartmentPhoto } from "@/types/apartment";
 import type { Booking } from "@/types/booking";
 import { bookingsOverlap, isBlockingBooking } from "@/lib/bookings/booking-conflicts";
+import { extractGoogleMapsCoordinates } from "@/lib/maps/google-maps";
 
 type SupportedCurrency = "EUR" | "USD" | "TRY" | "RUB";
 type PricingPeriod = "night" | "week" | "month";
@@ -320,8 +321,13 @@ export function getApartmentPublicNumber(apartment: Apartment): string {
 }
 
 export function getApartmentCoordinates(apartment: Apartment): { latitude: number; longitude: number } | null {
+  const googleCoordinates = apartment.googleLink ? extractGoogleMapsCoordinates(apartment.googleLink) : null;
   const latitudeRaw = typeof apartment.latitude === "number" ? apartment.latitude : Number(String(apartment.latitude ?? "").trim());
   const longitudeRaw = typeof apartment.longitude === "number" ? apartment.longitude : Number(String(apartment.longitude ?? "").trim());
+
+  if (googleCoordinates) {
+    return googleCoordinates;
+  }
 
   if (!Number.isFinite(latitudeRaw) || !Number.isFinite(longitudeRaw)) {
     return null;

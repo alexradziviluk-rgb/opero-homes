@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderClientTemplate, renderStaffTemplate } from "@/lib/notifications/templates";
 import { loadPreferencesMap, resolveStaffRecipients } from "@/lib/notifications/recipients";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import type {
   CreateBookingNotificationInput,
   InAppNotificationRow,
@@ -118,9 +119,10 @@ export async function createBookingNotifications(params: {
   request: CreateBookingNotificationInput;
 }): Promise<CreateBookingNotificationResult> {
   const { supabase, organizationId, actorUserId, request } = params;
+  const writeClient = createSupabaseServiceRoleClient() ?? supabase;
 
   const persisted = await upsertEvent({
-    supabase,
+    supabase: writeClient,
     row: toEventInsertRow({
       organizationId,
       createdByUserId: actorUserId,
@@ -270,7 +272,7 @@ export async function createBookingNotifications(params: {
   }
 
   if (notificationRows.length > 0) {
-    const { error } = await supabase
+    const { error } = await writeClient
       .from("notifications")
       .upsert(notificationRows, { onConflict: "organization_id,event_id,recipient_user_id" });
 
@@ -280,7 +282,7 @@ export async function createBookingNotifications(params: {
   }
 
   if (deliveryRows.length > 0) {
-    const { error } = await supabase
+    const { error } = await writeClient
       .from("notification_deliveries")
       .upsert(deliveryRows, { onConflict: "organization_id,event_id,recipient_key,channel,template_key" });
 

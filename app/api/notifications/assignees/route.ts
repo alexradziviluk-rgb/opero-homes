@@ -25,7 +25,8 @@ export async function GET() {
   const { data: members, error: membersError } = await supabase
     .from("organization_members")
     .select("user_id,role_code,additional_role_codes")
-    .eq("organization_id", auth.context.organization.id);
+    .eq("organization_id", auth.context.organization.id)
+    .eq("status", "active");
 
   if (membersError) {
     return NextResponse.json({ ok: false, error: membersError.message }, { status: 422 });

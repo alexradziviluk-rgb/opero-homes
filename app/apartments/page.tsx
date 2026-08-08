@@ -110,14 +110,28 @@ export default function ApartmentsPage() {
 
   const apartments = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
+    const idQuery = normalizedQuery.replace(/^id\s*-?\s*/i, "").replace(/\D/g, "");
     return localApartments.filter((apartment) => {
-      const matchesSearch = !normalizedQuery || [apartment.title, apartment.unitNumber ?? "", apartment.city, apartment.district, apartment.address].some((value) => value.toLocaleLowerCase("ru-RU").includes(normalizedQuery));
+      const matchesId = Boolean(idQuery) && String(apartment.internalNumber ?? "").startsWith(idQuery);
+      const matchesSearch = !normalizedQuery || matchesId || [apartment.title, apartment.unitNumber ?? "", apartment.city, apartment.district, apartment.address].some((value) => value.toLocaleLowerCase("ru-RU").includes(normalizedQuery));
       const isOccupied = occupiedApartmentIds.has(apartment.id);
       const matchesFilter = availabilityFilter === "all"
         || (availabilityFilter === "occupied" && isOccupied)
         || (availabilityFilter === "available" && !isOccupied && normalizeStatus(apartment.status) !== "черновик")
         || (availabilityFilter === "draft" && normalizeStatus(apartment.status) === "черновик");
       return matchesSearch && matchesFilter;
+    }).sort((left, right) => {
+      if (!idQuery) return 0;
+      const leftId = String(left.internalNumber ?? "");
+      const rightId = String(right.internalNumber ?? "");
+      const leftMatches = leftId.startsWith(idQuery);
+      const rightMatches = rightId.startsWith(idQuery);
+      if (leftMatches !== rightMatches) return leftMatches ? -1 : 1;
+      if (!leftMatches) return 0;
+      const leftIsExact = leftId === idQuery;
+      const rightIsExact = rightId === idQuery;
+      if (leftIsExact !== rightIsExact) return leftIsExact ? -1 : 1;
+      return Number(leftId) - Number(rightId);
     });
   }, [availabilityFilter, localApartments, occupiedApartmentIds, searchQuery]);
 

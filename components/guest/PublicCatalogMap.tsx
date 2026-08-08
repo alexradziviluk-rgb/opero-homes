@@ -32,10 +32,6 @@ const mapCopy = {
   tr: { hide: "Haritayı gizle", fullscreen: "Tam ekran", collapse: "Daralt", details: "Detaylar", book: "Rezervasyon", satellite: "Uydu", street: "Harita" },
 } as const;
 
-function getCoordinateKey(latitude: number, longitude: number): string {
-  return `${latitude.toFixed(6)}:${longitude.toFixed(6)}`;
-}
-
 function FitAllMarkers({ points }: { points: LatLngTuple[] }) {
   const map = useMap();
 
@@ -116,28 +112,11 @@ export default function PublicCatalogMap({
 }) {
   const copy = mapCopy[language];
   const items = useMemo<ApartmentMapItem[]>(() => {
-    const coordinateGroups = new Map<string, number>();
-
     return apartments
       .map((apartment) => {
         const coordinates = getApartmentCoordinates(apartment);
         if (!coordinates) {
           return null;
-        }
-
-        const coordinateKey = getCoordinateKey(coordinates.latitude, coordinates.longitude);
-        const duplicateIndex = coordinateGroups.get(coordinateKey) ?? 0;
-        coordinateGroups.set(coordinateKey, duplicateIndex + 1);
-        const duplicateCount = apartments.filter((item) => {
-          const itemCoordinates = getApartmentCoordinates(item);
-          return itemCoordinates ? getCoordinateKey(itemCoordinates.latitude, itemCoordinates.longitude) === coordinateKey : false;
-        }).length;
-
-        if (duplicateCount > 1) {
-          const angle = (duplicateIndex / duplicateCount) * Math.PI * 2 - Math.PI / 2;
-          const offset = 0.00035;
-          coordinates.latitude += Math.cos(angle) * offset;
-          coordinates.longitude += Math.sin(angle) * offset;
         }
 
         return {

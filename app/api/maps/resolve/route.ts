@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
-import { isGoogleMapsLink, normalizeGoogleMapsUrl } from "@/lib/maps/google-maps";
+import { extractGoogleMapsCoordinates, isGoogleMapsLink, normalizeGoogleMapsUrl } from "@/lib/maps/google-maps";
 
 export const runtime = "nodejs";
 
@@ -30,27 +30,6 @@ type NominatimResult = {
 
 function isAllowedMapsUrl(value: string) {
   return isGoogleMapsLink(value);
-}
-
-function coordinatesFromText(value: string) {
-  const patterns = [
-    /!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
-    /@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
-    /[?&](?:q|query|ll)=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = value.match(pattern);
-    if (match) {
-      const latitude = Number(match[1]);
-      const longitude = Number(match[2]);
-      if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
-        return { latitude, longitude };
-      }
-    }
-  }
-
-  return null;
 }
 
 function queryFromGoogleUrl(value: string) {
@@ -99,7 +78,7 @@ async function resolveAddress(value: string) {
     }
   }
 
-  const coordinates = coordinatesFromText(resolvedUrl);
+  const coordinates = extractGoogleMapsCoordinates(resolvedUrl);
   const geocoded = coordinates
     ? await nominatimRequest("reverse", { lat: String(coordinates.latitude), lon: String(coordinates.longitude) })
     : await nominatimRequest("search", { q: queryFromGoogleUrl(resolvedUrl) });

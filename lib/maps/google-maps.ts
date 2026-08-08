@@ -27,6 +27,26 @@ export function isGoogleMapsLink(value: string) {
   }
 }
 
+export function extractGoogleMapsCoordinates(value: string): { latitude: number; longitude: number } | null {
+  const patterns = [
+    /!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+    /[?&](?:q|query|ll)=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (!match) continue;
+
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+    if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+      return { latitude, longitude };
+    }
+  }
+
+  return null;
+}
+
 export async function resolveGoogleMapsAddress(url: string): Promise<AddressResolution> {
   const normalizedUrl = normalizeGoogleMapsUrl(url);
   if (!isGoogleMapsLink(normalizedUrl)) {
