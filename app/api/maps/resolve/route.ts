@@ -8,6 +8,10 @@ type NominatimAddress = {
   house_number?: string;
   neighbourhood?: string;
   suburb?: string;
+  village?: string;
+  quarter?: string;
+  city_district?: string;
+  county?: string;
   town?: string;
   city?: string;
   municipality?: string;
@@ -94,7 +98,7 @@ async function resolveAddress(value: string) {
 
   const address = result.address ?? {};
   const city = address.city || address.town || address.municipality || address.state || "";
-  const district = address.suburb || address.neighbourhood || "";
+  const district = address.suburb || address.neighbourhood || address.village || address.quarter || address.city_district || address.county || "";
   const street = [address.road, address.house_number].filter(Boolean).join(" ");
 
   return {
