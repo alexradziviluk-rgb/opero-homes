@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { isStaffRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
+import { formatBookingReference } from "@/lib/bookings/booking-reference";
 
 type CreateBookingPayload = {
   id?: string;
@@ -117,7 +118,7 @@ export async function GET() {
       const guest = booking.primary_guest_id ? guestById.get(booking.primary_guest_id) : undefined;
       return {
       id: booking.id,
-      bookingNumber: booking.booking_number ?? `Бронь ${String(booking.id).slice(0, 8)}`,
+      bookingNumber: booking.booking_number ?? formatBookingReference(String(booking.id)),
       apartmentId: booking.apartment_id,
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
       clientId: booking.client_id ?? null,

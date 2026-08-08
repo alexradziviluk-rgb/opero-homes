@@ -103,6 +103,7 @@ export async function seedRoleAuditFixtures(): Promise<RoleAuditFixture> {
   const admin = adminClient();
   runLocalSql("grant select, update on public.profiles to authenticated;");
   runLocalSql("grant select on public.bookings, public.clients, public.notifications, public.notification_events to authenticated;");
+  runLocalSql("grant select on public.bookings to service_role;");
   const prefix = `E2E-ROLE-AUDIT-${Date.now()}`;
   console.info("[role-audit-fixture]", { event: "seed-start", fixture: prefix, at: new Date().toISOString() });
   const roleSpecs: Array<[AuditRole, string, string]> = [
@@ -116,6 +117,7 @@ export async function seedRoleAuditFixtures(): Promise<RoleAuditFixture> {
   ];
   const accounts = {} as Record<AuditRole, AuditAccount>;
   for (const [role, name, authRole] of roleSpecs) accounts[role] = await createAccount(admin, prefix, role, name, authRole);
+  runLocalSql(`update public.profiles set phone = '+79990001111' where id = '${accounts.guest.id}';`);
 
   const organizationId = randomUUID();
   const apartmentPublishedId = randomUUID();
@@ -165,6 +167,18 @@ export async function signInRole(account: AuditAccount) {
   const result = await client.auth.signInWithPassword({ email: account.email, password: account.password });
   if (result.error || !result.data.session) throw new Error(`Unable to sign in ${account.role}: ${result.error?.message ?? account.email}`);
   return result.data.session;
+}
+
+export async function readBookingForAudit(bookingId: string) {
+  const admin = adminClient();
+  const result = await admin
+    .from("bookings")
+    .select("id,organization_id,apartment_id,primary_guest_id,guest_name,guest_email,guest_phone,guest_comment,check_in,check_out,check_in_date,check_out_date,guests_count,status,request_status")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (result.error) throw new Error(`Unable to read booking audit row: ${result.error.message}`);
+  return result.data;
 }
 
 function cleanupLog(event: "start" | "finish" | "timeout" | "error", step: string, detail?: string) {

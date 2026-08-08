@@ -7,6 +7,8 @@ import {
 } from "@/lib/bookings/guest-booking-service";
 import { getServerCurrentUserContext } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 function parseGuests(value: unknown): number {
   const numberValue = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
@@ -24,7 +26,7 @@ export async function GET() {
     return NextResponse.json(result, { status });
   }
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { cleanupRoleAuditFixtures, seedRoleAuditFixtures, storagePath, type AuditRole, type RoleAuditFixture, assertRoleAuditLocalEnv } from "./fixtures/role-audit-fixtures";
+import { cleanupRoleAuditFixtures, readBookingForAudit, seedRoleAuditFixtures, storagePath, type AuditRole, type RoleAuditFixture, assertRoleAuditLocalEnv } from "./fixtures/role-audit-fixtures";
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 let fixture: RoleAuditFixture;
@@ -278,6 +278,92 @@ test("guest sees public booking surface but cannot access staff or owner data", 
   await expectDenied(page, "/account/properties");
   const ownerProperties = await page.request.get("/api/owner/properties");
   expect(ownerProperties.status()).toBe(403);
+});
+
+test("authenticated booking reaches guest account and staff without duplicate or cross-user exposure", async ({ browser }) => {
+  const marker = "E2E-REVENUE-BOOKING";
+  const guest = await openRole(browser, "guest");
+  await gotoRolePage(guest.page, `/guest/book/new?apartmentId=${fixture.apartmentPublishedId}&checkIn=2030-01-10&checkOut=2030-01-12&guests=2`);
+  await expect(guest.page.getByRole("button", { name: "Отправить запрос на бронирование" })).toBeEnabled({ timeout: 20_000 });
+  await guest.page.getByLabel("Ваше имя").fill(`${fixture.prefix} Revenue Guest`);
+  await guest.page.getByLabel("Код страны вручную").fill("+7");
+  await guest.page.getByLabel("Телефон").fill("9990001111");
+  await guest.page.getByLabel("Email").fill(fixture.accounts.guest.email);
+  await guest.page.getByLabel("Комментарий").fill(marker);
+
+  const createResponsePromise = guest.page.waitForResponse(
+    (response) => response.url().endsWith("/api/guest/bookings") && response.request().method() === "POST",
+    { timeout: 15_000 },
+  );
+  const createRequestPromise = guest.page.waitForRequest((request) => request.url().endsWith("/api/guest/bookings") && request.method() === "POST", { timeout: 15_000 });
+  await guest.page.getByRole("button", { name: "Отправить запрос на бронирование" }).click();
+  const createRequest = await createRequestPromise;
+  const createResponse = await createResponsePromise;
+  const createPayload = (await createResponse.json()) as { ok: boolean; data?: { id?: string } };
+  const createBody = createRequest.postDataJSON() as Record<string, unknown>;
+  expect(createBody).toMatchObject({ guestEmail: fixture.accounts.guest.email, guestComment: marker });
+  expect(createBody.guestPhone).toMatch(/\d{5,}/);
+  expect(createResponse.status(), JSON.stringify(createPayload)).toBe(201);
+  expect(createPayload.ok).toBe(true);
+  const bookingId = createPayload.data?.id;
+  expect(bookingId).toMatch(/^[0-9a-f-]{36}$/i);
+
+  const booking = await readBookingForAudit(bookingId as string);
+  expect(booking).toMatchObject({
+    id: bookingId,
+    organization_id: fixture.organizationId,
+    apartment_id: fixture.apartmentPublishedId,
+    primary_guest_id: fixture.accounts.guest.id,
+    guest_email: fixture.accounts.guest.email,
+    guest_phone: "+79990001111",
+    guest_comment: marker,
+    check_in: "2030-01-10",
+    check_out: "2030-01-12",
+    guests_count: 2,
+    status: "pending",
+    request_status: "pending",
+  });
+
+  const successText = (await guest.page.getByText(/Номер заявки: Бронь [A-F0-9]{8}/).first().textContent()) ?? "";
+  const guestReference = successText.match(/Номер заявки: Бронь [A-F0-9]{8}/)?.[0] ?? "";
+  expect(guestReference).toMatch(/^Номер заявки: Бронь [A-F0-9]{8}$/);
+  await guest.page.getByRole("link", { name: "Открыть мои бронирования" }).click();
+  await expect(guest.page).toHaveURL(/\/guest\/bookings$/);
+  const guestBookingsResponse = await guest.page.request.get("/api/guest/bookings");
+  const guestBookingsPayload = (await guestBookingsResponse.json()) as { ok?: boolean; data?: Array<{ id: string }>; errorMessage?: string };
+  expect(guestBookingsResponse.status(), JSON.stringify(guestBookingsPayload)).toBe(200);
+  expect(guestBookingsPayload.data?.filter((item) => item.id === bookingId), JSON.stringify(guestBookingsPayload)).toHaveLength(1);
+  await expect(guest.page.getByText(guestReference)).toBeVisible();
+  await guest.page.reload();
+  await expect(guest.page.getByText(guestReference)).toBeVisible();
+
+  const manager = await openRole(browser, "manager");
+  const staffResponse = await manager.page.request.get("/api/bookings");
+  expect(staffResponse.status()).toBe(200);
+  const staffPayload = (await staffResponse.json()) as { ok: boolean; data?: Array<Record<string, unknown>> };
+  const staffBooking = staffPayload.data?.find((item) => item.id === bookingId);
+  expect(staffBooking).toMatchObject({
+    id: bookingId,
+    bookingNumber: expect.stringMatching(/^Бронь [A-F0-9]{8}$/),
+    apartmentId: fixture.apartmentPublishedId,
+    apartmentTitle: `${fixture.prefix} Published Apartment`,
+    guestEmail: fixture.accounts.guest.email,
+    guestPhone: "+79990001111",
+    checkIn: "2030-01-10",
+    checkOut: "2030-01-12",
+    guests: 2,
+    status: "pending",
+    requestStatus: "pending",
+  });
+  await gotoRolePage(manager.page, "/bookings?status=pending");
+  await expect(manager.page.getByText("E2E Role Audit").first()).toBeVisible();
+  await expect(manager.page.getByText(`${fixture.prefix} Published Apartment`).first()).toBeVisible();
+
+  const propertyOwner = await openRole(browser, "propertyOwner");
+  const foreignGuestBookings = await propertyOwner.page.request.get("/api/guest/bookings");
+  expect(foreignGuestBookings.status()).toBe(200);
+  const foreignPayload = (await foreignGuestBookings.json()) as { data?: Array<{ id: string }> };
+  expect(foreignPayload.data?.some((item) => item.id === bookingId)).toBe(false);
 });
 
 test("property owner is isolated to owned property and cannot read private booking data", async ({ browser }) => {
