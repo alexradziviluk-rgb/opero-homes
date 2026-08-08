@@ -47,6 +47,16 @@ function getApartmentLabel(apartment: Apartment): string {
   return `${apartment.title}${apartment.internalNumber ? ` · ID-${apartment.internalNumber}` : ""}`;
 }
 
+function getLocalDateParts(value: string): { date: string; time: string } {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { date: "", time: "" };
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return {
+    date: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+    time: `${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`,
+  };
+}
+
 type TaskBoardProps = {
   filterType?: "cleaning" | "technical" | "all";
   canManage: boolean;
@@ -100,7 +110,8 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
   const [taskType, setTaskType] = useState<TaskType>(filterType === "all" ? "cleaning" : filterType ?? "other");
   const [apartmentId, setApartmentId] = useState("");
   const [assignedUserId, setAssignedUserId] = useState("");
-  const [dueAt, setDueAt] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [dueTime, setDueTime] = useState("12:00");
   const [priority, setPriority] = useState<TaskPriority>("normal");
   const [checklistText, setChecklistText] = useState("");
   const [users, setUsers] = useState<Assignee[]>([]);
@@ -148,7 +159,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
   }, [activeFilterType, filterType]);
 
   function resetForm() {
-    setTitle(""); setApartmentId(""); setAssignedUserId(""); setDueAt(""); setPriority("normal"); setChecklistText(""); setEditingTaskId(null);
+    setTitle(""); setApartmentId(""); setAssignedUserId(""); setDueDate(""); setDueTime("12:00"); setPriority("normal"); setChecklistText(""); setEditingTaskId(null);
   }
 
   function editTask(task: Task) {
@@ -157,7 +168,9 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
     setTaskType(task.taskType);
     setApartmentId(task.apartmentId ?? "");
     setAssignedUserId(task.assignedUserId ?? "");
-    setDueAt(task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 16) : "");
+    const dueParts = task.dueAt ? getLocalDateParts(task.dueAt) : { date: "", time: "12:00" };
+    setDueDate(dueParts.date);
+    setDueTime(dueParts.time);
     setPriority(task.priority ?? "normal");
     setChecklistText((task.checklist ?? []).map((item) => item.title).join("\n"));
     setShowForm(true);
@@ -177,7 +190,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
       setError("Выберите ответственного сотрудника");
       return;
     }
-    if (!dueAt) {
+    if (!dueDate || !dueTime) {
       setError("Укажите срок выполнения");
       return;
     }
@@ -195,7 +208,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
         assignedUserId,
         ...(editingTaskId ? { id: editingTaskId } : {}),
         checklistItems,
-        dueAt: new Date(dueAt).toISOString(),
+        dueAt: new Date(`${dueDate}T${dueTime}`).toISOString(),
         priority,
       }),
     });
@@ -289,16 +302,25 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
             <option value="">Ответственный</option>
             {users.map((user) => <option key={user.userId} value={user.userId}>{user.firstName} {user.lastName} · {user.roleCode}</option>)}
           </select>
-          <label className="grid gap-1 text-xs text-slate-400">
-            Дата и время выполнения
-            <input
-              type="datetime-local"
-              aria-label="Дата и время выполнения"
-              value={dueAt}
-              onChange={(event) => setDueAt(event.target.value)}
-              className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-            />
-          </label>
+          <div className="grid gap-2 text-xs text-slate-400">
+            <span>Срок выполнения</span>
+            <div className="grid grid-cols-2 gap-2">
+              <label>
+                <span className="sr-only">Дата выполнения</span>
+                <input type="date" aria-label="Дата выполнения" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100" />
+              </label>
+              <label>
+                <span className="sr-only">Время выполнения</span>
+                <select aria-label="Время выполнения" value={dueTime} onChange={(event) => setDueTime(event.target.value)} className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+                  {Array.from({ length: 15 }, (_, index) => `${String(index + 8).padStart(2, "0")}:00`).map((time) => <option key={time} value={time}>{time}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setDueDate(new Date().toISOString().slice(0, 10))} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5">Сегодня</button>
+              <button type="button" onClick={() => { const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); setDueDate(tomorrow.toISOString().slice(0, 10)); }} className="rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-300 hover:bg-white/5">Завтра</button>
+            </div>
+          </div>
           <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             {Object.entries(PRIORITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
