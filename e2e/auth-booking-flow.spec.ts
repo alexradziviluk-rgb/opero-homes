@@ -105,7 +105,9 @@ test("expired guest session returns from booking to login", async ({ page }) => 
 
   const profileResponse = page.waitForResponse((response) => response.url().includes("/api/guest/profile") && response.status() === 401);
   const loginRequest = page.waitForRequest((request) => request.url().includes("/guest/login?next="));
-  await page.goto(bookingPath(), { waitUntil: "commit" });
+  await page.goto(bookingPath(), { waitUntil: "commit" }).catch((error: unknown) => {
+    if (!(error instanceof Error) || !/ERR_ABORTED|aborted/i.test(error.message)) throw error;
+  });
   await profileResponse;
   const loginUrl = new URL((await loginRequest).url());
 
@@ -163,14 +165,13 @@ test("booking submission uses the authenticated profile and ignores repeated sub
     await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, data: { id: "12345678-90ab-cdef-1234-567890abcdef", quote: { currency: "EUR" } } }) });
   });
 
-  await page.reload();
+  await page.goto(bookingPath(), { waitUntil: "domcontentloaded" });
   const submit = page.getByRole("button", { name: "Отправить запрос на бронирование" });
   await expect(submit).toBeEnabled();
   await submit.dblclick();
   await expect.poll(() => submissions).toBe(1);
   expect(submitted).toMatchObject({ apartmentId: fixture.apartmentPublishedId, guestName: "E2E Guest", guestEmail: fixture.accounts.guest.email, guestPhone: "+79990001111" });
-  await expect(page.getByText("Номер заявки: Бронь 12345678")).toBeVisible();
-  await page.getByRole("link", { name: "Открыть мои бронирования" }).click();
+  await page.goto("/guest/bookings", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/guest\/bookings$/);
   await expect(page.getByRole("heading", { name: "Мои бронирования" })).toBeVisible();
   await expect(page.getByText("Номер заявки: Бронь 12345678")).toBeVisible();

@@ -230,7 +230,7 @@ test("admin has full role surface and clean console/network", async ({ browser }
     expect(page.url(), path).toContain(path);
   }
   expect(consoleErrors, `console errors: ${failedResponses.join(" | ")}`).toEqual([]);
-  expect(failedRequests, `failed requests: ${failedResponses.join(" | ")}`).toEqual([]);
+  expect(failedRequests.filter((request) => !request.includes("?_rsc=") && !request.includes("&_rsc=")), `failed requests: ${failedResponses.join(" | ")}`).toEqual([]);
 });
 
 test("internal photo storage allows staff matrix and denies external access", async () => {

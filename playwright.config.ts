@@ -57,7 +57,7 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL && !isLocalE2E
     ? undefined
     : {
-        command: "npm run dev -- --port 3201",
+        command: "npm run build && npm run start -- --port 3201",
         url: `${localBaseUrl}/login`,
         reuseExistingServer: false,
         timeout: 120_000,
