@@ -23,6 +23,7 @@ type NominatimResult = {
   lat: string;
   lon: string;
   display_name: string;
+  name?: string;
   address?: NominatimAddress;
 };
 
@@ -66,6 +67,12 @@ function queryFromGoogleUrl(value: string) {
   return placeMatch ? placeMatch[1].replace(/\+/g, " ") : "";
 }
 
+function titleFromGoogleUrl(value: string) {
+  const url = new URL(value);
+  const placeMatch = decodeURIComponent(url.pathname).match(/\/place\/([^/]+)/);
+  return placeMatch ? placeMatch[1].replace(/\+/g, " ").trim() : "";
+}
+
 function labelCity(value: string) {
   return value.toLowerCase() === "alanya" ? "Аланья" : value;
 }
@@ -102,6 +109,7 @@ async function resolveAddress(value: string) {
   const street = [address.road, address.house_number].filter(Boolean).join(" ");
 
   return {
+    title: titleFromGoogleUrl(resolvedUrl) || result.name || "",
     city: labelCity(city),
     district,
     address: street || result.display_name,
