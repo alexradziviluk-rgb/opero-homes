@@ -101,6 +101,11 @@ function GuestBookingForm() {
     async function loadProfile() {
       try {
         const response = await fetch("/api/guest/profile", { signal: controller.signal });
+        if (response.status === 401) {
+          const next = `${window.location.pathname}${window.location.search}`;
+          window.location.replace(`/guest/login?next=${encodeURIComponent(next)}`);
+          return;
+        }
         if (!response.ok) return;
         const payload = (await response.json()) as { ok?: boolean; data?: { firstName?: string; lastName?: string; email?: string; phone?: string } };
         if (!payload.ok || !payload.data) return;

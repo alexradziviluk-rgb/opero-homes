@@ -95,6 +95,24 @@ test("guest login returns to booking and autofills the existing profile", async 
   await expect(page.getByLabel("Email")).toHaveValue(fixture.accounts.guest.email);
 });
 
+test("expired guest session returns from booking to login", async ({ page }) => {
+  await signInFromBookingRedirect(page);
+  await page.route("**/api/guest/profile", (route) => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: false, error: "Authentication required" }),
+  }));
+
+  const profileResponse = page.waitForResponse((response) => response.url().includes("/api/guest/profile") && response.status() === 401);
+  const loginRequest = page.waitForRequest((request) => request.url().includes("/guest/login?next="));
+  await page.goto(bookingPath(), { waitUntil: "commit" });
+  await profileResponse;
+  const loginUrl = new URL((await loginRequest).url());
+
+  expect(loginUrl.pathname).toBe("/guest/login");
+  expect(loginUrl.searchParams.get("next")).toBe(bookingPath());
+});
+
 test("booking submission uses the authenticated profile and ignores repeated submit", async ({ page }) => {
   await signInFromBookingRedirect(page);
   await page.route("**/api/guest/profile", (route) => route.fulfill({
