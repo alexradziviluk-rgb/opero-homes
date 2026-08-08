@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useEffect, useRef, useState } from "react";
 import ImageStorageProvider from "@/lib/storage";
 import type { ApartmentPhoto } from "@/types/apartment";
@@ -38,7 +40,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
             const url = await ImageStorageProvider.getPreviewUrl(p);
             if (url) created.push(url);
             return [p.id, url ?? ""] as const;
-          } catch (e) {
+          } catch {
             return [p.id, ""] as const;
           }
         })

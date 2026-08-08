@@ -17,6 +17,8 @@ function loadLocalSupabaseEnv() {
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = values.ANON_KEY;
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = values.PUBLISHABLE_KEY;
   process.env.SUPABASE_SERVICE_ROLE_KEY = values.SERVICE_ROLE_KEY;
+  process.env.E2E_SUPABASE_URL = localUrl;
+  process.env.E2E_SUPABASE_SERVICE_ROLE_KEY = values.SERVICE_ROLE_KEY;
 }
 
 loadLocalSupabaseEnv();

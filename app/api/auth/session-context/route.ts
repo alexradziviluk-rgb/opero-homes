@@ -3,7 +3,7 @@ import { createSupabaseServerClient, getServerCurrentUserContext } from "@/lib/s
 import { PRIMARY_ORGANIZATION_SLUG } from "@/lib/supabase/current-user";
 import { logServerAuthError } from "@/lib/supabase/server-auth-log";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
@@ -25,10 +25,12 @@ export async function GET() {
     );
   }
 
+  const authorization = request.headers.get("authorization");
+  const accessToken = authorization?.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : null;
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } = accessToken ? await supabase.auth.getUser(accessToken) : await supabase.auth.getUser();
 
   if (authError) {
     logServerAuthError({

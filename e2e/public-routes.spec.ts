@@ -1,4 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { cleanupPropertyOwnerFixtures, seedPropertyOwnerFixtures, type OwnerFixture } from "./fixtures/property-owner-fixtures";
+
+let fixture: OwnerFixture;
+
+test.beforeAll(async () => {
+  fixture = await seedPropertyOwnerFixtures();
+});
+
+test.afterAll(async () => {
+  await cleanupPropertyOwnerFixtures(fixture);
+});
 
 test.describe("public catalog routing", () => {
   test("home shows the public catalog without authentication", async ({ page }) => {
@@ -41,8 +52,7 @@ test.describe("public catalog routing", () => {
   test("property detail is public and starts booking flow without login", async ({ page }) => {
     await page.goto("/");
     const propertyLink = page.locator('a[href^="/properties/"]').first();
-    const propertyCount = await page.locator('a[href^="/properties/"]').count();
-    test.skip(propertyCount === 0, "The local catalog has no published apartments.");
+    await expect(propertyLink).toHaveCount(1, { timeout: 15_000 });
     const propertyHref = await propertyLink.getAttribute("href");
     expect(propertyHref).toBeTruthy();
 

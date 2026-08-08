@@ -49,6 +49,8 @@ export default function StoredImage({ storagePath, sourceUrl, alt = "", classNam
 
   const url = sourceUrl && !sourceFailed ? sourceUrl : localUrl;
   if (url) {
+    // Dynamic blob URLs cannot use next/image optimization.
+    // eslint-disable-next-line @next/next/no-img-element
     return <img src={url} alt={alt} className={className} onError={() => sourceUrl ? setSourceFailed(true) : setLocalUrl(null)} />;
   }
 

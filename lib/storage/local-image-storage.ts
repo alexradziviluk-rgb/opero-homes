@@ -18,7 +18,7 @@ export const localImageStorage = {
       width = imageBitmap.width;
       height = imageBitmap.height;
       imageBitmap.close();
-    } catch (e) {
+    } catch {
       // ignore
     }
     const photo: ApartmentPhoto = {
@@ -60,7 +60,7 @@ export const localImageStorage = {
     if (!url) return;
     try {
       URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch {
       // ignore
     }
   },

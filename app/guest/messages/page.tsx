@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import {
   getMessagesByClientId,
@@ -22,14 +22,14 @@ export default function GuestMessagesPage() {
 
   const clientId = currentUser?.clientId;
 
-  function reloadMessages() {
+  const reloadMessages = useCallback(() => {
     if (!clientId) {
       setMessages([]);
       return;
     }
 
     setMessages(getMessagesByClientId(clientId));
-  }
+  }, [clientId]);
 
   useEffect(() => {
     function handleMessagesChanged() {
@@ -42,7 +42,7 @@ export default function GuestMessagesPage() {
       window.clearTimeout(initialLoadId);
       window.removeEventListener("opero-client-messages-changed", handleMessagesChanged);
     };
-  }, [clientId]);
+  }, [reloadMessages]);
 
   const unreadCount = useMemo(
     () => messages.filter((message) => !message.isRead).length,

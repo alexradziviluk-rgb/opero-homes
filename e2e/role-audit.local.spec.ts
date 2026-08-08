@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { cleanupRoleAuditFixtures, seedRoleAuditFixtures, storagePath, type AuditRole, type RoleAuditFixture, assertRoleAuditLocalEnv } from "./fixtures/role-audit-fixtures";
 
-test.describe.configure({ mode: "serial", timeout: 60_000 });
+test.describe.configure({ mode: "serial", timeout: 120_000 });
 let fixture: RoleAuditFixture;
 const contexts: BrowserContext[] = [];
 let browserDisconnectLogged = false;

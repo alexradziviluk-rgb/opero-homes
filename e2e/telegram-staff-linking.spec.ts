@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createSupportFixture, sha256 } from "./fixtures/support-conversation-fixtures";
+import { clientForTest, createSupportFixture, sha256 } from "./fixtures/support-conversation-fixtures";
 
 test.describe("Telegram staff linking DB contract", () => {
   let fixture: Awaited<ReturnType<typeof createSupportFixture>>;
@@ -22,5 +22,15 @@ test.describe("Telegram staff linking DB contract", () => {
     expect(first.error).toBeNull();
     const conflict = await fixture.admin.from("support_telegram_bindings").insert({ organization_id: fixture.organizationB, user_id: fixture.managerB.id, telegram_user_id: (await fixture.admin.from("support_telegram_bindings").select("telegram_user_id").eq("user_id", fixture.manager1.id).single()).data?.telegram_user_id, telegram_chat_id: `tg-other-${Date.now()}` });
     expect(conflict.error?.code).toBe("23505");
+  });
+
+  test("anonymous clients cannot access Telegram token or binding tables directly", async () => {
+    const client = clientForTest();
+    const tokens = await client.from("support_telegram_link_tokens").select("id").limit(1);
+    const bindings = await client.from("support_telegram_bindings").select("organization_id").limit(1);
+    expect(tokens.data).toBeNull();
+    expect(bindings.data).toBeNull();
+    expect(tokens.error).toBeTruthy();
+    expect(bindings.error).toBeTruthy();
   });
 });

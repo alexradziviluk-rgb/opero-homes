@@ -66,7 +66,7 @@ export const supabaseImageStorage = {
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(photo.storagePath);
     return data.publicUrl ?? photo.url ?? null;
   },
-  revokePreviewUrl(_url: string | null) {
+  revokePreviewUrl() {
     // noop
   },
 };

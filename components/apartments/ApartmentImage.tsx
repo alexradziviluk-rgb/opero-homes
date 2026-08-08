@@ -85,6 +85,7 @@ export default function ApartmentImage({
   }
 
   return (
+    /* eslint-disable-next-line @next/next/no-img-element -- Dynamic storage URLs may be local blob URLs. */
     <img
       src={src}
       alt={alt}

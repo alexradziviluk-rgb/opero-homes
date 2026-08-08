@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type BookingNotificationsPanelProps = {
   bookingId: string;
@@ -48,7 +48,7 @@ export default function BookingNotificationsPanel({ bookingId }: BookingNotifica
   const [deliveries, setDeliveries] = useState<DeliveryRow[]>([]);
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const response = await fetch(`/api/notifications/bookings/${bookingId}`, { cache: "no-store" });
       const payload = (await response.json()) as ApiPayload;
@@ -64,12 +64,12 @@ export default function BookingNotificationsPanel({ bookingId }: BookingNotifica
     } finally {
       setLoading(false);
     }
-  }
+  }, [bookingId]);
 
   useEffect(() => {
     const loadId = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(loadId);
-  }, [bookingId]);
+  }, [load]);
 
   const deliveriesByEvent = useMemo(() => {
     const map = new Map<string, DeliveryRow[]>();

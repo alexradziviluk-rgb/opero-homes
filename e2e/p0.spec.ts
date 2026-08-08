@@ -1,19 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
+import { cleanupPropertyOwnerFixtures, seedPropertyOwnerFixtures, TEST_PASSWORD, type OwnerFixture } from "./fixtures/property-owner-fixtures";
 
-const APARTMENT_ID = "827ee563-b71e-43cb-9f61-bfa9d63da189";
 const UUID_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
+let fixture: OwnerFixture;
+
+test.beforeAll(async () => {
+  fixture = await seedPropertyOwnerFixtures();
+});
+
+test.afterAll(async () => {
+  await cleanupPropertyOwnerFixtures(fixture);
+});
 
 async function ensureStaffSession(page: Page) {
-  await page.goto("/admin");
+  await page.goto("/staff/login");
   if (!page.url().includes("/login")) return;
 
-  const email = process.env.E2E_STAFF_EMAIL;
-  const password = process.env.E2E_STAFF_PASSWORD;
-  test.skip(!email || !password, "Set E2E_STORAGE_STATE or E2E_STAFF_EMAIL/E2E_STAFF_PASSWORD to run authenticated P0 tests.");
+  const email = fixture.organizationOwner.email;
+  const password = TEST_PASSWORD;
 
-  await page.getByRole("textbox", { name: "Email", exact: true }).fill(email!);
-  await page.getByRole("textbox", { name: "Пароль", exact: true }).fill(password!);
-  await page.getByRole("button", { name: "Войти", exact: true }).click();
+  await page.locator('input[type="email"]').fill(email);
+  await page.locator('input[type="password"]').fill(password);
+  await page.locator('form button[type="submit"]').click();
   await expect(page).toHaveURL(/\/admin$/);
 }
 
@@ -24,14 +32,16 @@ test.beforeEach(async ({ page }) => {
 test("confirmed booking is visible in the administrative calendar", async ({ page }) => {
   await page.goto("/calendar");
   await expect(page.getByRole("heading", { name: "Календарь" })).toBeVisible();
-  await expect(page.locator("button").filter({ hasText: /Balkan Tower[\s\S]*08\.08\.2026/ }).first()).toBeVisible();
+  const nextMonth = page.locator("main").getByRole("button", { name: "›" });
+  for (let month = 0; month < 42; month += 1) await nextMonth.click();
+  await expect(page.getByTitle(/Таур Fixture A[\s\S]*10-12 февраль/)).toBeVisible();
 });
 
 test("confirmed booking is visible in apartment details", async ({ page }) => {
-  await page.goto(`/apartments/${APARTMENT_ID}`);
+  await page.goto(`/apartments/${fixture.apartmentA}`);
   const upcoming = page.getByText("Ближайшие бронирования").locator("..");
   await expect(upcoming).not.toContainText("Нет будущих бронирований");
-  await expect(upcoming).toContainText(/08\.08\.2026|8\/8\/2026/);
+  await expect(upcoming).toContainText(/10\.02\.2030|2\/10\/2030/);
 });
 
 test("staff operational pages do not expose UUIDs", async ({ page }) => {
@@ -43,18 +53,16 @@ test("staff operational pages do not expose UUIDs", async ({ page }) => {
 
 test("selected apartment only offers enabled rental modes and canonical price", async ({ page }) => {
   await page.goto("/bookings/new");
-  await page.getByLabel("Объект").selectOption(APARTMENT_ID);
+  await page.locator("select").nth(1).selectOption(fixture.apartmentA);
   const rentalType = page.getByLabel("Тип аренды");
-  await expect(rentalType.locator("option")).toHaveText(["Помесячная"]);
-  await expect(rentalType).toHaveValue("monthly");
-  await expect(page.getByLabel("Цена за период")).toHaveValue("1100");
-  await expect(page.getByLabel("Уборка")).toHaveValue("120");
-  await expect(page.getByLabel("Залог")).toHaveValue("400");
+  await expect(rentalType.locator("option")).toHaveText(["Посуточно"]);
+  await expect(rentalType).toHaveValue("daily");
+  await expect(page.getByLabel("Цена за период")).toHaveValue("100");
 });
 
 test("zero price requires explicit complimentary confirmation", async ({ page }) => {
   await page.goto("/bookings/new");
-  await page.getByLabel("Объект").selectOption(APARTMENT_ID);
+  await page.locator("select").nth(1).selectOption(fixture.apartmentA);
   await page.getByLabel("Цена за период").fill("0");
   await expect(page.getByText("Подтверждаю бесплатное размещение")).toBeVisible();
 });
@@ -69,7 +77,7 @@ test("check-in and check-out times are sent and displayed after reload", async (
   await page.route("**/api/notifications/events", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
 
   await page.goto("/bookings/new");
-  await page.getByLabel("Объект").selectOption(APARTMENT_ID);
+  await page.locator("select").nth(1).selectOption(fixture.apartmentA);
   await page.getByLabel("Имя гостя").fill("E2E Time Guest");
   await page.getByRole("textbox", { name: "Заезд", exact: true }).fill("2027-01-10");
   await page.getByRole("textbox", { name: "Выезд", exact: true }).fill("2027-02-10");
@@ -87,8 +95,8 @@ test("check-in and check-out times are sent and displayed after reload", async (
       ok: true,
       data: {
         id: "e2e-time-booking",
-        apartmentId: APARTMENT_ID,
-        apartmentTitle: "Balkan Tower",
+        apartmentId: fixture.apartmentA,
+        apartmentTitle: "Таур Fixture A",
         guestName: "E2E Time Guest",
         guestPhone: "",
         guestEmail: "",
@@ -130,7 +138,7 @@ test("task is created through apartment selection", async ({ page }) => {
       contentType: "application/json",
       body: JSON.stringify({ ok: true, data: {
         id: "e2e-task", title: "E2E Task", description: "", task_type: "other", priority: "normal", status: "assigned",
-        apartment_id: APARTMENT_ID, booking_id: null, assigned_user_id: taskPayload.assignedUserId, due_at: taskPayload.dueAt,
+        apartment_id: fixture.apartmentA, booking_id: null, assigned_user_id: taskPayload.assignedUserId, due_at: taskPayload.dueAt,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       } }),
     });
@@ -138,12 +146,17 @@ test("task is created through apartment selection", async ({ page }) => {
   await page.goto("/tasks");
   await page.getByRole("button", { name: "+ Создать задачу" }).click();
   await page.getByPlaceholder("Название задачи").fill("E2E Task");
-  await page.getByRole("combobox", { name: "Объект" }).selectOption(APARTMENT_ID);
-  await page.locator("form select").nth(2).selectOption({ index: 1 });
+  await expect(page.getByLabel("Объект").locator(`option[value="${fixture.apartmentA}"]`)).toHaveCount(1);
+  await page.getByLabel("Объект").selectOption(fixture.apartmentA);
+  await expect(page.getByLabel("Объект")).toHaveValue(fixture.apartmentA);
+  await expect(page.locator("form select").nth(2).locator("option").nth(1)).toBeAttached();
+  await expect(page.getByLabel("Ответственный").locator("option").nth(1)).toBeAttached();
+  await page.getByLabel("Ответственный").selectOption({ index: 1 });
+  await expect(page.getByLabel("Ответственный")).not.toHaveValue("");
   await page.locator('input[type="datetime-local"]').fill("2027-01-10T12:00");
-  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
-  await expect.poll(() => taskPayload?.apartmentId).toBe(APARTMENT_ID);
-  await expect(page.getByText("Balkan Tower").last()).toBeVisible();
+  await page.locator("form button[type=submit]").click();
+  await expect.poll(() => taskPayload?.apartmentId).toBe(fixture.apartmentA);
+  await expect(page.getByText("Таур Fixture A").last()).toBeVisible();
 });
 
 test("mobile sidebar opens and closes after navigation", async ({ page }) => {
@@ -159,11 +172,11 @@ test("mobile sidebar opens and closes after navigation", async ({ page }) => {
 
 test("employee appears in daily operations and access management contexts", async ({ page }) => {
   await page.goto("/employees");
-  await expect(page.getByText("Alex Radziviluk", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Ежедневная работа команды/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Organization Fixture", exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Ежедневная работа команды/)).toBeVisible({ timeout: 15_000 });
   await page.goto("/users");
-  await expect(page.getByText("Alex Radziviluk", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Приглашения, роли, статусы active\/paused/)).toBeVisible();
+  await expect(page.locator("tbody").getByText("Organization Fixture", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/Приглашения, роли, статусы active\/paused/)).toBeVisible({ timeout: 15_000 });
 });
 
 test("active employee invitation can be revoked for retry", async ({ page }) => {

@@ -281,7 +281,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
             <option value="">Выберите объект</option>
             {apartments.map((apartment) => <option key={apartment.id} value={apartment.id}>{apartment.title}</option>)}
           </select>
-          <select value={assignedUserId} onChange={(event) => setAssignedUserId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
+          <select aria-label="Ответственный" value={assignedUserId} onChange={(event) => setAssignedUserId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             <option value="">Ответственный</option>
             {users.map((user) => <option key={user.userId} value={user.userId}>{user.firstName} {user.lastName} · {user.roleCode}</option>)}
           </select>

@@ -299,10 +299,11 @@ function mapSignInError(error: AuthError): AuthResult {
   };
 }
 
-async function validateServerSessionContext(): Promise<SessionContextApiError | null> {
+async function validateServerSessionContext(accessToken?: string): Promise<SessionContextApiError | null> {
   const response = await fetch("/api/auth/session-context", {
     method: "GET",
     cache: "no-store",
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
   });
 
   let payload: SessionContextApiResponse | null = null;
@@ -486,7 +487,9 @@ export async function login(email: string, password: string): Promise<AuthResult
       };
     }
 
-    const sessionValidationError = await validateServerSessionContext();
+    await supabase.auth.getSession();
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    const sessionValidationError = await validateServerSessionContext(data.session.access_token);
     if (sessionValidationError) {
       return {
         currentUser: null,

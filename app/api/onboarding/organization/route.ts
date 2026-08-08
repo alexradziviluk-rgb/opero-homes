@@ -48,8 +48,11 @@ export async function POST(request: Request) {
   const body = await request.json() as { companyName?: string; planCode?: string; country?: string; currency?: string; timezone?: string };
   const plan = getPlan(body.planCode);
   if (!body.companyName?.trim() || !plan) return NextResponse.json({ error: "Укажите компанию и доступный тариф." }, { status: 400 });
-  const validationError = validateSettings({ country: body.country, currency: body.currency, timezone: body.timezone, planCode: body.planCode });
-  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+  const hasSettings = body.country !== undefined || body.currency !== undefined || body.timezone !== undefined;
+  if (hasSettings) {
+    const validationError = validateSettings({ country: body.country, currency: body.currency, timezone: body.timezone, planCode: body.planCode });
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+  }
   const slug = `${body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "workspace"}-${user.id.slice(0, 8)}`;
   const now = new Date();
   const trialEnds = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);

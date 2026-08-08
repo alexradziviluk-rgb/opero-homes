@@ -70,7 +70,7 @@ export async function proxy(request: NextRequest) {
     error,
   } = await supabase.auth.getUser();
 
-  if (error) {
+  if (error && !isAuthRoute) {
     logServerAuthError({
       stage: "session",
       message: error.message,

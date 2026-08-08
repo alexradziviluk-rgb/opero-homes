@@ -4,7 +4,6 @@ import { loadPreferencesMap, resolveStaffRecipients } from "@/lib/notifications/
 import type {
   CreateBookingNotificationInput,
   InAppNotificationRow,
-  NotificationDeliveryRow,
   NotificationEventRow,
   NotificationQueuePayload,
 } from "@/types/notification";

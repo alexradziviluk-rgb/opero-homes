@@ -1,4 +1,4 @@
-import type { Apartment, ApartmentPhoto, RentalTypes } from "@/types/apartment";
+import type { Apartment, RentalTypes } from "@/types/apartment";
 
 export type ApartmentForm = {
   title: string;

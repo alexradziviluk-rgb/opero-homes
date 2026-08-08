@@ -115,7 +115,7 @@ test.describe("local SaaS flow", () => {
     if (employeeError || !employeeData.user) throw employeeError ?? new Error("Employee was not created.");
     await admin.from("organization_members").insert({ organization_id: organization.id, user_id: employeeData.user.id, role_code: "employee", role: "employee", status: "active" });
     const employeePage = await browser.newPage();
-    await employeePage.goto("/login");
+    await employeePage.goto("/staff/login");
     await employeePage.getByLabel("Email").fill(employeeEmail);
     await employeePage.getByLabel("Пароль").fill("EmployeePassword123!");
     await employeePage.getByRole("button", { name: "Войти" }).click();
