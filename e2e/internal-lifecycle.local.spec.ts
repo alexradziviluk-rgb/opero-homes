@@ -29,6 +29,11 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
   await page.goto("/apartments/new", { waitUntil: "domcontentloaded" });
 
   const title = `${fixture.prefix} Lifecycle Apartment`;
+  const googleMapsUrl = "https://www.google.com/maps/place/Yekta+Homes/@36.4972455,32.0843866,496m/data=!3m2!1e3!4b1!4m6!3m5!1s0x14dc987b2e4361eb:0x7db5e430eea3587b!8m2!3d36.4972412!4d32.0869615!16s%2Fg%2F1pv0dvhwr!18m1!1e1?entry=ttu";
+  await page.getByLabel("Ссылка Google Maps").fill(googleMapsUrl);
+  await page.getByRole("button", { name: "Получить адрес" }).click();
+  await expect(page.getByLabel("Название объекта")).toHaveValue("Yekta Homes", { timeout: 15_000 });
+  await expect(page.getByLabel("Район")).toHaveValue("Mahmutlar");
   await page.getByLabel("Название объекта").fill(title);
   await page.getByLabel("Тип объекта").selectOption({ label: "Квартира" });
   await page.getByLabel("Город").selectOption({ label: "Аланья" });
