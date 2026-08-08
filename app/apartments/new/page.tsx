@@ -141,7 +141,6 @@ export default function NewApartmentPage() {
       address: "Полный адрес",
       rooms: "Комнаты",
       bedrooms: "Спальни",
-      beds: "Кровати",
       bathrooms: "Ванные комнаты",
       maxGuests: "Максимум гостей",
       latitude: "Широта",
@@ -446,11 +445,6 @@ export default function NewApartmentPage() {
                     />
                   </label>
                   <label>
-                    <div className="text-sm text-slate-300">Количество кроватей</div>
-                    <input type="number" min={1} step={1} inputMode="numeric" value={form.beds} onChange={(e) => update("beds", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
-                    {errors.beds ? <p className="mt-1 text-sm text-rose-400">{errors.beds}</p> : null}
-                  </label>
-                  <label>
                     <div className="text-sm text-slate-300">Количество санузлов</div>
                     <input
                       type="number"
@@ -726,7 +720,7 @@ export default function NewApartmentPage() {
               </section>
 
               <section className="order-5 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-                <h2 className="text-lg font-semibold text-white">Владелец</h2>
+                <h2 className="text-lg font-semibold text-white">Владелец <span className="text-sm font-normal text-slate-400">(необязательно)</span></h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
                     <div className="text-sm text-slate-300">Имя владельца</div>

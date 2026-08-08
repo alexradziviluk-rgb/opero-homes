@@ -289,6 +289,7 @@ export function normalizeApartment(raw: Partial<Apartment>): Apartment {
 
   return {
     id: raw.id ?? (typeof crypto !== "undefined" ? crypto.randomUUID() : String(Math.random())),
+    internalNumber: raw.internalNumber,
     slug: derivedSlug,
     title: raw.title ?? "",
     type: raw.type ?? "",
@@ -504,7 +505,6 @@ export function validateForm(form: ApartmentForm) {
   if (!form.address.trim()) errors.address = "Обязательное поле";
   if (!form.rooms.trim() || Number(form.rooms) < 1) errors.rooms = "Обязательное поле";
   if (!form.bedrooms.trim() || Number(form.bedrooms) < 1) errors.bedrooms = "Обязательное поле";
-  if (!form.beds.trim() || Number(form.beds) < 1) errors.beds = "Обязательное поле";
   if (!form.bathrooms.trim() || Number(form.bathrooms) < 1) errors.bathrooms = "Обязательное поле";
   if (!form.maxGuests.trim() || Number(form.maxGuests) < 1) errors.maxGuests = "Обязательное поле";
   if (!validateCoordinate(form.latitude, -90, 90)) errors.latitude = "Широта должна быть числом от -90 до 90";

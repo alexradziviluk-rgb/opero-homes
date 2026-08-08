@@ -14,6 +14,7 @@ import type { Apartment, ApartmentPhoto } from "@/types/apartment";
 
 const apartmentSelect = [
   "id",
+  "internal_number",
   "organization_id",
   "slug",
   "title:name",
@@ -117,6 +118,7 @@ function mapApartmentRow(row: Record<string, unknown>, photos: ApartmentPhoto[])
   const publishStatus = safeString(row.publish_status) || (publicationStatus === "published" ? "Опубликован" : "Черновик");
   const normalized = normalizeApartment({
     id: safeString(row.id),
+    internalNumber: typeof row.internal_number === "number" ? row.internal_number : undefined,
     slug: safeString(row.slug) || undefined,
     title: safeString(row.title),
     unitNumber: safeString(row.unit_number),
@@ -309,6 +311,7 @@ export async function saveApartmentToSupabase(apartment: Apartment): Promise<Apa
 
   const payload = {
     id: apartment.id,
+    ...(apartment.internalNumber ? { internal_number: apartment.internalNumber } : {}),
     organization_id: organizationId,
     slug,
     name: apartment.title,

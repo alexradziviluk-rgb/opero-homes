@@ -203,7 +203,7 @@ export default function ApartmentsPage() {
                   <tr>
                     <th className="px-4 py-3 text-left">Фото</th>
                     <th className="px-4 py-3 text-left">Название</th>
-                    <th className="px-4 py-3 text-left">Номер</th>
+                    <th className="px-4 py-3 text-left">ID объекта</th>
                     <th className="px-4 py-3 text-left">Город</th>
                     <th className="px-4 py-3 text-left">Комнаты</th>
                     <th className="px-4 py-3 text-left">Стоимость аренды</th>
@@ -271,7 +271,7 @@ export default function ApartmentsPage() {
                             {a.title}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-slate-300">{a.unitNumber || "—"}</td>
+                        <td className="px-4 py-3 text-slate-300">{a.internalNumber ? `ID-${a.internalNumber}` : "—"}</td>
                         <td className="px-4 py-3 text-slate-300">{a.city}</td>
                         <td className="px-4 py-3 text-slate-300">{a.rooms}</td>
                         <td className="px-4 py-3 text-slate-300 whitespace-pre-line">{getRentalCostText(a)}</td>

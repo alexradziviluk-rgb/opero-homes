@@ -21,6 +21,7 @@ export type ApartmentPhoto = {
 
 export type Apartment = {
   id: string;
+  internalNumber?: number;
   slug?: string;
   title: string;
   unitNumber?: string;
