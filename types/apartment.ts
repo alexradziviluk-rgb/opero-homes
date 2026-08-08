@@ -26,6 +26,7 @@ export type Apartment = {
   unitNumber?: string;
   type: string;
   googleLink: string;
+  country?: string;
   city: string;
   district: string;
   address: string;
@@ -35,6 +36,7 @@ export type Apartment = {
   rooms: number;
   bedrooms: number;
   bathrooms: number;
+  beds?: number;
   floor: number | null;
   area: number | null;
   maxGuests: number;
@@ -62,4 +64,12 @@ export type Apartment = {
   bookings: number;
   photos?: ApartmentPhoto[];
   coverPhotoUrl?: string | null;
+  amenities?: string[];
+  houseRules?: {
+    pets: "allowed" | "negotiable" | "not_allowed";
+    smoking: "allowed" | "not_allowed";
+    checkIn: string;
+    checkOut: string;
+    notes: string;
+  };
 };

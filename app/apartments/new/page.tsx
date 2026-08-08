@@ -18,6 +18,7 @@ type ApartmentForm = {
   unitNumber: string;
   type: string;
   googleLink: string;
+  country: string;
   city: string;
   district: string;
   address: string;
@@ -26,6 +27,7 @@ type ApartmentForm = {
   shortDesc: string;
   rooms: string;
   bedrooms: string;
+  beds: string;
   bathrooms: string;
   floor: string;
   area: string;
@@ -50,6 +52,12 @@ type ApartmentForm = {
   backupManagerUserId: string;
   publishStatus: "Черновик" | "Опубликован" | "На обслуживании";
   publicationStatus: "draft" | "published" | "hidden" | "archived";
+  amenities: string[];
+  pets: "allowed" | "negotiable" | "not_allowed";
+  smoking: "allowed" | "not_allowed";
+  checkIn: string;
+  checkOut: string;
+  houseRulesNotes: string;
 };
 
 const initialForm: ApartmentForm = {
@@ -57,6 +65,7 @@ const initialForm: ApartmentForm = {
   unitNumber: "",
   type: "",
   googleLink: "",
+  country: "Турция",
   city: "",
   district: "",
   address: "",
@@ -65,6 +74,7 @@ const initialForm: ApartmentForm = {
   shortDesc: "",
   rooms: "",
   bedrooms: "",
+  beds: "",
   bathrooms: "",
   floor: "",
   area: "",
@@ -89,6 +99,12 @@ const initialForm: ApartmentForm = {
   backupManagerUserId: "",
   publishStatus: "Черновик",
   publicationStatus: "draft",
+  amenities: [],
+  pets: "negotiable",
+  smoking: "not_allowed",
+  checkIn: "15:00",
+  checkOut: "11:00",
+  houseRulesNotes: "",
 };
 
 type AssigneeItem = {
@@ -110,12 +126,13 @@ export default function NewApartmentPage() {
   const [mapsStatus, setMapsStatus] = useState("");
   const [mapsError, setMapsError] = useState("");
   const [mapsLoading, setMapsLoading] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
   const [apartmentId] = useState(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())));
   const [photos, setPhotos] = useState<ApartmentPhoto[]>([]);
   const [responsibleOptions, setResponsibleOptions] = useState<AssigneeItem[]>([]);
   const [backupOptions, setBackupOptions] = useState<AssigneeItem[]>([]);
   const router = useRouter();
+  const requiredFieldErrors = validateForm(form);
+  const canUploadPhotos = Object.keys(requiredFieldErrors).length === 0;
 
   useEffect(() => {
     async function loadAssignees() {
@@ -141,6 +158,19 @@ export default function NewApartmentPage() {
   const handlePhotosChange = useCallback((nextPhotos: ApartmentPhoto[]) => {
     setPhotos(nextPhotos);
   }, []);
+
+  const prepareApartmentForPhotos = useCallback(async () => {
+    const validationErrors = validateForm(form);
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      throw new Error("Сначала заполните обязательные поля выше.");
+    }
+
+    const draft = buildApartment({ ...form, publicationStatus: "draft" }, apartmentId);
+    draft.photos = photos;
+    draft.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
+    await saveApartmentToSupabase(draft);
+  }, [apartmentId, form, photos]);
 
   function update<K extends keyof ApartmentForm>(key: K, value: ApartmentForm[K]) {
     setForm((s) => ({ ...s, [key]: value }));
@@ -182,8 +212,7 @@ export default function NewApartmentPage() {
     draft.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
     try {
       await saveApartmentToSupabase(draft);
-      setIsSaved(true);
-      showToast("Черновик сохранён. Теперь можно загружать фотографии.");
+      showToast("Черновик сохранён");
     } catch (error: unknown) {
       console.error("Failed to save apartment draft:", error);
       showToast(`Не удалось сохранить черновик: ${getErrorMessage(error)}`);
@@ -260,20 +289,8 @@ export default function NewApartmentPage() {
               </div>
             </div>
 
-            <form className="space-y-6">
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-                <h2 className="text-lg font-semibold text-white">Фотографии объекта</h2>
-                <div className="mt-4">
-                  <ApartmentPhotoManager
-                    apartmentId={apartmentId}
-                    photos={photos}
-                    onChange={handlePhotosChange}
-                    disabled={!isSaved}
-                  />
-                  {!isSaved ? <p className="mt-3 text-sm text-amber-300">Сначала заполните обязательные поля и сохраните объект, затем загрузите фотографии.</p> : null}
-                </div>
-              </section>
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+            <form className="flex flex-col gap-6">
+              <section className="order-1 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Основная информация</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label className="block">
@@ -321,6 +338,10 @@ export default function NewApartmentPage() {
                       </div>
                     </div>
                   </div>
+                  <label className="block">
+                    <div className="text-sm text-slate-300">Страна</div>
+                    <input value={form.country} onChange={(e) => update("country", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                  </label>
                   <label className="block">
                     <div className="text-sm text-slate-300">Город</div>
                     <select value={form.city} onChange={(e) => update("city", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
@@ -371,7 +392,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-2 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Характеристики</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
@@ -397,6 +418,11 @@ export default function NewApartmentPage() {
                       onChange={(e) => update("bedrooms", e.target.value)}
                       className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"
                     />
+                  </label>
+                  <label>
+                    <div className="text-sm text-slate-300">Количество кроватей</div>
+                    <input type="number" min={1} step={1} inputMode="numeric" value={form.beds} onChange={(e) => update("beds", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                    {errors.beds ? <p className="mt-1 text-sm text-rose-400">{errors.beds}</p> : null}
                   </label>
                   <label>
                     <div className="text-sm text-slate-300">Количество санузлов</div>
@@ -450,7 +476,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-3 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Условия аренды</h2>
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -606,7 +632,38 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-7 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white">Фотографии</h2>
+                <p className="mt-1 text-sm text-slate-400">После заполнения обязательных полей фотографии загрузятся в этот же объект автоматически.</p>
+                <div className="mt-4">
+                  <ApartmentPhotoManager apartmentId={apartmentId} photos={photos} onChange={handlePhotosChange} onBeforeUpload={prepareApartmentForPhotos} disabled={!canUploadPhotos} />
+                </div>
+              </section>
+
+              <section className="order-8 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white">Удобства</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {["Wi-Fi", "Бассейн", "Парковка", "Кондиционер", "Кухня", "Стиральная машина", "Балкон", "Лифт"].map((amenity) => (
+                    <label key={amenity} className="inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-200">
+                      <input type="checkbox" aria-label={amenity} checked={form.amenities.includes(amenity)} onChange={(e) => update("amenities", e.target.checked ? [...form.amenities, amenity] : form.amenities.filter((item) => item !== amenity))} className="h-4 w-4" />
+                      {amenity}
+                    </label>
+                  ))}
+                </div>
+              </section>
+
+              <section className="order-9 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white">Правила проживания</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label><div className="text-sm text-slate-300">Животные</div><select aria-label="Животные" value={form.pets} onChange={(e) => update("pets", e.target.value as ApartmentForm["pets"])} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white"><option value="negotiable">По согласованию</option><option value="allowed">Разрешены</option><option value="not_allowed">Запрещены</option></select></label>
+                  <label><div className="text-sm text-slate-300">Курение</div><select aria-label="Курение" value={form.smoking} onChange={(e) => update("smoking", e.target.value as ApartmentForm["smoking"])} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white"><option value="not_allowed">Запрещено</option><option value="allowed">Разрешено</option></select></label>
+                  <label><div className="text-sm text-slate-300">Check-in</div><input aria-label="Check-in" type="time" value={form.checkIn} onChange={(e) => update("checkIn", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white" /></label>
+                  <label><div className="text-sm text-slate-300">Check-out</div><input aria-label="Check-out" type="time" value={form.checkOut} onChange={(e) => update("checkOut", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white" /></label>
+                  <label className="sm:col-span-2"><div className="text-sm text-slate-300">Прочие правила</div><textarea aria-label="Прочие правила" value={form.houseRulesNotes} onChange={(e) => update("houseRulesNotes", e.target.value)} className="mt-1 h-20 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white" /></label>
+                </div>
+              </section>
+
+              <section className="order-4 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Ответственные за уведомления</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label>
@@ -642,7 +699,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-5 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Владелец</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
@@ -660,7 +717,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-6 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Статус</h2>
                 <div className="mt-4 space-y-4">
                   <div>
@@ -684,7 +741,7 @@ export default function NewApartmentPage() {
                 </div>
               </section>
 
-              <div className="flex items-center justify-end gap-3">
+              <div className="order-10 flex items-center justify-end gap-3">
                 <button type="button" onClick={saveDraft} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Сохранить черновик</button>
                 <button type="button" onClick={() => void create()} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">Создать объект</button>
               </div>

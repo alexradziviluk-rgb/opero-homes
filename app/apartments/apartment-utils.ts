@@ -5,6 +5,7 @@ export type ApartmentForm = {
   unitNumber: string;
   type: string;
   googleLink: string;
+  country: string;
   city: string;
   district: string;
   address: string;
@@ -13,6 +14,7 @@ export type ApartmentForm = {
   shortDesc: string;
   rooms: string;
   bedrooms: string;
+  beds: string;
   bathrooms: string;
   floor: string;
   area: string;
@@ -33,6 +35,12 @@ export type ApartmentForm = {
   backupManagerUserId: string;
   publishStatus: "Черновик" | "Опубликован" | "На обслуживании";
   publicationStatus: "draft" | "published" | "hidden" | "archived";
+  amenities: string[];
+  pets: "allowed" | "negotiable" | "not_allowed";
+  smoking: "allowed" | "not_allowed";
+  checkIn: string;
+  checkOut: string;
+  houseRulesNotes: string;
 };
 
 export type { ApartmentPhoto, RentalTypes } from "@/types/apartment";
@@ -44,6 +52,7 @@ export const initialApartmentForm: ApartmentForm = {
   unitNumber: "",
   type: "",
   googleLink: "",
+  country: "Турция",
   city: "",
   district: "",
   address: "",
@@ -52,6 +61,7 @@ export const initialApartmentForm: ApartmentForm = {
   shortDesc: "",
   rooms: "",
   bedrooms: "",
+  beds: "",
   bathrooms: "",
   floor: "",
   area: "",
@@ -76,6 +86,12 @@ export const initialApartmentForm: ApartmentForm = {
   backupManagerUserId: "",
   publishStatus: "Черновик",
   publicationStatus: "draft",
+  amenities: [],
+  pets: "negotiable",
+  smoking: "not_allowed",
+  checkIn: "15:00",
+  checkOut: "11:00",
+  houseRulesNotes: "",
 };
 
 const sampleApartments: Apartment[] = [
@@ -277,6 +293,7 @@ export function normalizeApartment(raw: Partial<Apartment>): Apartment {
     title: raw.title ?? "",
     type: raw.type ?? "",
     googleLink: raw.googleLink ?? "",
+    country: raw.country ?? "Турция",
     city: raw.city ?? "",
     district: raw.district ?? "",
     address: raw.address ?? "",
@@ -285,6 +302,7 @@ export function normalizeApartment(raw: Partial<Apartment>): Apartment {
     shortDesc: raw.shortDesc ?? "",
     rooms: raw.rooms ?? 0,
     bedrooms: raw.bedrooms ?? 0,
+    beds: raw.beds ?? 0,
     bathrooms: raw.bathrooms ?? 0,
     floor: raw.floor ?? null,
     area: raw.area ?? null,
@@ -313,6 +331,8 @@ export function normalizeApartment(raw: Partial<Apartment>): Apartment {
     bookings: typeof raw.bookings === "number" ? raw.bookings : 0,
     photos: raw.photos ?? [],
     coverPhotoUrl: raw.coverPhotoUrl ?? null,
+    amenities: raw.amenities ?? [],
+    houseRules: raw.houseRules ?? undefined,
   };
 }
 
@@ -398,6 +418,7 @@ export function buildApartment(form: ApartmentForm, id: string, existingApartmen
     unitNumber: form.unitNumber.trim(),
     type: form.type,
     googleLink: form.googleLink,
+    country: form.country,
     city: form.city,
     district: form.district,
     address: form.address,
@@ -406,6 +427,7 @@ export function buildApartment(form: ApartmentForm, id: string, existingApartmen
     shortDesc: form.shortDesc,
     rooms: toNullableInteger(form.rooms) ?? 0,
     bedrooms: toNullableInteger(form.bedrooms) ?? 0,
+    beds: toNullableInteger(form.beds) ?? 0,
     bathrooms: toNullableInteger(form.bathrooms) ?? 0,
     floor: toNullableInteger(form.floor),
     area: toNullableNumber(form.area),
@@ -438,6 +460,14 @@ export function buildApartment(form: ApartmentForm, id: string, existingApartmen
     bookings: existingApartment?.bookings ?? 0,
     photos: existingApartment?.photos ?? [],
     coverPhotoUrl: existingApartment?.coverPhotoUrl ?? null,
+    amenities: form.amenities,
+    houseRules: {
+      pets: form.pets,
+      smoking: form.smoking,
+      checkIn: form.checkIn,
+      checkOut: form.checkOut,
+      notes: form.houseRulesNotes,
+    },
   };
 }
 
@@ -474,6 +504,7 @@ export function validateForm(form: ApartmentForm) {
   if (!form.address.trim()) errors.address = "Обязательное поле";
   if (!form.rooms.trim() || Number(form.rooms) < 1) errors.rooms = "Обязательное поле";
   if (!form.bedrooms.trim() || Number(form.bedrooms) < 1) errors.bedrooms = "Обязательное поле";
+  if (!form.beds.trim() || Number(form.beds) < 1) errors.beds = "Обязательное поле";
   if (!form.bathrooms.trim() || Number(form.bathrooms) < 1) errors.bathrooms = "Обязательное поле";
   if (!form.maxGuests.trim() || Number(form.maxGuests) < 1) errors.maxGuests = "Обязательное поле";
   if (!validateCoordinate(form.latitude, -90, 90)) errors.latitude = "Широта должна быть числом от -90 до 90";
@@ -519,6 +550,7 @@ export function apartmentToForm(apartment: Apartment): ApartmentForm {
     unitNumber: apartment.unitNumber ?? "",
     type: apartment.type,
     googleLink: apartment.googleLink || "",
+    country: apartment.country || "Турция",
     city: apartment.city,
     district: apartment.district,
     address: apartment.address,
@@ -527,6 +559,7 @@ export function apartmentToForm(apartment: Apartment): ApartmentForm {
     shortDesc: apartment.shortDesc || "",
     rooms: String(apartment.rooms ?? ""),
     bedrooms: String(apartment.bedrooms ?? ""),
+    beds: String(apartment.beds ?? ""),
     bathrooms: String(apartment.bathrooms ?? ""),
     floor: apartment.floor !== null && apartment.floor !== undefined ? String(apartment.floor) : "",
     area: apartment.area !== null && apartment.area !== undefined ? String(apartment.area) : "",
@@ -547,5 +580,11 @@ export function apartmentToForm(apartment: Apartment): ApartmentForm {
     backupManagerUserId: apartment.backupManagerUserId ?? "",
     publishStatus: apartment.publishStatus,
     publicationStatus: apartment.publicationStatus ?? "draft",
+    amenities: apartment.amenities ?? [],
+    pets: apartment.houseRules?.pets ?? "negotiable",
+    smoking: apartment.houseRules?.smoking ?? "not_allowed",
+    checkIn: apartment.houseRules?.checkIn ?? "15:00",
+    checkOut: apartment.houseRules?.checkOut ?? "11:00",
+    houseRulesNotes: apartment.houseRules?.notes ?? "",
   };
 }

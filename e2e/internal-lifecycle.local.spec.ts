@@ -36,13 +36,12 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
   await page.getByLabel("Полный адрес").fill("Lifecycle Address 1");
   await page.getByLabel("Количество комнат").fill("2");
   await page.getByLabel("Количество спален").fill("1");
+  await page.getByLabel("Количество кроватей").fill("2");
   await page.getByLabel("Количество санузлов").fill("1");
   await page.getByLabel("Макс. гостей").fill("4");
   await page.getByLabel("Посуточно").check();
   await page.getByLabel("Цена за ночь, €").fill("145");
   await page.getByLabel("Минимальное количество ночей").fill("1");
-  await page.getByRole("button", { name: "Сохранить черновик" }).click();
-  await expect(page.getByText("Черновик сохранён. Теперь можно загружать фотографии.")).toBeVisible();
 
   const imageInput = page.locator('input[type="file"]');
   await expect(imageInput).toBeEnabled();
@@ -53,8 +52,11 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
     buffer: tinyPng,
   })));
   await expect(page.getByText("Фотографии объекта (10)")).toBeVisible({ timeout: 20_000 });
+  await page.getByLabel("Wi-Fi").check();
+  await page.getByLabel("Курение").selectOption("not_allowed");
+  await page.getByLabel("Прочие правила").fill("No parties");
   await page.getByRole("button", { name: "Сохранить черновик" }).click();
-  await expect(page.getByText("Черновик сохранён. Теперь можно загружать фотографии.")).toBeVisible();
+  await expect(page.getByText("Черновик сохранён").first()).toBeVisible();
 
   await expect.poll(() => readApartmentForAuditByTitle(title), { timeout: 15_000 }).toMatchObject({
     organization_id: fixture.organizationId,
@@ -71,14 +73,17 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
   await page.goto("/apartments", { waitUntil: "domcontentloaded" });
   await page.goto(`/apartments/${apartmentId}/edit`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Редактирование объекта" })).toBeVisible();
+  await expect(page.getByLabel("Страна")).toHaveValue("Турция");
+  await expect(page.getByLabel("Количество кроватей")).toHaveValue("2");
+  await expect(page.getByLabel("Wi-Fi")).toBeChecked();
+  await expect(page.getByLabel("Прочие правила")).toHaveValue("No parties");
+  await expect(page.getByText("Фотографии объекта (10)")).toBeVisible();
   await page.getByLabel("Название объекта").fill(`${title} Updated`);
   await page.getByLabel("Цена за ночь, €").fill("175");
-  const statusSelects = page.locator("select");
-  await statusSelects.nth((await statusSelects.count()) - 2).selectOption("published");
-  await statusSelects.nth((await statusSelects.count()) - 1).selectOption("Опубликован");
+  await page.getByLabel("Публикация на сайте").selectOption("published");
+  await page.getByLabel("Внутренний статус объекта").selectOption("Опубликован");
 
   await page.getByRole("button", { name: "Сохранить изменения" }).click();
-  await expect(page).toHaveURL(new RegExp(`/apartments/${apartmentId}$`), { timeout: 15_000 });
 
   await expect.poll(() => readApartmentForAuditById(apartmentId), { timeout: 15_000 }).toMatchObject({
     organization_id: fixture.organizationId,

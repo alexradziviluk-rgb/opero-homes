@@ -239,8 +239,8 @@ export default function EditApartmentPage() {
               </div>
             </div>
 
-            <form className="space-y-6">
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+            <form className="flex flex-col gap-6">
+              <section className="order-1 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Основная информация</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label className="block">
@@ -288,6 +288,10 @@ export default function EditApartmentPage() {
                       </div>
                     </div>
                   </div>
+                  <label className="block">
+                    <div className="text-sm text-slate-300">Страна</div>
+                    <input value={form.country} onChange={(e) => update("country", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
+                  </label>
                   <label className="block">
                     <div className="text-sm text-slate-300">Город</div>
                     <select value={form.city} onChange={(e) => update("city", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
@@ -337,14 +341,32 @@ export default function EditApartmentPage() {
                   </label>
                 </div>
               </section>
-                <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-5 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+                <h2 className="text-lg font-semibold text-white">Удобства и правила проживания</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {["Wi-Fi", "Бассейн", "Парковка", "Кондиционер", "Кухня", "Стиральная машина", "Балкон", "Лифт"].map((amenity) => (
+                    <label key={amenity} className="inline-flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-200">
+                      <input type="checkbox" checked={form.amenities.includes(amenity)} onChange={(e) => update("amenities", e.target.checked ? [...form.amenities, amenity] : form.amenities.filter((item) => item !== amenity))} className="h-4 w-4" />
+                      {amenity}
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label><div className="text-sm text-slate-300">Животные</div><select value={form.pets} onChange={(e) => update("pets", e.target.value as ApartmentForm["pets"])} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white"><option value="negotiable">По согласованию</option><option value="allowed">Разрешены</option><option value="not_allowed">Запрещены</option></select></label>
+                  <label><div className="text-sm text-slate-300">Курение</div><select value={form.smoking} onChange={(e) => update("smoking", e.target.value as ApartmentForm["smoking"])} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white"><option value="not_allowed">Запрещено</option><option value="allowed">Разрешено</option></select></label>
+                  <label><div className="text-sm text-slate-300">Check-in</div><input type="time" value={form.checkIn} onChange={(e) => update("checkIn", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white" /></label>
+                  <label><div className="text-sm text-slate-300">Check-out</div><input type="time" value={form.checkOut} onChange={(e) => update("checkOut", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white" /></label>
+                  <label className="sm:col-span-2"><div className="text-sm text-slate-300">Прочие правила</div><textarea value={form.houseRulesNotes} onChange={(e) => update("houseRulesNotes", e.target.value)} className="mt-1 h-20 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white" /></label>
+                </div>
+              </section>
+                <section className="order-4 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                   <h2 className="text-lg font-semibold text-white">Фотографии объекта</h2>
                   <div className="mt-4">
                     <ApartmentPhotoManager apartmentId={apartment.id} photos={photos} onChange={handlePhotosChange} />
                   </div>
                 </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-6 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Ответственные за уведомления</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <label>
@@ -380,7 +402,7 @@ export default function EditApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-2 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Характеристики</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
@@ -406,6 +428,10 @@ export default function EditApartmentPage() {
                       onChange={(e) => update("bedrooms", e.target.value)}
                       className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"
                     />
+                  </label>
+                  <label>
+                    <div className="text-sm text-slate-300">Количество кроватей</div>
+                    <input type="number" min={1} step={1} inputMode="numeric" value={form.beds} onChange={(e) => update("beds", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none" />
                   </label>
                   <label>
                     <div className="text-sm text-slate-300">Количество санузлов</div>
@@ -459,7 +485,7 @@ export default function EditApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-3 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Условия аренды</h2>
                 <div className="mt-4 space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -613,7 +639,7 @@ export default function EditApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-7 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Владелец</h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <label>
@@ -631,12 +657,14 @@ export default function EditApartmentPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
+              <section className="order-8 rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Статус</h2>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <div className="text-xs text-slate-400">Публикация на сайте</div>
+                    <label htmlFor="publication-status" className="text-xs text-slate-400">Публикация на сайте</label>
                     <select
+                      id="publication-status"
+                      aria-label="Публикация на сайте"
                       value={form.publicationStatus}
                       onChange={(e) => update("publicationStatus", e.target.value as ApartmentForm["publicationStatus"])}
                       className="mt-1 rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none"
@@ -646,8 +674,8 @@ export default function EditApartmentPage() {
                       <option value="hidden">Скрыт</option>
                     </select>
                   </div>
-                  <div className="text-xs text-slate-400">Внутренний статус объекта</div>
-                  <select value={form.publishStatus} onChange={(e) => update("publishStatus", e.target.value as ApartmentForm["publishStatus"])} className="rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
+                  <label htmlFor="internal-status" className="text-xs text-slate-400">Внутренний статус объекта</label>
+                  <select id="internal-status" aria-label="Внутренний статус объекта" value={form.publishStatus} onChange={(e) => update("publishStatus", e.target.value as ApartmentForm["publishStatus"])} className="rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
                     <option value="Черновик">Черновик</option>
                     <option value="Опубликован">Опубликован</option>
                     <option value="На обслуживании">На обслуживании</option>
@@ -655,7 +683,7 @@ export default function EditApartmentPage() {
                 </div>
               </section>
 
-              <div className="flex items-center justify-end gap-3">
+              <div className="order-9 flex items-center justify-end gap-3">
                 <button type="button" onClick={saveDraft} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Сохранить черновик</button>
                 <button type="button" onClick={() => void updateApartment()} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20">Сохранить изменения</button>
               </div>

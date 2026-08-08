@@ -10,10 +10,11 @@ type Props = {
   apartmentId: string;
   photos: ApartmentPhoto[];
   onChange: (photos: ApartmentPhoto[]) => Promise<void> | void;
+  onBeforeUpload?: () => Promise<void> | void;
   disabled?: boolean;
 };
 
-export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, disabled }: Props) {
+export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, onBeforeUpload, disabled }: Props) {
   const [photoState, setPhotoState] = useState<{ source: ApartmentPhoto[]; value: ApartmentPhoto[] }>(() => ({
     source: initialPhotos,
     value: initialPhotos,
@@ -124,6 +125,14 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
     }
 
     if (validFiles.length === 0) return;
+
+    try {
+      await onBeforeUpload?.();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "неизвестная ошибка";
+      enqueueError(`Не удалось подготовить объект для загрузки (${message})`);
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress({ completed: 0, total: validFiles.length });
