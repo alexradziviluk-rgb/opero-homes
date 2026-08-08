@@ -303,6 +303,18 @@ test("guest sees public booking surface but cannot access staff or owner data", 
   expect(ownerProperties.status()).toBe(403);
 });
 
+test("external property owner and guest cannot access apartment management UI", async ({ browser }) => {
+  for (const role of ["propertyOwner", "guest"] as const) {
+    const { page } = await openRole(browser, role);
+    await gotoRolePage(page, "/apartments/new");
+    await expect(page).not.toHaveURL(/\/apartments\/new/, { timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "Создать объект" })).toHaveCount(0);
+    await gotoRolePage(page, `/apartments/${fixture.apartmentPublishedId}/edit`);
+    await expect(page).not.toHaveURL(/\/apartments\/[^/]+\/edit/, { timeout: 15_000 });
+    await expect(page.getByText("Фотографии объекта")).toHaveCount(0);
+  }
+});
+
 test("authenticated booking reaches guest account and staff without duplicate or cross-user exposure", async ({ browser }) => {
   const marker = "E2E-REVENUE-BOOKING";
   const guest = await openRole(browser, "guest");

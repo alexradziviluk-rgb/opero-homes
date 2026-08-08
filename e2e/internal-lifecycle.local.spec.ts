@@ -27,6 +27,7 @@ test.afterAll(async () => {
 test("creates and reloads one linked internal lifecycle apartment", async ({ page }) => {
   await signInManager(page);
   await page.goto("/apartments/new", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Новый объект" })).toBeVisible({ timeout: 15_000 });
   await expect(page.locator("form > section h2").evaluateAll((headings) => headings.map((heading) => heading.textContent?.trim()))).resolves.toEqual([
     "Основная информация",
     "Адрес",

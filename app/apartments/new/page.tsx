@@ -12,6 +12,8 @@ import type { ApartmentPhoto } from "@/types/apartment";
 import { buildApartment, getErrorMessage, validateForm } from "@/app/apartments/apartment-utils";
 import { useCallback } from "react";
 import { saveApartmentToSupabase } from "@/lib/apartments/supabase-apartments";
+import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { hasEffectivePermission } from "@/lib/permissions";
 
 type ApartmentForm = {
   title: string;
@@ -120,6 +122,7 @@ const cities = ["Аланья", "Анталья", "Стамбул", "Друго�
 // Use shared buildApartment, validateForm, and storage helpers from apartment-utils
 
 export default function NewApartmentPage() {
+  const { currentUser, isAuthLoading } = useCurrentUser();
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState("");
@@ -294,6 +297,20 @@ export default function NewApartmentPage() {
       console.error("Failed to create apartment:", error);
       showToast(`Не удалось создать объект: ${getErrorMessage(error)}`);
     }
+  }
+
+  if (isAuthLoading) {
+    return <p className="p-8 text-sm text-slate-300">Загрузка профиля...</p>;
+  }
+
+  if (!currentUser || !hasEffectivePermission(currentUser, "apartments.manage")) {
+    return (
+      <section className="mx-auto mt-16 max-w-xl rounded-2xl border border-white/10 bg-slate-900/80 p-8 text-center text-slate-200">
+        <h1 className="text-xl font-semibold text-white">Недостаточно прав</h1>
+        <p className="mt-2 text-sm text-slate-400">Создание объектов доступно только сотрудникам организации с правом управления объектами.</p>
+        <Link href="/admin" className="mt-6 inline-flex rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">Вернуться в панель</Link>
+      </section>
+    );
   }
 
   return (

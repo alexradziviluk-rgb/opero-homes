@@ -18,6 +18,8 @@ import {
 import ApartmentPhotoManager from "@/components/apartments/apartment-photo-manager";
 import { resolveGoogleMapsAddress } from "@/lib/maps/google-maps";
 import { loadApartmentFromSupabase, saveApartmentToSupabase } from "@/lib/apartments/supabase-apartments";
+import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { hasEffectivePermission } from "@/lib/permissions";
 
 type AssigneeItem = {
   userId: string;
@@ -31,6 +33,7 @@ const objectTypes = ["Квартира", "Вилла", "Апарт-отель", 
 const cities = ["Аланья", "Анталья", "Стамбул", "Другой"];
 
 export default function EditApartmentPage() {
+  const { currentUser, isAuthLoading } = useCurrentUser();
   const params = useParams();
   const apartmentId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
@@ -197,6 +200,20 @@ export default function EditApartmentPage() {
       console.error("Failed to update apartment:", error);
       showToast(`Не удалось сохранить изменения: ${getErrorMessage(error)}`);
     }
+  }
+
+  if (isAuthLoading) {
+    return <p className="p-8 text-sm text-slate-300">Загрузка профиля...</p>;
+  }
+
+  if (!currentUser || !hasEffectivePermission(currentUser, "apartments.manage")) {
+    return (
+      <section className="mx-auto mt-16 max-w-xl rounded-2xl border border-white/10 bg-slate-900/80 p-8 text-center text-slate-200">
+        <h1 className="text-xl font-semibold text-white">Недостаточно прав</h1>
+        <p className="mt-2 text-sm text-slate-400">Редактирование объектов и управление фотографиями доступно только сотрудникам организации с правом управления объектами.</p>
+        <Link href="/admin" className="mt-6 inline-flex rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">Вернуться в панель</Link>
+      </section>
+    );
   }
 
   if (notFound) {
