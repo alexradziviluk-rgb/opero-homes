@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { cleanupRoleAuditFixtures, readBookingForAudit, seedRoleAuditFixtures, storagePath, type AuditRole, type RoleAuditFixture, assertRoleAuditLocalEnv } from "./fixtures/role-audit-fixtures";
+import { cleanupRoleAuditFixtures, readBookingForAudit, seedRoleAuditFixtures, storagePath, type AuditRole, type RoleAuditFixture, assertRoleAuditLocalEnv, uploadApartmentPhotoAnonymouslyForAudit, uploadApartmentPhotoForAudit } from "./fixtures/role-audit-fixtures";
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 let fixture: RoleAuditFixture;
@@ -231,6 +231,29 @@ test("admin has full role surface and clean console/network", async ({ browser }
   }
   expect(consoleErrors, `console errors: ${failedResponses.join(" | ")}`).toEqual([]);
   expect(failedRequests, `failed requests: ${failedResponses.join(" | ")}`).toEqual([]);
+});
+
+test("internal photo storage allows staff matrix and denies external access", async () => {
+  const allowedRoles: AuditRole[] = ["admin", "manager", "employee"];
+  for (const role of allowedRoles) {
+    const uploads = await Promise.all(
+      Array.from({ length: 10 }, (_, index) => uploadApartmentPhotoForAudit(
+        fixture.accounts[role],
+        fixture.organizationId,
+        fixture.apartmentDraftId,
+        `${role}-${index}.png`,
+      )),
+    );
+    expect(uploads.filter((upload) => upload.error), role).toEqual([]);
+  }
+
+  for (const role of ["propertyOwner", "guest"] as const) {
+    const result = await uploadApartmentPhotoForAudit(fixture.accounts[role], fixture.organizationId, fixture.apartmentDraftId, `${role}-denied.png`);
+    expect(result.error, role).toMatch(/row-level security|not authorized|permission/i);
+  }
+
+  const anonymousResult = await uploadApartmentPhotoAnonymouslyForAudit(fixture.organizationId, fixture.apartmentDraftId, "anonymous-denied.png");
+  expect(anonymousResult.error, "anonymous").toMatch(/row-level security|not authorized|permission/i);
 });
 
 test("manager and employee have staff access but no owner UI or owner API", async ({ browser }) => {

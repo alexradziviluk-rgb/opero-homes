@@ -137,6 +137,13 @@ export default function NewApartmentPage() {
     void loadAssignees();
   }, []);
 
+  const prepareApartmentForPhotos = useCallback(async () => {
+    const draft = buildApartment({ ...form, publicationStatus: "draft" }, apartmentId);
+    draft.photos = [];
+    draft.coverPhotoUrl = null;
+    await saveApartmentToSupabase(draft);
+  }, [apartmentId, form]);
+
   const handlePhotosChange = useCallback((nextPhotos: ApartmentPhoto[]) => {
     setPhotos(nextPhotos);
   }, []);
@@ -254,7 +261,12 @@ export default function NewApartmentPage() {
               <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
                 <h2 className="text-lg font-semibold text-white">Фотографии объекта</h2>
                 <div className="mt-4">
-                  <ApartmentPhotoManager apartmentId={apartmentId} photos={photos} onChange={handlePhotosChange} />
+                  <ApartmentPhotoManager
+                    apartmentId={apartmentId}
+                    photos={photos}
+                    onChange={handlePhotosChange}
+                    onBeforeUpload={prepareApartmentForPhotos}
+                  />
                 </div>
               </section>
               <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">

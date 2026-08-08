@@ -10,10 +10,11 @@ type Props = {
   apartmentId: string;
   photos: ApartmentPhoto[];
   onChange: (photos: ApartmentPhoto[]) => Promise<void> | void;
+  onBeforeUpload?: () => Promise<void> | void;
   disabled?: boolean;
 };
 
-export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, disabled }: Props) {
+export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, onBeforeUpload, disabled }: Props) {
   const [photoState, setPhotoState] = useState<{ source: ApartmentPhoto[]; value: ApartmentPhoto[] }>(() => ({
     source: initialPhotos,
     value: initialPhotos,
@@ -70,6 +71,14 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
     setTimeout(() => setError(null), 4000);
   }
 
+  function getPhotoErrorMessage(error: unknown, fallback: string): string {
+    const message = error instanceof Error ? error.message : "";
+    if (/row-level security|not authorized|permission denied|forbidden/i.test(message)) {
+      return "У вас нет доступа к фотографиям этого объекта.";
+    }
+    return message || fallback;
+  }
+
   async function handleFiles(selectedFiles: File[]) {
     if (disabled || !selectedFiles || selectedFiles.length === 0) return;
 
@@ -117,6 +126,14 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
 
     if (validFiles.length === 0) return;
 
+    try {
+      await onBeforeUpload?.();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "неизвестная ошибка";
+      enqueueError(`Не удалось подготовить объект для загрузки (${message})`);
+      return;
+    }
+
     setIsUploading(true);
     setUploadProgress({ completed: 0, total: validFiles.length });
 
@@ -129,8 +146,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
         uploaded.push({ ...p, sortOrder: nextOrder } as ApartmentPhoto);
       } catch (e) {
         console.error("Upload failed", file.name, e);
-        const message = e instanceof Error ? e.message : "неизвестная ошибка";
-        validationErrors.push(`${file.name}: не удалось загрузить (${message})`);
+        validationErrors.push(`${file.name}: не удалось загрузить (${getPhotoErrorMessage(e, "неизвестная ошибка")})`);
       } finally {
         setUploadProgress((prev) => ({ ...prev, completed: prev.completed + 1 }));
       }
@@ -145,8 +161,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       setPhotos(normalized);
     } catch (e) {
       console.error(e);
-      const message = e instanceof Error ? e.message : "неизвестная ошибка";
-      enqueueError(`Не удалось сохранить фотографии (${message})`);
+      enqueueError(`Не удалось сохранить фотографии (${getPhotoErrorMessage(e, "неизвестная ошибка")})`);
     }
 
     setIsUploading(false);
@@ -183,8 +198,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       setPhotos(next);
     } catch (e) {
       console.error(e);
-      const message = e instanceof Error ? e.message : "неизвестная ошибка";
-      enqueueError(`Не удалось сохранить фотографии (${message})`);
+      enqueueError(`Не удалось сохранить фотографии (${getPhotoErrorMessage(e, "неизвестная ошибка")})`);
       return;
     }
     try {
@@ -205,8 +219,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       setPhotos(normalized);
     } catch (e) {
       console.error(e);
-      const message = e instanceof Error ? e.message : "неизвестная ошибка";
-      enqueueError(`Не удалось сохранить фотографии (${message})`);
+      enqueueError(`Не удалось сохранить фотографии (${getPhotoErrorMessage(e, "неизвестная ошибка")})`);
     }
   }
 
@@ -251,8 +264,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       setPhotos(normalized);
     } catch (error) {
       console.error(error);
-      const message = error instanceof Error ? error.message : "неизвестная ошибка";
-      enqueueError(`Не удалось сохранить фотографии (${message})`);
+      enqueueError(`Не удалось сохранить фотографии (${getPhotoErrorMessage(error, "неизвестная ошибка")})`);
     }
     draggingIdx.current = null;
   }

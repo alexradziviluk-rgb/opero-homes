@@ -169,6 +169,30 @@ export async function signInRole(account: AuditAccount) {
   return result.data.session;
 }
 
+export async function uploadApartmentPhotoForAudit(account: AuditAccount, organizationId: string, apartmentId: string, fileName: string) {
+  const session = await signInRole(account);
+  const client = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const sessionResult = await client.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+  if (sessionResult.error) throw new Error(`Unable to establish ${account.role} storage session: ${sessionResult.error.message}`);
+
+  const storagePath = `organizations/${organizationId}/apartments/${apartmentId}/${randomUUID()}-${fileName}`;
+  const result = await client.storage.from("apartment-photos").upload(storagePath, new Blob(["e2e-photo"], { type: "image/png" }), {
+    contentType: "image/png",
+    upsert: false,
+  });
+  return { storagePath, error: result.error?.message ?? null };
+}
+
+export async function uploadApartmentPhotoAnonymouslyForAudit(organizationId: string, apartmentId: string, fileName: string) {
+  const client = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const storagePath = `organizations/${organizationId}/apartments/${apartmentId}/${randomUUID()}-${fileName}`;
+  const result = await client.storage.from("apartment-photos").upload(storagePath, new Blob(["e2e-photo"], { type: "image/png" }), {
+    contentType: "image/png",
+    upsert: false,
+  });
+  return { storagePath, error: result.error?.message ?? null };
+}
+
 export async function readBookingForAudit(bookingId: string) {
   const admin = adminClient();
   const result = await admin
@@ -207,6 +231,16 @@ export async function cleanupRoleAuditFixtures(fixture?: RoleAuditFixture) {
   }
   const admin = adminClient();
   await cleanupStep("organization", async () => {
+    for (const apartmentId of [fixture.apartmentPublishedId, fixture.apartmentDraftId]) {
+      const prefix = `organizations/${fixture.organizationId}/apartments/${apartmentId}`;
+      const listed = await admin.storage.from("apartment-photos").list(prefix, { limit: 1000 });
+      if (listed.error) throw new Error(`Unable to list photo objects: ${listed.error.message}`);
+      const paths = (listed.data ?? []).filter((item) => item.name).map((item) => `${prefix}/${item.name}`);
+      if (paths.length > 0) {
+        const removed = await admin.storage.from("apartment-photos").remove(paths);
+        if (removed.error) throw new Error(`Unable to remove photo objects: ${removed.error.message}`);
+      }
+    }
     runLocalSql(`delete from public.organizations where id = '${fixture.organizationId}';`);
   });
   for (const account of Object.values(fixture.accounts)) {
