@@ -43,6 +43,10 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
   urgent: "Срочный",
 };
 
+function getApartmentLabel(apartment: Apartment): string {
+  return `${apartment.title}${apartment.internalNumber ? ` · ID-${apartment.internalNumber}` : ""}`;
+}
+
 type TaskBoardProps = {
   filterType?: "cleaning" | "technical" | "all";
   canManage: boolean;
@@ -279,7 +283,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
           ) : null}
           <select aria-label="Объект" value={apartmentId} onChange={(event) => setApartmentId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             <option value="">Выберите объект</option>
-            {apartments.map((apartment) => <option key={apartment.id} value={apartment.id}>{apartment.title}</option>)}
+            {apartments.map((apartment) => <option key={apartment.id} value={apartment.id}>{getApartmentLabel(apartment)}</option>)}
           </select>
           <select aria-label="Ответственный" value={assignedUserId} onChange={(event) => setAssignedUserId(event.target.value)} className="rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm">
             <option value="">Ответственный</option>
@@ -326,7 +330,7 @@ export default function TaskBoard({ filterType, canManage }: TaskBoardProps) {
               return (
                 <tr key={task.id}>
                   <td className="px-4 py-3"><p className="font-medium text-white">{task.title}</p><p className="text-xs text-slate-400">{TYPE_LABELS[task.taskType]}</p></td>
-                  <td className="px-4 py-3 text-slate-300">{apartment?.title ?? "Объект не найден"}</td>
+                  <td className="px-4 py-3 text-slate-300">{apartment ? getApartmentLabel(apartment) : "Объект не найден"}</td>
                   <td className="px-4 py-3 text-slate-300">{task.dueAt ? new Date(task.dueAt).toLocaleString("ru-RU") : "—"}</td>
                   <td className="px-4 py-3">
                     {canManage ? (
