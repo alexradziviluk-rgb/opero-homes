@@ -94,6 +94,9 @@ async function resolveAddress(value: string) {
   if (parsed.hostname === "maps.app.goo.gl" || parsed.hostname === "goo.gl") {
     const response = await fetch(normalizedUrl, { redirect: "follow", signal: AbortSignal.timeout(10_000) });
     resolvedUrl = response.url || normalizedUrl;
+    if (!isAllowedMapsUrl(resolvedUrl)) {
+      throw new Error("Invalid Google Maps redirect");
+    }
   }
 
   const coordinates = coordinatesFromText(resolvedUrl);

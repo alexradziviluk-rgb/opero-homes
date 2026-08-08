@@ -20,7 +20,8 @@ export function isGoogleMapsLink(value: string) {
     const isShortLink = hostname === "maps.app.goo.gl" || hostname === "goo.gl";
     const isMapsHost = /^maps\.google\.[a-z]{2,}(?:\.[a-z]{2})?$/.test(hostname);
     const isGoogleWebHost = /^(?:www\.)?google\.[a-z]{2,}(?:\.[a-z]{2})?$/.test(hostname);
-    return isShortLink || isMapsHost || (isGoogleWebHost && url.pathname.startsWith("/maps"));
+    const isMapsPath = url.pathname === "/maps" || url.pathname.startsWith("/maps/");
+    return isShortLink || isMapsHost || (isGoogleWebHost && isMapsPath);
   } catch {
     return false;
   }
