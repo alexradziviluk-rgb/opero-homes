@@ -1,5 +1,6 @@
 export type AddressResolution = {
   title: string;
+  country: string;
   city: string;
   district: string;
   address: string;

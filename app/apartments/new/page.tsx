@@ -234,6 +234,7 @@ export default function NewApartmentPage() {
     try {
       const result = await resolveGoogleMapsAddress(form.googleLink);
       if (!form.title.trim() && result.title) update("title", result.title);
+      if (result.country) update("country", result.country);
       update("city", result.city);
       update("district", result.district);
       update("address", result.address);

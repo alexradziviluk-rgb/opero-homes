@@ -77,6 +77,10 @@ function labelCity(value: string) {
   return value.toLowerCase() === "alanya" ? "Аланья" : value;
 }
 
+function labelCountry(value: string) {
+  return value.toLowerCase() === "türkiye" || value.toLowerCase() === "turkey" ? "Турция" : value;
+}
+
 async function nominatimRequest(endpoint: "search" | "reverse", params: Record<string, string>) {
   const search = new URLSearchParams({ format: "jsonv2", addressdetails: "1", ...params });
   const response = await fetch(`https://nominatim.openstreetmap.org/${endpoint}?${search.toString()}`, {
@@ -110,6 +114,7 @@ async function resolveAddress(value: string) {
 
   return {
     title: titleFromGoogleUrl(resolvedUrl) || result.name || "",
+    country: labelCountry(address.country || ""),
     city: labelCity(city),
     district,
     address: street || result.display_name,
