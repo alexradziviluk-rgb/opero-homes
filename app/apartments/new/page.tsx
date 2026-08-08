@@ -110,6 +110,7 @@ export default function NewApartmentPage() {
   const [mapsStatus, setMapsStatus] = useState("");
   const [mapsError, setMapsError] = useState("");
   const [mapsLoading, setMapsLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [apartmentId] = useState(() => (typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())));
   const [photos, setPhotos] = useState<ApartmentPhoto[]>([]);
   const [responsibleOptions, setResponsibleOptions] = useState<AssigneeItem[]>([]);
@@ -136,13 +137,6 @@ export default function NewApartmentPage() {
 
     void loadAssignees();
   }, []);
-
-  const prepareApartmentForPhotos = useCallback(async () => {
-    const draft = buildApartment({ ...form, publicationStatus: "draft" }, apartmentId);
-    draft.photos = [];
-    draft.coverPhotoUrl = null;
-    await saveApartmentToSupabase(draft);
-  }, [apartmentId, form]);
 
   const handlePhotosChange = useCallback((nextPhotos: ApartmentPhoto[]) => {
     setPhotos(nextPhotos);
@@ -174,17 +168,26 @@ export default function NewApartmentPage() {
     setTimeout(() => setToast(""), 3000);
   }
 
-  function saveDraft() {
+  async function saveDraft() {
+    const validationErrors = validateForm(form);
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      showToast("Пожалуйста, заполните обязательные поля");
+      return;
+    }
+
     const id = apartmentId;
     const draft = buildApartment({ ...form, publicationStatus: "draft" }, id);
     draft.photos = photos;
     draft.coverPhotoUrl = photos.find((p) => p.isCover)?.storagePath ?? null;
-    void saveApartmentToSupabase(draft)
-      .then(() => showToast("Черновик сохранён"))
-      .catch((error: unknown) => {
-        console.error("Failed to save apartment draft:", error);
-        showToast(`Не удалось сохранить черновик: ${getErrorMessage(error)}`);
-      });
+    try {
+      await saveApartmentToSupabase(draft);
+      setIsSaved(true);
+      showToast("Черновик сохранён. Теперь можно загружать фотографии.");
+    } catch (error: unknown) {
+      console.error("Failed to save apartment draft:", error);
+      showToast(`Не удалось сохранить черновик: ${getErrorMessage(error)}`);
+    }
   }
 
   async function handleResolveAddress() {
@@ -265,8 +268,9 @@ export default function NewApartmentPage() {
                     apartmentId={apartmentId}
                     photos={photos}
                     onChange={handlePhotosChange}
-                    onBeforeUpload={prepareApartmentForPhotos}
+                    disabled={!isSaved}
                   />
+                  {!isSaved ? <p className="mt-3 text-sm text-amber-300">Сначала заполните обязательные поля и сохраните объект, затем загрузите фотографии.</p> : null}
                 </div>
               </section>
               <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
@@ -485,6 +489,7 @@ export default function NewApartmentPage() {
                         <label>
                           <div className="text-sm text-slate-300">Цена за ночь, €</div>
                           <input
+                            aria-label="Цена за ночь, €"
                             type="number"
                             min={0}
                             step="any"
@@ -498,6 +503,7 @@ export default function NewApartmentPage() {
                         <label>
                           <div className="text-sm text-slate-300">Минимальное количество ночей</div>
                           <input
+                            aria-label="Минимальное количество ночей"
                             type="number"
                             min={1}
                             step={1}

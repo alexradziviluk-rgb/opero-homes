@@ -10,11 +10,10 @@ type Props = {
   apartmentId: string;
   photos: ApartmentPhoto[];
   onChange: (photos: ApartmentPhoto[]) => Promise<void> | void;
-  onBeforeUpload?: () => Promise<void> | void;
   disabled?: boolean;
 };
 
-export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, onBeforeUpload, disabled }: Props) {
+export default function ApartmentPhotoManager({ apartmentId, photos: initialPhotos, onChange, disabled }: Props) {
   const [photoState, setPhotoState] = useState<{ source: ApartmentPhoto[]; value: ApartmentPhoto[] }>(() => ({
     source: initialPhotos,
     value: initialPhotos,
@@ -125,14 +124,6 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
     }
 
     if (validFiles.length === 0) return;
-
-    try {
-      await onBeforeUpload?.();
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "неизвестная ошибка";
-      enqueueError(`Не удалось подготовить объект для загрузки (${message})`);
-      return;
-    }
 
     setIsUploading(true);
     setUploadProgress({ completed: 0, total: validFiles.length });
@@ -274,7 +265,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       <div className="flex items-center justify-between">
         <div className="text-sm text-slate-300">Фотографии объекта ({photos.length})</div>
         <div className="flex items-center gap-2">
-          <label className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-200 cursor-pointer ${isUploading ? "opacity-50 pointer-events-none" : "bg-white/5"}`}>
+          <label className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-200 ${isUploading || disabled ? "opacity-50 pointer-events-none" : "bg-white/5 cursor-pointer"}`}>
             Выбрать фотографии
             <input
               ref={inputRef}
@@ -283,7 +274,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
               accept="image/jpeg,image/png,image/webp"
               className="hidden"
               onChange={handleFileInputChange}
-              disabled={isUploading}
+              disabled={isUploading || disabled}
             />
           </label>
         </div>
@@ -292,7 +283,7 @@ export default function ApartmentPhotoManager({ apartmentId, photos: initialPhot
       {error ? <div className="text-sm text-rose-400">{error}</div> : null}
 
       <div
-        className={`rounded-2xl border border-white/10 p-4 mb-3 ${isDragging ? "bg-white/5" : "bg-transparent"}`}
+        className={`rounded-2xl border border-white/10 p-4 mb-3 ${isDragging ? "bg-white/5" : "bg-transparent"} ${disabled ? "opacity-60" : ""}`}
         onDrop={handleDropFiles}
         onDragOver={(e) => e.preventDefault()}
         onDragEnter={handleDragEnter}
