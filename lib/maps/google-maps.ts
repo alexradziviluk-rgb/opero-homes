@@ -30,6 +30,7 @@ export function isGoogleMapsLink(value: string) {
 export function extractGoogleMapsCoordinates(value: string): { latitude: number; longitude: number } | null {
   const patterns = [
     /!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+    /@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
     /[?&](?:q|query|ll)=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
   ];
 
