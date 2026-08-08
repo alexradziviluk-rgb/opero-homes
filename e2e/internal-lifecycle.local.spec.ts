@@ -35,6 +35,9 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
   await expect(page.getByLabel("Название объекта")).toHaveValue("Yekta Homes", { timeout: 15_000 });
   await expect(page.getByLabel("Страна")).toHaveValue("Турция");
   await expect(page.getByLabel("Район")).toHaveValue("Mahmutlar");
+  await expect(page.getByLabel("Полный адрес")).toHaveValue("Barbaros Caddesi 14");
+  await expect(page.getByLabel("Широта")).toHaveValue("36.4972412");
+  await expect(page.getByLabel("Долгота")).toHaveValue("32.0869615");
   await page.getByLabel("Название объекта").fill(title);
   await page.getByLabel("Тип объекта").selectOption({ label: "Квартира" });
   await page.getByLabel("Город").selectOption({ label: "Аланья" });

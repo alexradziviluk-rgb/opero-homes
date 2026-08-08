@@ -39,8 +39,8 @@ function isAllowedMapsUrl(value: string) {
 
 function coordinatesFromText(value: string) {
   const patterns = [
-    /@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
     /!3d(-?\d{1,3}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
+    /@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
     /[?&](?:q|query|ll)=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
   ];
 
@@ -118,8 +118,8 @@ async function resolveAddress(value: string) {
     city: labelCity(city),
     district,
     address: street || result.display_name,
-    latitude: result.lat,
-    longitude: result.lon,
+    latitude: coordinates ? String(coordinates.latitude) : result.lat,
+    longitude: coordinates ? String(coordinates.longitude) : result.lon,
   };
 }
 
