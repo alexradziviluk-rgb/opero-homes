@@ -57,6 +57,31 @@ function formatRoleMessage(context: AIContext, message: string): string {
   return context.displayName ? `Добро пожаловать${name}. Я работаю с доступными вашей роли данными Opero Homes.` : "Я работаю только с доступными вашей роли данными Opero Homes.";
 }
 
+function propertyAnswer(language: "ru" | "en" | "tr", properties: unknown[], message: string): string {
+  if (properties.length === 0) {
+    if (language === "en") return `I couldn't find a matching property for “${message}”. A manager can check additional options and availability.`;
+    if (language === "tr") return `“${message}” için uygun bir konut bulamadım. Bir yönetici ek seçenekleri ve müsaitliği kontrol edebilir.`;
+    return `По запросу «${message}» подходящих опубликованных квартир не нашёл. Менеджер сможет проверить дополнительные варианты и точную доступность.`;
+  }
+  const rows = properties.slice(0, 3).map((item) => item as Record<string, unknown>).map((property) => {
+    const title = String(property.title ?? "Квартира");
+    const location = [property.district, property.city].filter(Boolean).join(", ");
+    const guests = Number(property.maxGuests ?? 0);
+    const price = property.dailyPrice == null ? "" : ` · ${property.dailyPrice} ${String(property.currency ?? "EUR")}/ночь`;
+    return `${title}${location ? ` (${location})` : ""}${guests ? ` · до ${guests} гостей` : ""}${price}`;
+  });
+  if (language === "en") return `I found ${properties.length} published option${properties.length === 1 ? "" : "s"}. ${rows.join("; ")}. Tell me your dates and number of guests and I’ll check the next step.`;
+  if (language === "tr") return `${properties.length} yayınlanmış seçenek buldum: ${rows.join("; ")}. Tarihleri ve misafir sayısını yazarsanız sonraki adımı kontrol edebilirim.`;
+  return `Нашёл ${properties.length} опубликованн${properties.length === 1 ? "ую квартиру" : "ых квартиры"}: ${rows.join("; ")}. Напишите даты и количество гостей, и я проверю следующий шаг.`;
+}
+
+function dataAnswer(language: "ru" | "en" | "tr", count: number | null, results: AIToolResult[]): string {
+  if (count !== null) return propertyAnswer(language, (results[0]?.data as { properties?: unknown[] } | undefined)?.properties ?? [], "ваш запрос");
+  if (language === "en") return "I checked the Opero Homes data available to your account. Tell me what you want to inspect next, and I’ll work through it with you.";
+  if (language === "tr") return "Hesabınız için mevcut Opero Homes verilerini kontrol ettim. Sırada neyi incelememi istediğinizi yazın, birlikte ilerleyelim.";
+  return "Проверил доступные вашей роли данные Opero Homes. Напишите, что именно нужно уточнить дальше, и разберём это по шагам.";
+}
+
 export async function answerWithTools(context: AIContext, rawMessage: string): Promise<AIChatResponse> {
   const message = rawMessage.replace(/\s+/g, " ").trim();
   const lower = message.toLocaleLowerCase("ru-RU");
@@ -108,20 +133,23 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
 
   if (results.length === 0) {
     const handoff = buildHandoff(context, message, false, true);
-    return { ok: true, message: handoff.offered ? "Я не могу решить этот вопрос автоматически. Передать его менеджеру?" : formatRoleMessage(context, message) + (context.role === "anonymous" ? " Укажите город, даты и количество гостей, чтобы начать поиск." : " Выберите один из быстрых запросов или уточните, что нужно найти."), role: context.role, tools: [], results: [], suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
+    const language = languageOf(message);
+    const messageText = handoff.offered
+      ? language === "en" ? "I don’t have enough verified information to answer this reliably. Would you like me to connect you with a manager?"
+        : language === "tr" ? "Bu soruyu güvenilir şekilde yanıtlamak için doğrulanmış yeterli bilgim yok. Sizi bir yöneticiye bağlamamı ister misiniz?"
+        : "У меня нет достаточно подтверждённых данных, чтобы ответить надёжно. Подключить менеджера?"
+      : formatRoleMessage(context, message) + (context.role === "anonymous" ? " Укажите город, даты и количество гостей, чтобы начать поиск." : " Уточните, что именно нужно найти или проверить.");
+    return { ok: true, message: messageText, role: context.role, tools: [], results: [], suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
   }
 
   const publicResults = results.map((result) => sanitizeAiToolResultForClient(context.role, result));
   const language = languageOf(message);
   const first = results[0]?.data as Record<string, unknown> | undefined;
   const count = Array.isArray(first?.properties) ? first.properties.length : Array.isArray(first) ? first.length : null;
-  const messageText = language === "en"
-    ? count !== null ? `I found ${count} published properties. Only public catalog data is shown.` : "Here is the latest data available to your role."
-    : language === "tr"
-    ? count !== null ? `${count} yayınlanmış konut buldum. Yalnızca herkese açık katalog verileri gösteriliyor.` : "Rolünüz için mevcut son veriler burada."
-    : count !== null ? `Нашёл объектов: ${count}. Показаны только опубликованные объекты публичного каталога.` : "Вот актуальные данные, доступные вашей роли.";
+  const messageText = dataAnswer(language, count, results);
 
   const hasToolError = results.some((result) => Boolean((result.data as Record<string, unknown> | null)?.error));
-  const handoff = buildHandoff(context, message, hasToolError, publicResults.length === 0);
-  return { ok: true, message: handoff.offered ? "Я не могу решить этот вопрос автоматически. Передать его менеджеру?" : messageText, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
+  const noResult = count === 0 || publicResults.length === 0;
+  const handoff = buildHandoff(context, message, hasToolError, noResult);
+  return { ok: true, message: handoff.offered && (hasToolError || noResult) ? `${messageText} ${language === "en" ? "Would you like me to connect you with a manager?" : language === "tr" ? "Sizi bir yöneticiye bağlamamı ister misiniz?" : "Подключить менеджера, чтобы проверить дополнительные варианты?"}` : messageText, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
 }
