@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const { error: replayError } = await supabase.from("support_telegram_updates").insert({ update_id: updateId });
     if (replayError?.code === "23505") return NextResponse.json({ ok: true, result: "noop", replay: true });
     if (replayError) return NextResponse.json({ ok: true, result: "rejected" });
-    const start = text.match(/^\/start\s+([^\s]{10,200})$/i);
+    const start = text.match(/^\/start(?:@[A-Za-z0-9_]+)?[\s\u00a0]+([^\s\u00a0]{10,200})$/iu);
     if (start && telegramUserId && chatId) {
       const tokenHash = hashTelegramLinkToken(start[1]);
       const { data: tokenRows } = await supabase.rpc("support_accept_telegram_link_token", { target_token_hash: tokenHash, target_telegram_user_id: telegramUserId, target_telegram_chat_id: chatId });
