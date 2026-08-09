@@ -32,7 +32,7 @@ type DeliveryInsertRow = {
   recipient_user_id: string | null;
   recipient_guest_id: string | null;
   recipient_key: string;
-  channel: "email" | "whatsapp";
+  channel: "email" | "whatsapp" | "telegram";
   destination: string;
   template_key: string;
   status: "queued";
@@ -171,6 +171,22 @@ export async function createBookingNotifications(params: {
         title: staffTemplate.title,
         message: staffTemplate.message,
         action_url: request.payload.actionUrl,
+      });
+    }
+
+    if (recipient.telegramChatId) {
+      deliveryRows.push({
+        organization_id: organizationId,
+        event_id: persisted.event.id,
+        recipient_user_id: recipient.userId,
+        recipient_guest_id: null,
+        recipient_key: buildStaffRecipientKey(recipient.userId),
+        channel: "telegram",
+        destination: recipient.telegramChatId,
+        template_key: staffTemplate.whatsappTemplateKey,
+        status: "queued",
+        attempt_count: 0,
+        next_attempt_at: nowIso(),
       });
     }
 

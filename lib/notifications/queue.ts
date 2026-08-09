@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { NOTIFICATION_MAX_ATTEMPTS, NOTIFICATION_RETRY_BACKOFF_MINUTES } from "@/lib/notifications/constants";
 import { createEmailProvider } from "@/lib/notifications/providers/email-provider";
 import { createWhatsAppProvider, normalizePhoneToE164 } from "@/lib/notifications/providers/whatsapp-provider";
+import { sendTelegramMessage } from "@/lib/support/telegram";
 import { renderClientTemplate, renderStaffTemplate } from "@/lib/notifications/templates";
 import type { NotificationDeliveryRow, NotificationEventRow, NotificationQueuePayload } from "@/types/notification";
 
@@ -216,6 +217,47 @@ export async function processNotificationQueue(params: {
         }
       }
 
+      continue;
+    }
+
+    if (item.channel === "telegram") {
+      const result = await sendTelegramMessage(item.destination, rendered.message);
+      if (result.ok) {
+        await markDeliveryState({
+          supabase,
+          id: item.id,
+          status: "sent",
+          attemptCount: item.attempt_count + 1,
+          providerMessageId: result.messageId ?? undefined,
+          sentAt: now().toISOString(),
+          deliveredAt: now().toISOString(),
+        });
+        sent += 1;
+      } else {
+        const nextAttemptCount = item.attempt_count + 1;
+        if (nextAttemptCount >= NOTIFICATION_MAX_ATTEMPTS) {
+          await markDeliveryState({
+            supabase,
+            id: item.id,
+            status: "permanently_failed",
+            attemptCount: nextAttemptCount,
+            failedAt: now().toISOString(),
+            lastError: result.error ?? "Telegram delivery failed",
+          });
+          permanentlyFailed += 1;
+        } else {
+          await markDeliveryState({
+            supabase,
+            id: item.id,
+            status: "retry_scheduled",
+            attemptCount: nextAttemptCount,
+            failedAt: now().toISOString(),
+            nextAttemptAt: scheduleRetry(nextAttemptCount),
+            lastError: result.error ?? "Telegram delivery failed",
+          });
+          retryScheduled += 1;
+        }
+      }
       continue;
     }
 

@@ -22,7 +22,7 @@ export type NotificationEventType =
 
 export type BookingNotificationEventType = NotificationEventType;
 
-export type NotificationDeliveryChannel = "email" | "whatsapp";
+export type NotificationDeliveryChannel = "email" | "whatsapp" | "telegram";
 
 export type NotificationDeliveryStatus =
   | "queued"
@@ -110,6 +110,7 @@ export type NotificationRecipient = {
   userId: string;
   email: string | null;
   phone: string | null;
+  telegramChatId: string | null;
   roleCode: string;
   receivesAs: "responsible" | "backup_manager" | "fallback_manager" | "client";
 };

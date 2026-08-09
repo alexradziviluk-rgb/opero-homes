@@ -13,6 +13,11 @@ type ProfileContactRow = {
   phone: string | null;
 };
 
+type TelegramContactRow = {
+  user_id: string;
+  telegram_chat_id: string;
+};
+
 type ApartmentAssigneeRow = {
   id: string;
   title: string | null;
@@ -137,17 +142,37 @@ async function loadProfileContacts(
   return new Map((data as ProfileContactRow[]).map((row) => [row.id, row]));
 }
 
+async function loadTelegramContacts(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map<string, string>();
+
+  const { data, error } = await supabase
+    .from("support_telegram_bindings")
+    .select("user_id,telegram_chat_id")
+    .eq("organization_id", organizationId)
+    .in("user_id", userIds)
+    .is("revoked_at", null);
+
+  if (error || !data) return new Map<string, string>();
+  return new Map((data as TelegramContactRow[]).map((row) => [row.user_id, row.telegram_chat_id]));
+}
+
 function buildRecipient(
   userId: string,
   roleCode: string,
   receivesAs: NotificationRecipient["receivesAs"],
   contacts: Map<string, ProfileContactRow>,
+  telegramContacts: Map<string, string>,
 ): NotificationRecipient {
   const profile = contacts.get(userId);
   return {
     userId,
     email: profile?.email ?? null,
     phone: profile?.phone ?? null,
+    telegramChatId: telegramContacts.get(userId) ?? null,
     roleCode,
     receivesAs,
   };
@@ -201,6 +226,7 @@ export async function resolveStaffRecipients(params: {
       userId,
       email: null,
       phone: null,
+      telegramChatId: null,
       roleCode,
       receivesAs,
     });
@@ -223,9 +249,14 @@ export async function resolveStaffRecipients(params: {
     supabase,
     recipients.map((recipient) => recipient.userId),
   );
+  const telegramContactMap = await loadTelegramContacts(
+    supabase,
+    organizationId,
+    recipients.map((recipient) => recipient.userId),
+  );
 
   const hydrated = recipients.map((recipient) =>
-    buildRecipient(recipient.userId, recipient.roleCode, recipient.receivesAs, contactMap),
+    buildRecipient(recipient.userId, recipient.roleCode, recipient.receivesAs, contactMap, telegramContactMap),
   );
 
   return {
