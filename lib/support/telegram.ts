@@ -26,6 +26,15 @@ export function buildTelegramKeyboard(publicNumber: string, actionToken = "uncon
   return { inline_keyboard: [[{ text: "Принять", callback_data: `support:accept:${actionToken}` }, { text: "Отметить решённым", callback_data: `support:resolve:${actionToken}` }], [{ text: "Открыть в Opero", url: `${productionUrl()}/admin/support/${safe}` }]] };
 }
 
+export async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: { inline_keyboard: TelegramButton[][] }): Promise<TelegramSendResult> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId || !text) return { ok: false, chatId: chatId || null, messageId: null, error: "Telegram is not configured" };
+  const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text: sanitizeSupportText(text, 4000), reply_markup: replyMarkup, disable_web_page_preview: true }) });
+  const payload = await response.json().catch(() => null) as { ok?: boolean; result?: { message_id?: number }; description?: string } | null;
+  if (!response.ok || !payload?.ok) return { ok: false, chatId, messageId: null, error: payload?.description || "Telegram request failed" };
+  return { ok: true, chatId, messageId: payload.result?.message_id ? String(payload.result.message_id) : null };
+}
+
 export async function sendSupportTelegram(ticket: SupportTicket, apartmentTitle?: string | null, routedChatId?: string | null): Promise<TelegramSendResult> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = routedChatId || process.env.TELEGRAM_MANAGER_CHAT_ID;
@@ -37,9 +46,5 @@ export async function sendSupportTelegram(ticket: SupportTicket, apartmentTitle?
 }
 
 export async function sendTelegramText(chatId: string, text: string): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !chatId || !text) return false;
-  const response = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text: sanitizeSupportText(text, 4000), disable_web_page_preview: true }) });
-  const payload = await response.json().catch(() => null) as { ok?: boolean } | null;
-  return Boolean(response.ok && payload?.ok);
+  return (await sendTelegramMessage(chatId, text)).ok;
 }

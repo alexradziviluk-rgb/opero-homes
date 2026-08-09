@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendSupportTelegram } from "./telegram";
 import { sanitizeSupportSummary, sanitizeSupportText } from "./privacy";
 import { isAnonymousContinuationEnabled, isLiveConversationT2Enabled } from "./feature-flags";
+import { notifyStaff } from "./notifications";
 import type { SupportCategory, SupportHandoff, SupportPriority, SupportTicket } from "./types";
 import type { AIContext } from "@/lib/ai/types";
 
@@ -72,6 +73,26 @@ export async function createSupportTicket(params: { supabase: SupabaseClient; co
   }
   if (error || !data) throw new Error("Не удалось создать обращение");
   const ticket = data as SupportTicket;
+  if (ticket.organization_id) {
+    try {
+      await notifyStaff({
+        supabase: params.supabase,
+        organizationId: ticket.organization_id,
+        ticketId: ticket.id,
+        publicNumber: ticket.public_number,
+        eventType: "support_ticket_created",
+        title: ticket.priority === "urgent" ? "🚨 URGENT · Новое обращение Opero" : "Новое обращение Opero",
+        message: `${ticket.public_number}: ${ticket.subject}\nПриоритет: ${ticket.priority}\n${sanitizeSupportText(ticket.customer_message, 500)}`,
+        actionUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/admin/support/${encodeURIComponent(ticket.public_number)}`,
+        idempotencyKey: `support:${ticket.id}:created`,
+        priority: ticket.priority,
+        apartmentId: ticket.apartment_id,
+        bookingId: ticket.booking_id,
+      });
+    } catch (notificationError) {
+      console.error("[support-notification]", notificationError instanceof Error ? notificationError.message : "Unable to persist support notification");
+    }
+  }
   const routedChatIds = await resolveTelegramChatIds(params.supabase, params.context.organizationId);
   const delivery = { ok: false, chatId: null as string | null, messageId: null as string | null, error: "Telegram is not configured" };
   const outcomes: Array<{ chatId: string; ok: boolean; messageId: string | null; error?: string }> = [];
@@ -94,7 +115,7 @@ export async function createSupportTicket(params: { supabase: SupabaseClient; co
 
 async function resolveTelegramChatIds(supabase: SupabaseClient, organizationId: string | null): Promise<string[]> {
   if (!organizationId) return process.env.TELEGRAM_MANAGER_CHAT_ID ? [process.env.TELEGRAM_MANAGER_CHAT_ID] : [];
-  const bindings = isLiveConversationT2Enabled() ? (await supabase.from("support_telegram_bindings").select("telegram_chat_id").eq("organization_id", organizationId)).data : [];
+  const bindings = isLiveConversationT2Enabled() ? (await supabase.from("support_telegram_bindings").select("telegram_chat_id").eq("organization_id", organizationId).is("revoked_at", null)).data : [];
   const linkedChats = (bindings ?? []).map((row) => (row as { telegram_chat_id?: string | null }).telegram_chat_id?.trim()).filter((value): value is string => Boolean(value));
   const { data: settings } = await supabase.from("organization_notification_settings").select("telegram_manager_chat_id").eq("organization_id", organizationId).maybeSingle();
   if (typeof settings?.telegram_manager_chat_id === "string" && settings.telegram_manager_chat_id.trim()) linkedChats.push(settings.telegram_manager_chat_id.trim());

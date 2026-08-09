@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { callbackAuditMetadata, hashTelegramUpdateId, isAllowedTelegramChat, parseTelegramCallbackData, transitionTelegramCallback } from "@/lib/telegram/callback";
 import { hashTelegramLinkToken } from "@/lib/telegram/link";
-import { sendTelegramText } from "@/lib/support/telegram";
+import { sendTelegramMessage, sendTelegramText } from "@/lib/support/telegram";
+import { notifyStaff } from "@/lib/support/notifications";
 import { publishConversationEvent } from "@/lib/support/realtime";
 import { isLiveConversationT2Enabled, isTelegramMessageRepliesEnabled } from "@/lib/support/feature-flags";
 import type { SupportStatus } from "@/lib/support/types";
@@ -65,6 +66,13 @@ export async function POST(request: Request) {
     if (messageError) return NextResponse.json({ ok: true, result: "rejected" });
     await supabase.from("support_tickets").update({ first_response_at: nowMessage }).eq("id", ticket.ticket_id).is("first_response_at", null);
     await supabase.from("support_audit_log").insert({ ticket_id: ticket.ticket_id, actor_type: "telegram", actor_user_id: binding.user_id, action: "message_added", safe_metadata: { source: "telegram", message_type: "telegram" } });
+    if (binding.organization_id) {
+      try {
+        await notifyStaff({ supabase, organizationId: binding.organization_id, ticketId: ticket.ticket_id, publicNumber: ticket.public_number, eventType: "support_manager_replied", title: "Новое сообщение менеджера", message: `${ticket.public_number}: менеджер ответил в Telegram.`, actionUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/admin/support/${encodeURIComponent(ticket.public_number)}`, idempotencyKey: `support:${ticket.ticket_id}:message:${updateId}`, priority: "normal", preferredUserId: binding.user_id });
+      } catch (notificationError) {
+        console.error("[support-notification]", notificationError instanceof Error ? notificationError.message : "Unable to persist manager reply notification");
+      }
+    }
     await publishConversationEvent({ kind: "message", conversation: ticket.public_number, senderType: "manager", message: text.slice(0, 2000), messageType: "telegram", source: "telegram", createdAt: nowMessage });
     return NextResponse.json({ ok: true, result: "applied" });
   }
@@ -77,7 +85,7 @@ export async function POST(request: Request) {
   const callbackUserId = callback?.from?.id ? String(callback.from.id) : "";
   const { data: linkedBinding } = isLiveConversationT2Enabled() && callbackUserId ? await supabase.from("support_telegram_bindings").select("organization_id,user_id,telegram_chat_id").eq("telegram_user_id", callbackUserId).eq("telegram_chat_id", chatId).eq("organization_id", ticket.organization_id).maybeSingle() : { data: null };
   if (!isAllowedTelegramChat(ticket.telegram_chat_id, chatId, process.env.TELEGRAM_MANAGER_CHAT_ID) && !linkedBinding) {
-    console.info("[telegram-callback]", { public_number: ticket.public_number, action: parsedCallback.action, result: "rejected", status_before: ticket.status, status_after: ticket.status, timestamp: new Date().toISOString() });
+    console.info("[telegram-callback]", { public_number: ticket.public_number, action: parsedCallback.action, result: "rejected", status_before: ticket.status, bindingFound: Boolean(linkedBinding), t2Enabled: isLiveConversationT2Enabled(), timestamp: new Date().toISOString() });
     return NextResponse.json({ ok: true, result: "rejected" });
   }
 
@@ -98,6 +106,19 @@ export async function POST(request: Request) {
       const { data: accepted, error: acceptError } = await supabase.rpc("support_accept_conversation", { target_ticket_id: ticket.id, manager_user_id: linkedBinding.user_id });
       result = acceptError ? "rejected" : Array.isArray(accepted) && accepted.length > 0 ? "applied" : "noop";
       if (result === "applied") await supabase.from("support_audit_log").insert({ ticket_id: ticket.id, actor_type: "telegram", actor_user_id: linkedBinding.user_id, action: "conversation_accepted", safe_metadata: { update_id_hash: updateIdHash } });
+      if (result === "applied") {
+        const confirmation = await sendTelegramMessage(chatId, `Вы отвечаете на ${ticket.public_number}. Ответьте именно на это сообщение.`);
+        if (confirmation.ok && confirmation.messageId) {
+          await supabase.from("support_telegram_message_refs").upsert({ ticket_id: ticket.id, organization_id: ticket.organization_id, telegram_chat_id: chatId, telegram_message_id: confirmation.messageId }, { onConflict: "ticket_id,telegram_chat_id" });
+        }
+        if (ticket.organization_id) {
+          try {
+            await notifyStaff({ supabase, organizationId: ticket.organization_id, ticketId: ticket.id, publicNumber: ticket.public_number, eventType: "support_manager_replied", title: "Менеджер подключился к обращению", message: `${ticket.public_number}: менеджер подключился к диалогу.`, actionUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/admin/support/${encodeURIComponent(ticket.public_number)}`, idempotencyKey: `support:${ticket.id}:accepted:${linkedBinding.user_id}`, priority: "normal", preferredUserId: linkedBinding.user_id });
+          } catch (notificationError) {
+            console.error("[support-notification]", notificationError instanceof Error ? notificationError.message : "Unable to persist manager notification");
+          }
+        }
+      }
     }
   }
   const linkedUserId = linkedBinding?.user_id;

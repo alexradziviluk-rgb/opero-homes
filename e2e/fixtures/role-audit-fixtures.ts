@@ -9,6 +9,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 export type AuditRole = "admin" | "manager" | "employee" | "cleaner" | "maintenance" | "guest" | "propertyOwner";
 export type AuditAccount = { role: AuditRole; email: string; password: string; id: string };
 export type RoleAuditFixture = {
+  admin: SupabaseClient;
   prefix: string;
   organizationId: string;
   apartmentPublishedId: string;
@@ -54,7 +55,7 @@ function adminClient(): SupabaseClient {
   });
 }
 
-function runLocalSql(statement: string) {
+export function runLocalSql(statement: string) {
   const file = join(tmpdir(), `role-audit-sql-${randomUUID()}.sql`);
   writeFileSync(file, statement, "utf8");
   try {
@@ -77,7 +78,7 @@ async function createAccount(admin: SupabaseClient, prefix: string, role: AuditR
   return { role, email, password, id: result.data.user.id };
 }
 
-async function insertOrThrow(admin: SupabaseClient, table: string, values: Record<string, unknown> | Record<string, unknown>[]) {
+export async function insertOrThrow(admin: SupabaseClient, table: string, values: Record<string, unknown> | Record<string, unknown>[]) {
   void admin;
   const rows = Array.isArray(values) ? values : [values];
   const columns = Object.keys(rows[0]);
@@ -157,7 +158,7 @@ export async function seedRoleAuditFixtures(): Promise<RoleAuditFixture> {
   await insertOrThrow(admin, "notification_events", { id: eventId, organization_id: organizationId, event_type: "booking_created", entity_type: "booking", entity_id: pendingBookingId, booking_id: pendingBookingId, apartment_id: apartmentPublishedId, payload: { prefix }, idempotency_key: `${prefix}-notification`, created_by_user_id: accounts.admin.id });
   await insertOrThrow(admin, "notifications", roleSpecs.slice(0, 5).map(([role]) => ({ organization_id: organizationId, recipient_user_id: accounts[role].id, event_id: eventId, title: `${prefix} Notification`, message: `${prefix} notification`, action_url: `/bookings/${pendingBookingId}` })));
 
-  const fixture = { prefix, organizationId, apartmentPublishedId, apartmentDraftId, clientId, confirmedBookingId, pendingBookingId, cleaningTaskId, maintenanceTaskId, ownerBlockId, lifecycleApartmentIds: [], accounts, storagePaths: [] };
+  const fixture = { admin, prefix, organizationId, apartmentPublishedId, apartmentDraftId, clientId, confirmedBookingId, pendingBookingId, cleaningTaskId, maintenanceTaskId, ownerBlockId, lifecycleApartmentIds: [], accounts, storagePaths: [] };
   console.info("[role-audit-fixture]", { event: "seed-finish", fixture: prefix, recordsSeeded: true, at: new Date().toISOString() });
   return fixture;
 }

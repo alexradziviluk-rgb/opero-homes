@@ -24,7 +24,7 @@ export async function PATCH(request: Request) {
   const clientMessageId = typeof body?.clientMessageId === "string" ? body.clientMessageId.trim().slice(0, 120) : "";
   const allowed = ["assigned", "in_progress", "waiting_for_client", "resolved", "closed", "cancelled"];
   if (!/^OP-\d{4,}$/.test(publicNumber) || (!allowed.includes(status) && !message && !["accept", "transfer", "internal_note", "revoke_anonymous"].includes(action))) return NextResponse.json({ ok: false, error: "Invalid support update" }, { status: 400 });
-    const { data: ticket, error: ticketError } = await supabase.from("support_tickets").select("id,organization_id,conversation_state,assigned_to").eq("public_number", publicNumber).maybeSingle();
+    const { data: ticket, error: ticketError } = await supabase.from("support_tickets").select("id,organization_id,conversation_state,assigned_to,public_number").eq("public_number", publicNumber).maybeSingle();
     if (ticketError || !ticket) return NextResponse.json({ ok: false, error: "Обращение не найдено" }, { status: 404 });
     const id = ticket.id;
   const role = getRoleCodeFromContext(auth.context);
@@ -67,6 +67,13 @@ export async function PATCH(request: Request) {
     const applied = Array.isArray(data) && data.length > 0;
     if (applied) {
       await serviceSupabase.from("support_audit_log").insert({ ticket_id: id, actor_type: role, actor_user_id: auth.context.authUserId, action: `conversation_${status}`, safe_metadata: {} });
+      if (ticket.organization_id) {
+        try {
+          await (await import("@/lib/support/notifications")).notifyStaff({ supabase: serviceSupabase, organizationId: ticket.organization_id, ticketId: id, publicNumber: ticket.public_number, eventType: "support_conversation_closed", title: "Обращение закрыто", message: `${ticket.public_number}: обращение закрыто менеджером.`, actionUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/admin/support/${encodeURIComponent(ticket.public_number)}`, idempotencyKey: `support:${id}:closed`, priority: "normal", preferredUserId: ticket.assigned_to });
+        } catch (notificationError) {
+          console.error("[support-notification]", notificationError instanceof Error ? notificationError.message : "Unable to persist support close notification");
+        }
+      }
       await publishConversationEvent({ kind: "state", conversation: publicNumber, state: status, createdAt: new Date().toISOString() });
     }
     return NextResponse.json({ ok: true, result: applied ? "applied" : "noop", conversationState: applied ? status : ticket.conversation_state });

@@ -15,7 +15,10 @@ export type NotificationEventType =
   | "booking_ready_for_checkin"
   | "booking_checkin_upcoming"
   | "booking_checkout_upcoming"
-  | "booking_unassigned";
+  | "booking_unassigned"
+  | "support_ticket_created"
+  | "support_manager_replied"
+  | "support_conversation_closed";
 
 export type BookingNotificationEventType = NotificationEventType;
 

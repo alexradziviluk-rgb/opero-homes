@@ -18,6 +18,9 @@ export const NOTIFICATION_EVENT_TYPES: NotificationEventType[] = [
   "booking_checkin_upcoming",
   "booking_checkout_upcoming",
   "booking_unassigned",
+  "support_ticket_created",
+  "support_manager_replied",
+  "support_conversation_closed",
 ];
 
 export const BOOKING_NOTIFICATION_EVENT_TYPES = NOTIFICATION_EVENT_TYPES;

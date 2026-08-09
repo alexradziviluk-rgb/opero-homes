@@ -217,7 +217,7 @@ export default function OperoAI() {
     if (!handoff) return;
     const response = await fetch("/api/support/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: handoff.prompt, route: pathname, confirmed: true, idempotencyKey: handoff.details.actionId, actionId: handoff.details.actionId, expiresAt: handoff.details.expiresAt, email: contactEmail, phone: contactPhone, consent: currentUser ? true : contactConsent }) });
     const payload = await response.json() as { ok?: boolean; message?: string; error?: string; publicNumber?: string; conversationState?: ConversationState };
-    setMessages((current) => [...current, { id: `handoff-${Date.now()}`, role: "assistant", text: payload.ok ? payload.message || `Обращение ${payload.publicNumber} передано менеджеру.` : payload.error || "Не удалось создать обращение." }]);
+    setMessages((current) => [...current, { id: `handoff-${Date.now()}`, role: "assistant", text: payload.ok ? payload.message || `Обращение ${payload.publicNumber} передано менеджеру.` : payload.error || "Не удалось передать обращение. Попробуйте ещё раз." }]);
     if (payload.ok) { setHandoff(null); setContactEmail(""); setContactPhone(""); setContactConsent(false); if (payload.publicNumber) { setConversationId(payload.publicNumber); setConversationState(payload.conversationState ?? "waiting_manager"); void loadConversation(payload.publicNumber); } }
   }
 
