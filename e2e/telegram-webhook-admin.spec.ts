@@ -85,6 +85,13 @@ test.describe("Telegram webhook admin controls", () => {
     expect(get.status()).toBe(405);
   });
 
+  test("anonymous activation is denied", async ({ request }) => {
+    const response = await request.post("/api/admin/telegram/webhook/activate");
+    expect(response.status()).toBe(401);
+    const body = await response.text();
+    expect(body).not.toMatch(/TELEGRAM_BOT_TOKEN|TELEGRAM_WEBHOOK_SECRET|setup_secret/i);
+  });
+
   test("anonymous status is denied without exposing secrets", async ({ request }) => {
     const response = await request.get("/api/admin/telegram/webhook/status");
     expect(response.status()).toBe(401);

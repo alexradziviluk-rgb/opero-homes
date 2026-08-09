@@ -18,6 +18,7 @@ type TelegramWebhookInfoPayload = {
 type TelegramApiPayload = { ok?: boolean; description?: unknown; result?: unknown };
 
 export type SafeWebhookStatus = {
+  bot_connected: boolean;
   configured: boolean;
   url: string;
   pending_update_count: number;
@@ -45,7 +46,7 @@ export function hasSetupSecret(request: Request): boolean {
   return expectedBuffer.length === providedBuffer.length && timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-function telegramApiUrl(token: string, method: "getWebhookInfo" | "setWebhook"): string {
+function telegramApiUrl(token: string, method: "getMe" | "getWebhookInfo" | "setWebhook"): string {
   return `https://api.telegram.org/bot${encodeURIComponent(token)}/${method}`;
 }
 
@@ -64,6 +65,7 @@ export function sanitizeWebhookInfo(payload: TelegramWebhookInfoPayload): SafeWe
     ? result.allowed_updates.filter((value): value is string => typeof value === "string").slice(0, 20)
     : [];
   return {
+    bot_connected: false,
     configured: url.length > 0,
     url,
     pending_update_count: finiteNumber(result.pending_update_count) ?? 0,
@@ -84,7 +86,7 @@ export function buildSetWebhookPayload(secret: string) {
 
 type Fetcher = typeof fetch;
 
-async function telegramRequest(token: string, method: "getWebhookInfo" | "setWebhook", body?: object, fetcher: Fetcher = fetch): Promise<TelegramApiPayload | null> {
+async function telegramRequest(token: string, method: "getMe" | "getWebhookInfo" | "setWebhook", body?: object, fetcher: Fetcher = fetch): Promise<TelegramApiPayload | null> {
   try {
     const response = await fetcher(telegramApiUrl(token, method), {
       method: body ? "POST" : "GET",
@@ -100,9 +102,10 @@ async function telegramRequest(token: string, method: "getWebhookInfo" | "setWeb
 export async function getSafeTelegramWebhookStatus(fetcher: Fetcher = fetch): Promise<{ ok: true; status: SafeWebhookStatus } | { ok: false; error: "not_configured" | "telegram_unavailable" }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return { ok: false, error: "not_configured" };
+  const bot = await telegramRequest(token, "getMe", undefined, fetcher);
   const payload = await telegramRequest(token, "getWebhookInfo", undefined, fetcher);
   if (!payload?.ok) return { ok: false, error: "telegram_unavailable" };
-  return { ok: true, status: sanitizeWebhookInfo(payload as TelegramWebhookInfoPayload) };
+  return { ok: true, status: { ...sanitizeWebhookInfo(payload as TelegramWebhookInfoPayload), bot_connected: Boolean(bot?.ok) } };
 }
 
 export async function configureTelegramWebhook(fetcher: Fetcher = fetch): Promise<TelegramWebhookOperation> {
