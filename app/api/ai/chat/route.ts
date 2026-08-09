@@ -3,6 +3,8 @@ import { getAIContext } from "@/lib/ai/context";
 import { answerWithTools } from "@/lib/ai/assistant";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { createSupportTicket } from "@/lib/support/service";
+import { classifyAiIntent } from "@/lib/ai/intent";
+import { executeAiOperationalAction } from "@/lib/ai/operations";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
@@ -41,7 +43,34 @@ export async function POST(request: Request) {
   }
   const rateKey = context.userId ? `user:${context.userId}` : `ip:${ip}`;
   if (!allowedByRateLimit(rateKey)) return NextResponse.json({ ok: false, error: "Слишком много запросов. Повторите позже." }, { status: 429 });
+  const classification = classifyAiIntent(message);
   const response = await answerWithTools(context, message);
+  response.intent = classification.intent;
+  response.action = classification.action;
+  if (classification.action === "CREATE_MAINTENANCE_TASK" || classification.action === "CREATE_CLEANING_TASK" || classification.action === "URGENT_HANDOFF") {
+    const supabase = createSupabaseServiceRoleClient();
+    if (supabase) {
+      const operationalAction = await executeAiOperationalAction({ supabase, context, conversationId, message, classification });
+      response.operationalAction = operationalAction;
+      if (operationalAction.ok) {
+        response.message = operationalAction.duplicate
+          ? `Проблема уже зарегистрирована: задача ${operationalAction.taskReference ?? "существует"}. Новое действие не создавалось.`
+          : `Проблема зарегистрирована. Задача ${operationalAction.taskReference ?? "создана"}, обращение ${operationalAction.ticketReference ?? "передано менеджеру"}. Я буду опираться на этот статус и не буду обещать невыполненное действие.`;
+        response.handoff = undefined;
+      } else if (operationalAction.ticketReference) {
+        response.message = `Не удалось автоматически зарегистрировать операционную задачу. Я передал вопрос менеджеру: ${operationalAction.ticketReference}.`;
+        response.handoff = undefined;
+      } else if (response.handoff && context.userId) {
+        try {
+          const ticket = await createSupportTicket({ supabase, context, message, route: context.route, handoff: response.handoff, idempotencyKey: response.handoff.actionId });
+          response.message = `Не удалось автоматически зарегистрировать операционную задачу. Я передал вопрос менеджеру: ${ticket.ticket.public_number}.`;
+          response.handoff = { ...response.handoff, offered: false, requiresConfirmation: false, critical: false };
+        } catch {
+          response.message = "Не удалось автоматически зарегистрировать проблему и передать её менеджеру. Пожалуйста, свяжитесь с Opero Homes напрямую.";
+        }
+      }
+    }
+  }
   if (response.handoff?.critical) {
     const supabase = createSupabaseServiceRoleClient();
     if (supabase) {

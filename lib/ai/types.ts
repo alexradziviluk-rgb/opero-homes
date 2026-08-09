@@ -31,5 +31,15 @@ export type AIChatResponse = {
   tools: string[];
   results: AIToolResult[];
   suggestions: string[];
+  intent?: string;
+  action?: string;
+  operationalAction?: {
+    ok: boolean;
+    taskReference?: string;
+    ticketReference?: string;
+    duplicate?: boolean;
+    fallbackUsed?: boolean;
+    reason?: string;
+  };
   handoff?: import("@/lib/support/types").SupportHandoff;
 };
