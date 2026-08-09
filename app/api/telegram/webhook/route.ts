@@ -68,10 +68,11 @@ export async function POST(request: Request) {
     const chatId = incomingMessage.chat?.id ? String(incomingMessage.chat.id) : "";
     const telegramUserId = incomingMessage.from?.id ? String(incomingMessage.from.id) : "";
     const text = typeof incomingMessage.text === "string" ? incomingMessage.text.trim() : "";
+    const normalizedText = text.replace(/[\u200b-\u200d\ufeff]/g, "");
     const { error: replayError } = await supabase.from("support_telegram_updates").insert({ update_id: updateId });
     if (replayError?.code === "23505") return NextResponse.json({ ok: true, result: "noop", replay: true });
     if (replayError) return NextResponse.json({ ok: true, result: "rejected" });
-    const start = text.match(/^\/start(?:@[A-Za-z0-9_]+)?[\s\u00a0]+([^\s\u00a0]{10,200})$/iu);
+    const start = normalizedText.match(/^\/start(?:@[A-Za-z0-9_]+)?[\s\u00a0]+([^\s\u00a0]{10,200})$/iu);
     console.info("[telegram-link-check]", { update_id_hash: hashTelegramUpdateId(updateId), has_text: Boolean(text), has_user: Boolean(telegramUserId), has_chat: Boolean(chatId), start_format_valid: Boolean(start) });
     if (start && telegramUserId && chatId) {
       const tokenHash = hashTelegramLinkToken(start[1]);
