@@ -161,19 +161,6 @@ export async function PUT(request: Request) {
   if (bookingError) return error(422, bookingError.message);
   if (!booking) return error(404, "Booking not found");
 
-  const { data, error: upsertError } = await supabase
-    .from("booking_operation_checklists")
-    .upsert({
-      organization_id: auth.context.organization.id,
-      booking_id: bookingId,
-      [field]: body.value,
-      updated_by: auth.context.authUserId,
-    }, { onConflict: "booking_id" })
-    .select("*")
-    .single();
-
-  if (upsertError) return error(422, upsertError.message);
-
   const targetStatus = field === "check_in_completed" && body.value
     ? "checked_in"
     : field === "check_out_completed" && body.value
@@ -194,6 +181,19 @@ export async function PUT(request: Request) {
       .eq("status", booking.status);
     if (statusError) return error(422, statusError.message, statusError.code);
   }
+
+  const { data, error: upsertError } = await supabase
+    .from("booking_operation_checklists")
+    .upsert({
+      organization_id: auth.context.organization.id,
+      booking_id: bookingId,
+      [field]: body.value,
+      updated_by: auth.context.authUserId,
+    }, { onConflict: "booking_id" })
+    .select("*")
+    .single();
+
+  if (upsertError) return error(422, upsertError.message);
 
   if (field === "apartment_ready" && body.value) {
     try {

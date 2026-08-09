@@ -240,4 +240,30 @@ test("check-in and check-out checklist transitions persist booking state", async
     data: { bookingId, field: "check_out_completed", value: true },
   });
   expect(repeatedCheckOut.status(), await repeatedCheckOut.text()).toBe(200);
+
+  const invalidBookingId = randomUUID();
+  const invalidCreateResponse = await page.request.post("/api/bookings", {
+    data: {
+      id: invalidBookingId,
+      apartmentId,
+      guestName: `${fixture.prefix} Premature Checkout Guest`,
+      guestPhone: "+79990007777",
+      guestEmail: fixture.accounts.guest.email,
+      checkIn: new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10),
+      checkOut: new Date(Date.now() + 4 * 86_400_000).toISOString().slice(0, 10),
+      guests: 1,
+      rentalType: "daily",
+      status: "confirmed",
+      paymentStatus: "unpaid",
+      source: "internal-checkin-transition-e2e",
+    },
+  });
+  expect(invalidCreateResponse.status(), await invalidCreateResponse.text()).toBe(201);
+  const invalidCheckOut = await page.request.put("/api/operations/checklists", {
+    data: { bookingId: invalidBookingId, field: "check_out_completed", value: true },
+  });
+  expect(invalidCheckOut.status(), await invalidCheckOut.text()).toBe(409);
+  const checklistAfterInvalidTransition = await page.request.get(`/api/operations/checklists?bookingId=${invalidBookingId}`);
+  expect(checklistAfterInvalidTransition.status()).toBe(200);
+  expect(await checklistAfterInvalidTransition.json()).toMatchObject({ ok: true, data: [] });
 });
