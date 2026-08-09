@@ -19,6 +19,7 @@ export type SupportFixture = {
   waitingTicket: string;
   resolvedTicket: string;
   closedTicket: string;
+  legacyTicket: string;
   otherOrgTicket: string;
   cleanup: () => Promise<void>;
 };
@@ -72,13 +73,19 @@ export async function createSupportFixture(): Promise<SupportFixture> {
   const resolvedTicket = await ticket(clientA.id, organizationA, "resolved", manager1.id);
   const closedTicket = await ticket(clientA.id, organizationA, "closed", manager1.id);
   const otherOrgTicket = await ticket(clientB.id, organizationB, "manager_active", managerB.id);
+  const legacyTicket = randomUUID();
+  const legacyActionToken = `${randomUUID().replace(/-/g, "")}${randomUUID().replace(/-/g, "").slice(0, 4)}`;
+  const legacyChatId = `legacy-chat-${organizationA}`;
+  await insert(admin, "support_tickets", { id: legacyTicket, organization_id: organizationA, requester_user_id: clientA.id, requester_name: "Support Test", category: "general", priority: "normal", status: "in_progress", conversation_state: "bot_active", subject: `${prefix} legacy ticket`, customer_message: "Legacy initial message", idempotency_scope: `fixture:${legacyTicket}`, idempotency_key_hash: randomUUID(), confirmation_action_id: randomUUID(), confirmation_expires_at: new Date(Date.now() + 60_000).toISOString(), telegram_action_token: legacyActionToken, telegram_chat_id: legacyChatId, assigned_to: null });
+  await insert(admin, "support_messages", { ticket_id: legacyTicket, sender_type: "client", sender_user_id: clientA.id, message: "Legacy public message", message_type: "text", content_type: "text", source: "web", is_internal: false });
+  await insert(admin, "support_telegram_message_refs", { ticket_id: legacyTicket, organization_id: organizationA, telegram_chat_id: legacyChatId, telegram_message_id: "legacy-anchor" });
   const cleanup = async () => {
-    await admin.from("support_tickets").delete().in("id", [activeTicket, waitingTicket, resolvedTicket, closedTicket, otherOrgTicket]);
+    await admin.from("support_tickets").delete().in("id", [activeTicket, waitingTicket, resolvedTicket, closedTicket, otherOrgTicket, legacyTicket]);
     await admin.from("organization_members").delete().in("user_id", [clientA.id, clientB.id, manager1.id, manager2.id, employee.id, managerB.id]);
     await admin.from("organizations").delete().in("id", [organizationA, organizationB]);
     for (const account of [clientA, clientB, manager1, manager2, employee, managerB]) await admin.auth.admin.deleteUser(account.id);
   };
-  return { admin, organizationA, organizationB, clientA, clientB, manager1, manager2, employee, managerB, activeTicket, waitingTicket, resolvedTicket, closedTicket, otherOrgTicket, cleanup };
+  return { admin, organizationA, organizationB, clientA, clientB, manager1, manager2, employee, managerB, activeTicket, waitingTicket, resolvedTicket, closedTicket, otherOrgTicket, legacyTicket, cleanup };
 }
 
 export function sha256(value: string) { return createHash("sha256").update(value).digest("hex"); }

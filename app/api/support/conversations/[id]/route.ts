@@ -4,6 +4,7 @@ import { canClientSend } from "@/lib/support/conversation";
 import { publishConversationEvent } from "@/lib/support/realtime";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { isLiveConversationT2Enabled } from "@/lib/support/feature-flags";
+import { effectiveConversationState } from "@/lib/support/legacy-conversation";
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -14,9 +15,9 @@ async function loadOwnedTicket(publicNumber: string) {
   if (!context.userId) return { context, ticket: null, response: NextResponse.json({ ok: false, error: "Authentication required" }, { status: 401 }) };
   const supabase = createSupabaseServiceRoleClient();
   if (!supabase) return { context, ticket: null, response: NextResponse.json({ ok: false, error: "Сервис диалогов временно недоступен." }, { status: 503 }) };
-  const { data: ticket, error } = await supabase.from("support_tickets").select("id,public_number,conversation_state,conversation_summary,assigned_to,subject,created_at,updated_at,manager_joined_at,first_response_at,resolved_at,closed_at").eq("public_number", publicNumber).eq("requester_user_id", context.userId).maybeSingle();
+  const { data: ticket, error } = await supabase.from("support_tickets").select("id,public_number,status,conversation_state,conversation_summary,assigned_to,subject,created_at,updated_at,manager_joined_at,first_response_at,resolved_at,closed_at").eq("public_number", publicNumber).eq("requester_user_id", context.userId).maybeSingle();
   if (error || !ticket) return { context, ticket: null, response: NextResponse.json({ ok: false, error: "Диалог не найден" }, { status: 404 }) };
-  return { context, ticket, supabase };
+  return { context, ticket: { ...ticket, conversation_state: effectiveConversationState(ticket) ?? ticket.conversation_state }, supabase };
 }
 
 function publicMessage(row: Record<string, unknown>) {

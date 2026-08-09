@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { getRoleCodeFromContext, isManagerRoleCode } from "@/lib/supabase/role-code";
 import { publishConversationEvent } from "@/lib/support/realtime";
+import { effectiveConversationState } from "@/lib/support/legacy-conversation";
 
 export async function GET(request: Request) {
   const auth = await requireStaffApiAuth(); if (!auth.ok) return auth.response;
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
-  return NextResponse.json({ ok: true, data });
+  return NextResponse.json({ ok: true, data: (data ?? []).map((ticket) => ({ ...ticket, conversation_state: effectiveConversationState(ticket) ?? ticket.conversation_state })) });
 }
 
 export async function PATCH(request: Request) {

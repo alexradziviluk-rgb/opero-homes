@@ -6,10 +6,31 @@ import { sendTelegramMessage, sendTelegramText } from "@/lib/support/telegram";
 import { notifyStaff } from "@/lib/support/notifications";
 import { publishConversationEvent } from "@/lib/support/realtime";
 import { isLiveConversationT2Enabled, isTelegramMessageRepliesEnabled } from "@/lib/support/feature-flags";
+import { effectiveConversationState, isLegacyWaitingManagerConversation } from "@/lib/support/legacy-conversation";
 import type { SupportStatus } from "@/lib/support/types";
 
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
 type WebhookTicket = { id: string; status: SupportStatus; conversation_state?: string; assigned_to: string | null; organization_id: string | null; telegram_chat_id: string | null; public_number: string };
+
+async function findLegacyManagerUserId(supabase: ReturnType<typeof createSupabaseServiceRoleClient>, organizationId: string | null): Promise<string | null> {
+  if (!supabase || !organizationId) return null;
+  const { data } = await supabase.from("organization_members").select("user_id,role_code").eq("organization_id", organizationId).eq("status", "active").in("role_code", ["owner", "manager"]);
+  const members = (data ?? []) as Array<{ user_id: string; role_code: string }>;
+  return members.find((member) => member.role_code.trim().toLowerCase() === "manager")?.user_id ?? members.find((member) => member.role_code.trim().toLowerCase() === "owner")?.user_id ?? null;
+}
+
+async function findLegacyReplyTicket(supabase: ReturnType<typeof createSupabaseServiceRoleClient>, organizationId: string | null, chatId: string, replyMessageId: string) {
+  if (!supabase || !replyMessageId) return null;
+  let refsQuery = supabase.from("support_telegram_message_refs").select("ticket_id").eq("telegram_chat_id", chatId).eq("telegram_message_id", replyMessageId);
+  if (organizationId) refsQuery = refsQuery.eq("organization_id", organizationId);
+  const { data: refs } = await refsQuery.limit(2);
+  const ticketIds = (refs ?? []).map((ref) => ref.ticket_id as string).filter(Boolean);
+  if (ticketIds.length !== 1) return null;
+  let ticketQuery = supabase.from("support_tickets").select("id,public_number,assigned_to,organization_id,conversation_state,telegram_chat_id").eq("id", ticketIds[0]).eq("conversation_state", "manager_active").not("assigned_to", "is", null);
+  if (organizationId) ticketQuery = ticketQuery.eq("organization_id", organizationId);
+  const { data: ticket } = await ticketQuery.maybeSingle();
+  return ticket as { id: string; public_number: string; assigned_to: string; organization_id: string; conversation_state: string; telegram_chat_id: string | null } | null;
+}
 
 export async function POST(request: Request) {
   const expected = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -55,7 +76,17 @@ export async function POST(request: Request) {
     }
     if (!telegramUserId || !chatId || !text) return NextResponse.json({ ok: true, result: "ignored" });
     const { data: binding } = await supabase.from("support_telegram_bindings").select("organization_id,user_id,telegram_chat_id").eq("telegram_user_id", telegramUserId).eq("telegram_chat_id", chatId).is("revoked_at", null).maybeSingle();
-    if (!binding) return NextResponse.json({ ok: true, result: "rejected" });
+    if (!binding) {
+      const legacyTicket = await findLegacyReplyTicket(supabase, null, chatId, incomingMessage.reply_to_message?.message_id ? String(incomingMessage.reply_to_message.message_id) : "");
+      if (!legacyTicket) return NextResponse.json({ ok: true, result: "rejected" });
+      const { error: messageError } = await supabase.from("support_messages").insert({ ticket_id: legacyTicket.id, sender_type: "manager", sender_user_id: legacyTicket.assigned_to, message: text.slice(0, 2000), message_type: "telegram", source: "telegram", telegram_message_id: incomingMessage.message_id ? String(incomingMessage.message_id) : null, client_message_id: `telegram:${updateId}`, is_internal: false });
+      if (messageError) return NextResponse.json({ ok: true, result: "rejected" });
+      const nowMessage = new Date().toISOString();
+      await supabase.from("support_tickets").update({ first_response_at: nowMessage }).eq("id", legacyTicket.id).is("first_response_at", null);
+      await supabase.from("support_audit_log").insert({ ticket_id: legacyTicket.id, actor_type: "telegram", actor_user_id: legacyTicket.assigned_to, action: "message_added", safe_metadata: { source: "telegram", message_type: "telegram", compatibility: "legacy_conversation" } });
+      await publishConversationEvent({ kind: "message", conversation: legacyTicket.public_number, senderType: "manager", message: text.slice(0, 2000), messageType: "telegram", source: "telegram", createdAt: nowMessage });
+      return NextResponse.json({ ok: true, result: "applied" });
+    }
     const replyMessageId = incomingMessage.reply_to_message?.message_id ? String(incomingMessage.reply_to_message.message_id) : "";
     const { data: routedTickets, error: routingError } = await supabase.rpc("support_route_telegram_message", { target_organization_id: binding.organization_id, target_user_id: binding.user_id, target_chat_id: chatId, target_reply_message_id: replyMessageId || null });
     if (routingError) return NextResponse.json({ ok: true, result: "rejected" });
@@ -78,10 +109,12 @@ export async function POST(request: Request) {
   }
   if (!parsedCallback) return NextResponse.json({ ok: true, result: "rejected" });
   const chatId = callback?.message?.chat?.id ? String(callback.message.chat.id) : "";
-  const ticketSelect = isLiveConversationT2Enabled() ? "id,status,conversation_state,assigned_to,organization_id,telegram_chat_id,public_number" : "id,status,assigned_to,organization_id,telegram_chat_id,public_number";
+  const ticketSelect = "id,status,conversation_state,assigned_to,organization_id,telegram_chat_id,public_number";
   const { data: rawTicket, error: ticketError } = await supabase.from("support_tickets").select(ticketSelect).eq("telegram_action_token", parsedCallback.actionToken).maybeSingle();
   const ticket = rawTicket as WebhookTicket | null;
   if (ticketError || !ticket || !chatId) return NextResponse.json({ ok: true, result: "rejected" });
+  const legacyConversation = isLegacyWaitingManagerConversation(ticket);
+  const effectiveState = effectiveConversationState(ticket);
   const callbackUserId = callback?.from?.id ? String(callback.from.id) : "";
   const { data: linkedBinding } = isLiveConversationT2Enabled() && callbackUserId ? await supabase.from("support_telegram_bindings").select("organization_id,user_id,telegram_chat_id").eq("telegram_user_id", callbackUserId).eq("telegram_chat_id", chatId).eq("organization_id", ticket.organization_id).maybeSingle() : { data: null };
   if (!isAllowedTelegramChat(ticket.telegram_chat_id, chatId, process.env.TELEGRAM_MANAGER_CHAT_ID) && !linkedBinding) {
@@ -100,12 +133,14 @@ export async function POST(request: Request) {
 
   const transition = transitionTelegramCallback(parsedCallback.action, ticket.status);
   let result: "applied" | "noop" | "rejected" = transition.result;
-  if (isLiveConversationT2Enabled() && parsedCallback.action === "accept" && ticket.conversation_state === "waiting_manager") {
-    if (!linkedBinding || linkedBinding.user_id === ticket.assigned_to) result = "rejected";
+  const legacyManagerUserId = legacyConversation && !linkedBinding ? await findLegacyManagerUserId(supabase, ticket.organization_id) : null;
+  const managerUserId = linkedBinding?.user_id ?? legacyManagerUserId;
+  if (isLiveConversationT2Enabled() && parsedCallback.action === "accept" && effectiveState === "waiting_manager") {
+    if (!managerUserId || managerUserId === ticket.assigned_to) result = "rejected";
     else {
-      const { data: accepted, error: acceptError } = await supabase.rpc("support_accept_conversation", { target_ticket_id: ticket.id, manager_user_id: linkedBinding.user_id });
+      const { data: accepted, error: acceptError } = await supabase.rpc("support_accept_conversation", { target_ticket_id: ticket.id, manager_user_id: managerUserId });
       result = acceptError ? "rejected" : Array.isArray(accepted) && accepted.length > 0 ? "applied" : "noop";
-      if (result === "applied") await supabase.from("support_audit_log").insert({ ticket_id: ticket.id, actor_type: "telegram", actor_user_id: linkedBinding.user_id, action: "conversation_accepted", safe_metadata: { update_id_hash: updateIdHash } });
+      if (result === "applied") await supabase.from("support_audit_log").insert({ ticket_id: ticket.id, actor_type: "telegram", actor_user_id: managerUserId, action: "conversation_accepted", safe_metadata: { update_id_hash: updateIdHash, compatibility: legacyConversation ? "legacy_conversation" : undefined } });
       if (result === "applied") {
         const confirmation = await sendTelegramMessage(chatId, `Вы отвечаете на ${ticket.public_number}. Ответьте именно на это сообщение.`);
         if (confirmation.ok && confirmation.messageId) {
@@ -113,7 +148,7 @@ export async function POST(request: Request) {
         }
         if (ticket.organization_id) {
           try {
-            await notifyStaff({ supabase, organizationId: ticket.organization_id, ticketId: ticket.id, publicNumber: ticket.public_number, eventType: "support_manager_replied", title: "Менеджер подключился к обращению", message: `${ticket.public_number}: менеджер подключился к диалогу.`, actionUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/admin/support/${encodeURIComponent(ticket.public_number)}`, idempotencyKey: `support:${ticket.id}:accepted:${linkedBinding.user_id}`, priority: "normal", preferredUserId: linkedBinding.user_id });
+            await notifyStaff({ supabase, organizationId: ticket.organization_id, ticketId: ticket.id, publicNumber: ticket.public_number, eventType: "support_manager_replied", title: "Менеджер подключился к обращению", message: `${ticket.public_number}: менеджер подключился к диалогу.`, actionUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/admin/support/${encodeURIComponent(ticket.public_number)}`, idempotencyKey: `support:${ticket.id}:accepted:${managerUserId}`, priority: "normal", preferredUserId: managerUserId });
           } catch (notificationError) {
             console.error("[support-notification]", notificationError instanceof Error ? notificationError.message : "Unable to persist manager notification");
           }
@@ -121,13 +156,16 @@ export async function POST(request: Request) {
       }
     }
   }
-  const linkedUserId = linkedBinding?.user_id;
-  if (isLiveConversationT2Enabled() && parsedCallback.action === "resolve" && ticket.conversation_state === "manager_active" && linkedUserId === ticket.assigned_to) {
+  const linkedUserId = linkedBinding?.user_id ?? (ticket.assigned_to && isAllowedTelegramChat(ticket.telegram_chat_id, chatId, process.env.TELEGRAM_MANAGER_CHAT_ID) ? ticket.assigned_to : null);
+  if (isLiveConversationT2Enabled() && parsedCallback.action === "resolve" && effectiveState === "manager_active" && linkedUserId === ticket.assigned_to) {
     const { data: resolved, error: resolveError } = await supabase.rpc("support_transition_conversation", { target_ticket_id: ticket.id, expected_state: "manager_active", next_state: "resolved", actor_user_id: linkedUserId });
     result = resolveError ? "rejected" : Array.isArray(resolved) && resolved.length > 0 ? "applied" : "noop";
-    if (result === "applied") await publishConversationEvent({ kind: "state", conversation: ticket.public_number, state: "resolved", createdAt: new Date().toISOString() });
+    if (result === "applied") {
+      await supabase.from("support_audit_log").insert({ ticket_id: ticket.id, actor_type: "telegram", actor_user_id: linkedUserId, action: "conversation_resolved", safe_metadata: { compatibility: legacyConversation ? "legacy_conversation" : undefined, update_id_hash: updateIdHash } });
+      await publishConversationEvent({ kind: "state", conversation: ticket.public_number, state: "resolved", createdAt: new Date().toISOString() });
+    }
   } else if (transition.result === "applied") {
-    if (isLiveConversationT2Enabled() && parsedCallback.action === "accept" && ticket.conversation_state === "waiting_manager") {
+    if (isLiveConversationT2Enabled() && parsedCallback.action === "accept" && effectiveState === "waiting_manager") {
       await publishConversationEvent({ kind: "state", conversation: ticket.public_number, state: result === "applied" ? "manager_active" : ticket.conversation_state, createdAt: new Date().toISOString() });
     } else {
     const messageId = callback?.message?.message_id ?? null;

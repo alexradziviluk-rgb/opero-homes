@@ -100,3 +100,48 @@ test("completes AI handoff, Telegram accept/reply, and close through real routes
     await fixture.cleanup();
   }
 });
+
+test("transitions a legacy conversation through the live state machine", async ({ page }) => {
+  const fixture = await createSupportFixture();
+  try {
+    await page.goto("/staff/login", { waitUntil: "domcontentloaded" });
+    const form = page.locator("form").first();
+    await expect(form).toHaveAttribute("data-auth-ready", "true", { timeout: 15_000 });
+    await form.locator('input[type="email"]').fill(fixture.manager1.email);
+    await form.locator('input[type="password"]').fill(fixture.manager1.password);
+    await form.getByRole("button", { name: "Войти" }).click();
+    await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 15_000 });
+
+    const legacy = await fixture.admin.from("support_tickets").select("id,telegram_action_token,telegram_chat_id").eq("id", fixture.legacyTicket).single();
+    const chatId = legacy.data?.telegram_chat_id as string;
+    const actionToken = legacy.data?.telegram_action_token as string;
+    const updateBase = Date.now() * 10;
+    const acceptResponse = await page.request.post("/api/telegram/webhook", { headers: { "x-telegram-bot-api-secret-token": "e2e-telegram-secret", "content-type": "application/json" }, data: JSON.stringify({ update_id: updateBase + 1, callback_query: { id: "legacy-accept", data: `support:accept:${actionToken}`, from: { id: 92001 }, message: { message_id: 200, chat: { id: chatId } } } }) });
+    expect(await acceptResponse.json()).toMatchObject({ ok: true, result: "applied" });
+    const accepted = await fixture.admin.from("support_tickets").select("status,conversation_state,assigned_to,manager_joined_at").eq("id", fixture.legacyTicket).single();
+    expect(accepted.data).toMatchObject({ status: "in_progress", conversation_state: "manager_active", assigned_to: fixture.manager1.id });
+    expect(accepted.data?.manager_joined_at).toBeTruthy();
+
+    const replyResponse = await page.request.post("/api/telegram/webhook", { headers: { "x-telegram-bot-api-secret-token": "e2e-telegram-secret", "content-type": "application/json" }, data: JSON.stringify({ update_id: updateBase + 2, message: { message_id: 201, text: "Legacy manager reply", from: { id: 92001 }, chat: { id: chatId }, reply_to_message: { message_id: "legacy-anchor" } } }) });
+    expect(await replyResponse.json()).toMatchObject({ ok: true, result: "applied" });
+    const managerMessage = await fixture.admin.from("support_messages").select("message,sender_user_id,source").eq("ticket_id", fixture.legacyTicket).eq("source", "telegram").single();
+    expect(managerMessage.data).toMatchObject({ message: "Legacy manager reply", sender_user_id: fixture.manager1.id, source: "telegram" });
+
+    const duplicateAccept = await page.request.post("/api/telegram/webhook", { headers: { "x-telegram-bot-api-secret-token": "e2e-telegram-secret", "content-type": "application/json" }, data: JSON.stringify({ update_id: updateBase + 3, callback_query: { id: "legacy-accept-duplicate", data: `support:accept:${actionToken}`, from: { id: 92001 }, message: { message_id: 200, chat: { id: chatId } } } }) });
+    expect(await duplicateAccept.json()).toMatchObject({ ok: true, result: "noop" });
+    const duplicateReply = await page.request.post("/api/telegram/webhook", { headers: { "x-telegram-bot-api-secret-token": "e2e-telegram-secret", "content-type": "application/json" }, data: JSON.stringify({ update_id: updateBase + 2, message: { message_id: 201, text: "Legacy manager reply", from: { id: 92001 }, chat: { id: chatId }, reply_to_message: { message_id: "legacy-anchor" } } }) });
+    expect(await duplicateReply.json()).toMatchObject({ ok: true, result: "noop", replay: true });
+
+    const resolveResponse = await page.request.post("/api/telegram/webhook", { headers: { "x-telegram-bot-api-secret-token": "e2e-telegram-secret", "content-type": "application/json" }, data: JSON.stringify({ update_id: updateBase + 4, callback_query: { id: "legacy-resolve", data: `support:resolve:${actionToken}`, from: { id: 92001 }, message: { message_id: 200, chat: { id: chatId } } } }) });
+    expect(await resolveResponse.json()).toMatchObject({ ok: true, result: "applied" });
+    const closeResponse = await page.request.patch("/api/admin/support", { data: { publicNumber: (await fixture.admin.from("support_tickets").select("public_number").eq("id", fixture.legacyTicket).single()).data?.public_number, status: "closed" } });
+    expect(closeResponse.status()).toBe(200);
+    const closed = await fixture.admin.from("support_tickets").select("conversation_state,closed_at").eq("id", fixture.legacyTicket).single();
+    expect(closed.data?.conversation_state).toBe("closed");
+    expect(closed.data?.closed_at).toBeTruthy();
+    const audit = await fixture.admin.from("support_audit_log").select("action,safe_metadata").eq("ticket_id", fixture.legacyTicket);
+    expect(audit.data?.map((row) => row.action)).toEqual(expect.arrayContaining(["conversation_accepted", "message_added", "conversation_resolved", "conversation_closed"]));
+  } finally {
+    await fixture.cleanup();
+  }
+});

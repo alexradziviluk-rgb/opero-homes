@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { buildSetWebhookPayload, configureTelegramWebhook, isWebhookCompatible, sanitizeWebhookInfo, TELEGRAM_ALLOWED_UPDATES, TELEGRAM_WEBHOOK_URL } from "../lib/telegram/webhook-admin";
 import { hasSetupSecret, isWebhookAdminRole } from "../lib/telegram/webhook-admin";
+import { effectiveConversationState, isLegacyWaitingManagerConversation } from "../lib/support/legacy-conversation";
 
 test.describe("Telegram webhook admin controls", () => {
   test("authorization matrix allows only owner and admin", () => {
@@ -10,6 +11,15 @@ test.describe("Telegram webhook admin controls", () => {
     expect(isWebhookAdminRole("employee")).toBe(false);
     expect(isWebhookAdminRole("property_owner")).toBe(false);
     expect(isWebhookAdminRole(null)).toBe(false);
+  });
+
+  test("normalizes only the legacy waiting-manager contract", () => {
+    const legacy = { status: "in_progress", conversation_state: "bot_active", assigned_to: null, resolved_at: null, closed_at: null };
+    expect(isLegacyWaitingManagerConversation(legacy)).toBe(true);
+    expect(effectiveConversationState(legacy)).toBe("waiting_manager");
+    expect(effectiveConversationState({ ...legacy, status: "resolved" })).toBe("bot_active");
+    expect(effectiveConversationState({ ...legacy, status: "closed" })).toBe("bot_active");
+    expect(effectiveConversationState({ ...legacy, assigned_to: "manager-1" })).toBe("bot_active");
   });
 
   test("safe status strips token, secret, certificate, and unknown fields", () => {
