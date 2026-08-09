@@ -35,7 +35,10 @@ async function getOp0008CallbackSnapshot() {
 
   const token = typeof ticket.telegram_action_token === "string" ? ticket.telegram_action_token : "";
   const tokenFormatValid = /^[a-f0-9]{36}$/i.test(token);
-  const tokenNotExpired = typeof ticket.confirmation_expires_at === "string" && new Date(ticket.confirmation_expires_at).getTime() > Date.now();
+  const tokenNotConsumed = !(audits ?? []).some((row) => {
+    const metadata = row.safe_metadata && typeof row.safe_metadata === "object" ? row.safe_metadata as Record<string, unknown> : {};
+    return metadata.result === "applied";
+  });
   const sentMessageIds = (deliveries ?? []).filter((row) => row.status === "sent").map((row) => row.telegram_message_id).filter((value): value is string => typeof value === "string" && value.length > 0);
   const referenceIds = (messageRefs ?? []).map((row) => row.telegram_message_id).filter((value): value is string => typeof value === "string" && value.length > 0);
   const messageReferenceExists = Boolean(ticket.telegram_message_id) && referenceIds.includes(ticket.telegram_message_id) && (sentMessageIds.length === 0 || sentMessageIds.includes(ticket.telegram_message_id));
@@ -57,7 +60,7 @@ async function getOp0008CallbackSnapshot() {
     last_callback_timestamp: callbackRows[0]?.timestamp ?? null,
     last_callback: callbackRows[0] ?? null,
     callbacks: callbackRows,
-    accept_token_valid: tokenFormatValid && tokenNotExpired,
+    accept_token_valid: tokenFormatValid && tokenNotConsumed && effectiveState === "waiting_manager",
     message_reference_exists: messageReferenceExists,
     callback_action_valid: callbackActionValid,
     notification: { delivery_status: ticket.delivery_status, telegram_message_reference_exists: Boolean(ticket.telegram_message_id), sent_message_reference_matches: messageReferenceExists },
