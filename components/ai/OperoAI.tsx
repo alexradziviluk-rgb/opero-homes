@@ -231,7 +231,7 @@ export default function OperoAI() {
   return (
     <>
       {open ? (
-        <section ref={panelRef} className="fixed inset-0 z-50 flex flex-col border-l border-white/10 bg-slate-950 shadow-2xl shadow-black/40 sm:inset-y-4 sm:right-4 sm:left-auto sm:w-[390px] sm:rounded-2xl sm:border" aria-label="Opero AI панель">
+        <section ref={panelRef} className="fixed inset-0 z-[1100] flex flex-col border-l border-white/10 bg-slate-950 shadow-2xl shadow-black/40 sm:inset-y-4 sm:right-4 sm:left-auto sm:w-[390px] sm:rounded-2xl sm:border" aria-label="Opero AI панель">
           <header className="flex items-center justify-between border-b border-white/10 px-4 py-4">
             <div>
               <p className="text-sm font-semibold text-cyan-200">Opero AI</p>
@@ -271,7 +271,7 @@ export default function OperoAI() {
           </div>
         </section>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} aria-label="Открыть Opero AI" className="fixed bottom-5 right-5 z-40 rounded-full border border-cyan-200/30 bg-slate-950 px-5 py-3 text-sm font-semibold text-cyan-100 shadow-xl shadow-cyan-950/30 transition hover:-translate-y-0.5 hover:border-cyan-200/60 sm:bottom-6 sm:right-6">Opero AI</button>
+        <button type="button" onClick={() => setOpen(true)} aria-label="Открыть Opero AI" className="fixed bottom-5 right-5 z-[1100] rounded-full border border-cyan-200/30 bg-slate-950 px-5 py-3 text-sm font-semibold text-cyan-100 shadow-xl shadow-cyan-950/30 transition hover:-translate-y-0.5 hover:border-cyan-200/60 sm:bottom-6 sm:right-6">Opero AI</button>
       )}
     </>
   );

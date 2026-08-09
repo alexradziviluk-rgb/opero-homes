@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
 import { getRoleCodeFromContext, isManagerRoleCode } from "@/lib/supabase/role-code";
 import { publishConversationEvent } from "@/lib/support/realtime";
@@ -7,13 +7,13 @@ import { effectiveConversationState } from "@/lib/support/legacy-conversation";
 
 export async function GET(request: Request) {
   const auth = await requireStaffApiAuth(); if (!auth.ok) return auth.response;
-  const supabase = await createSupabaseServerClient(); if (!supabase) return NextResponse.json({ ok: false, error: "Supabase is not configured" }, { status: 503 });
+  const supabase = createSupabaseServiceRoleClient(); if (!supabase) return NextResponse.json({ ok: false, error: "Supabase is not configured" }, { status: 503 });
   const url = new URL(request.url); const status = url.searchParams.get("status");
-  let query = supabase.from("support_tickets").select("public_number,requester_name,requester_language,category,priority,status,conversation_state,conversation_summary,assigned_to,manager_joined_at,first_response_at,resolved_at,closed_at,subject,customer_message,ai_summary,delivery_status,created_at,updated_at").order("created_at", { ascending: false }).limit(100);
+  let query = supabase.from("support_tickets").select("public_number,requester_name,requester_language,category,priority,status,conversation_state,conversation_summary,assigned_to,manager_joined_at,first_response_at,resolved_at,closed_at,subject,customer_message,ai_summary,delivery_status,created_at,updated_at").or(`organization_id.eq.${auth.context.organization.id},organization_id.is.null`).order("created_at", { ascending: false }).limit(100);
   if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
-  return NextResponse.json({ ok: true, data: (data ?? []).map((ticket) => ({ ...ticket, conversation_state: effectiveConversationState(ticket) ?? ticket.conversation_state })) });
+  return NextResponse.json({ ok: true, data: (data ?? []).map((ticket: { conversation_state?: string | null; status?: string | null; assigned_to?: string | null; resolved_at?: string | null; closed_at?: string | null }) => ({ ...ticket, conversation_state: effectiveConversationState(ticket) ?? ticket.conversation_state })) });
 }
 
 export async function PATCH(request: Request) {
