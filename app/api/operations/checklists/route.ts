@@ -24,8 +24,8 @@ const BOOLEAN_FIELDS = new Set([
   "check_out_completed",
 ]);
 
-function error(status: number, message: string) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function error(status: number, message: string, code?: string) {
+  return NextResponse.json({ ok: false, error: message, ...(code ? { code } : {}) }, { status });
 }
 
 function stringValue(row: Record<string, unknown>, ...keys: string[]): string {
@@ -154,7 +154,7 @@ export async function PUT(request: Request) {
 
   const { data: booking, error: bookingError } = await supabase
     .from("bookings")
-    .select("id")
+    .select("id,status")
     .eq("organization_id", auth.context.organization.id)
     .eq("id", bookingId)
     .maybeSingle();
@@ -173,6 +173,27 @@ export async function PUT(request: Request) {
     .single();
 
   if (upsertError) return error(422, upsertError.message);
+
+  const targetStatus = field === "check_in_completed" && body.value
+    ? "checked_in"
+    : field === "check_out_completed" && body.value
+    ? "checked_out"
+    : null;
+  if (targetStatus && booking.status !== targetStatus) {
+    const validTransition = (targetStatus === "checked_in" && booking.status === "confirmed")
+      || (targetStatus === "checked_out" && booking.status === "checked_in");
+    if (!validTransition) {
+      return error(409, `Booking must be ${targetStatus === "checked_in" ? "confirmed before check-in" : "checked in before check-out"}`, "invalid_booking_transition");
+    }
+
+    const { error: statusError } = await supabase
+      .from("bookings")
+      .update({ status: targetStatus, updated_at: new Date().toISOString() })
+      .eq("organization_id", auth.context.organization.id)
+      .eq("id", bookingId)
+      .eq("status", booking.status);
+    if (statusError) return error(422, statusError.message, statusError.code);
+  }
 
   if (field === "apartment_ready" && body.value) {
     try {

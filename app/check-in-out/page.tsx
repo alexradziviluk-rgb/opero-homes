@@ -98,22 +98,18 @@ export default function CheckInOutPage() {
     };
   }, []);
 
-  function toggle(bookingId: string, key: string) {
-    setChecklists((current) => {
-      const next = {
-        ...current,
-        [bookingId]: {
-          ...current[bookingId],
-          [key]: !current[bookingId]?.[key],
-        },
-      };
-      void fetch("/api/operations/checklists", {
+  async function toggle(bookingId: string, key: string) {
+    const value = !checklists[bookingId]?.[key];
+    const response = await fetch("/api/operations/checklists", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, field: key, value: next[bookingId][key] }),
+        body: JSON.stringify({ bookingId, field: key, value }),
       });
-      return next;
-    });
+    if (!response.ok) return;
+    setChecklists((current) => ({
+      ...current,
+      [bookingId]: { ...current[bookingId], [key]: value },
+    }));
   }
 
   return (

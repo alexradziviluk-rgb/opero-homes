@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
-import { cleanupRoleAuditFixtures, readApartmentForAuditById, readApartmentForAuditByTitle, seedRoleAuditFixtures, type RoleAuditFixture } from "./fixtures/role-audit-fixtures";
+import { cleanupRoleAuditFixtures, readApartmentForAuditById, readApartmentForAuditByTitle, readBookingForAudit, seedRoleAuditFixtures, type RoleAuditFixture } from "./fixtures/role-audit-fixtures";
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
@@ -150,16 +150,6 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
   await expect(page.getByText(`${title} Updated`, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByAltText(`${title} Updated`).first()).toBeVisible({ timeout: 15_000 });
 
-  for (const status of ["checked_in", "checked_out"] as const) {
-    const statusResponse = await page.request.patch(`/api/bookings/${bookingId}`, { data: { status } });
-    expect(statusResponse.status(), `${status}: ${await statusResponse.text()}`).toBe(200);
-    expect(await statusResponse.json()).toMatchObject({ ok: true, data: { id: bookingId, status } });
-  }
-
-  const bookingReadResponse = await page.request.get(`/api/bookings/${bookingId}`);
-  expect(bookingReadResponse.status()).toBe(200);
-  expect(await bookingReadResponse.json()).toMatchObject({ ok: true, data: { id: bookingId, apartmentId, status: "checked_out" } });
-
   const lifecycleTaskIds: string[] = [];
   for (const task of [
     { title: `${title} Cleaning`, taskType: "cleaning", assignedUserId: fixture.accounts.cleaner.id },
@@ -186,6 +176,10 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
     expect(await checklistResponse.json()).toMatchObject({ ok: true });
   }
 
+  const bookingReadResponse = await page.request.get(`/api/bookings/${bookingId}`);
+  expect(bookingReadResponse.status()).toBe(200);
+  expect(await bookingReadResponse.json()).toMatchObject({ ok: true, data: { id: bookingId, apartmentId, status: "checked_out" } });
+
   const supportResponse = await page.request.post("/api/support/tickets", {
     data: { message: `Maintenance support for ${title}`, confirmed: true, idempotencyKey: `lifecycle-${bookingId}`, route: "/account/support" },
   });
@@ -195,4 +189,55 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
   const metricsResponse = await page.request.get("/api/dashboard/metrics");
   expect(metricsResponse.status()).toBe(200);
   expect(await metricsResponse.json()).toMatchObject({ ok: true, data: { propertiesTotal: expect.any(Number), bookingsTotal: expect.any(Number) } });
+});
+
+test("check-in and check-out checklist transitions persist booking state", async ({ page }) => {
+  await signInManager(page);
+  const apartmentId = fixture.apartmentPublishedId;
+  const bookingId = randomUUID();
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const guestName = `${fixture.prefix} Check-in Guest`;
+  const createResponse = await page.request.post("/api/bookings", {
+    data: {
+      id: bookingId,
+      apartmentId,
+      guestName,
+      guestPhone: "+79990008888",
+      guestEmail: fixture.accounts.guest.email,
+      checkIn: today,
+      checkOut: tomorrow,
+      guests: 1,
+      rentalType: "daily",
+      status: "confirmed",
+      requestStatus: "confirmed",
+      paymentStatus: "unpaid",
+      source: "internal-checkin-e2e",
+    },
+  });
+  expect(createResponse.status(), await createResponse.text()).toBe(201);
+
+  await page.goto("/check-in-out", { waitUntil: "domcontentloaded" });
+  const bookingCard = page.locator("section").filter({ hasText: "Сегодняшние заезды" }).locator("article").filter({ hasText: guestName }).first();
+  await expect(bookingCard).toBeVisible({ timeout: 15_000 });
+  const checkInCheckbox = bookingCard.locator("label").filter({ hasText: "Check-in завершён" }).locator("input");
+  const checklistResponsePromise = page.waitForResponse((response) => response.url().includes("/api/operations/checklists") && response.request().method() === "PUT");
+  await checkInCheckbox.click();
+  const checklistResponse = await checklistResponsePromise;
+  expect(checklistResponse.status(), await checklistResponse.text()).toBe(200);
+  await expect.poll(async () => (await readBookingForAudit(bookingId))?.status).toBe("checked_in");
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(bookingCard.locator("label").filter({ hasText: "Check-in завершён" }).locator("input")).toBeChecked();
+
+  const checkOutResponse = await page.request.put("/api/operations/checklists", {
+    data: { bookingId, field: "check_out_completed", value: true },
+  });
+  expect(checkOutResponse.status(), await checkOutResponse.text()).toBe(200);
+  await expect.poll(async () => (await readBookingForAudit(bookingId))?.status).toBe("checked_out");
+
+  const repeatedCheckOut = await page.request.put("/api/operations/checklists", {
+    data: { bookingId, field: "check_out_completed", value: true },
+  });
+  expect(repeatedCheckOut.status(), await repeatedCheckOut.text()).toBe(200);
 });
