@@ -21,6 +21,8 @@ alter table public.notification_events
       'maintenance_created',
       'maintenance_completed',
       'booking_ready_for_checkin',
+      'task_due_soon',
+      'task_overdue',
       'support_ticket_created',
       'support_manager_replied',
       'support_conversation_closed'
