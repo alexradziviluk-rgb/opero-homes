@@ -65,7 +65,6 @@ export async function POST(request: Request) {
   const supabase = createSupabaseServiceRoleClient(); if (!supabase) return NextResponse.json({ ok: false, error: "Service unavailable" }, { status: 503 });
   const incomingMessage = payload?.message;
   if (incomingMessage) {
-    if (!isTelegramMessageRepliesEnabled()) return NextResponse.json({ ok: true, result: "noop" });
     const chatId = incomingMessage.chat?.id ? String(incomingMessage.chat.id) : "";
     const telegramUserId = incomingMessage.from?.id ? String(incomingMessage.from.id) : "";
     const text = typeof incomingMessage.text === "string" ? incomingMessage.text.trim() : "";
@@ -81,6 +80,7 @@ export async function POST(request: Request) {
       await sendTelegramText(chatId, "Telegram подключён к Opero Homes.");
       return NextResponse.json({ ok: true, result: "linked" });
     }
+      if (!isTelegramMessageRepliesEnabled()) return NextResponse.json({ ok: true, result: "noop" });
     if (!telegramUserId || !chatId || !text) return NextResponse.json({ ok: true, result: "ignored" });
     const { data: binding } = await supabase.from("support_telegram_bindings").select("organization_id,user_id,telegram_chat_id").eq("telegram_user_id", telegramUserId).eq("telegram_chat_id", chatId).is("revoked_at", null).maybeSingle();
     if (!binding) {
