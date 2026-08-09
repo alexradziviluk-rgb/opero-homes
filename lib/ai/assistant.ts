@@ -57,11 +57,11 @@ function formatRoleMessage(context: AIContext, message: string): string {
   return context.displayName ? `Добро пожаловать${name}. Я работаю с доступными вашей роли данными Opero Homes.` : "Я работаю только с доступными вашей роли данными Opero Homes.";
 }
 
-function propertyAnswer(language: "ru" | "en" | "tr", properties: unknown[], message: string): string {
+function propertyAnswer(language: "ru" | "en" | "tr", properties: unknown[]): string {
   if (properties.length === 0) {
-    if (language === "en") return `I couldn't find a matching property for “${message}”. A manager can check additional options and availability.`;
-    if (language === "tr") return `“${message}” için uygun bir konut bulamadım. Bir yönetici ek seçenekleri ve müsaitliği kontrol edebilir.`;
-    return `По запросу «${message}» подходящих опубликованных квартир не нашёл. Менеджер сможет проверить дополнительные варианты и точную доступность.`;
+    if (language === "en") return "I couldn't find a matching published property. A manager can check additional options and availability.";
+    if (language === "tr") return "Uygun yayınlanmış bir konut bulamadım. Bir yönetici ek seçenekleri ve müsaitliği kontrol edebilir.";
+    return "Подходящих опубликованных квартир не нашёл. Менеджер сможет проверить дополнительные варианты и точную доступность.";
   }
   const rows = properties.slice(0, 3).map((item) => item as Record<string, unknown>).map((property) => {
     const title = String(property.title ?? "Квартира");
@@ -76,7 +76,7 @@ function propertyAnswer(language: "ru" | "en" | "tr", properties: unknown[], mes
 }
 
 function dataAnswer(language: "ru" | "en" | "tr", count: number | null, results: AIToolResult[]): string {
-  if (count !== null) return propertyAnswer(language, (results[0]?.data as { properties?: unknown[] } | undefined)?.properties ?? [], "ваш запрос");
+  if (count !== null) return propertyAnswer(language, (results[0]?.data as { properties?: unknown[] } | undefined)?.properties ?? []);
   if (language === "en") return "I checked the Opero Homes data available to your account. Tell me what you want to inspect next, and I’ll work through it with you.";
   if (language === "tr") return "Hesabınız için mevcut Opero Homes verilerini kontrol ettim. Sırada neyi incelememi istediğinizi yazın, birlikte ilerleyelim.";
   return "Проверил доступные вашей роли данные Opero Homes. Напишите, что именно нужно уточнить дальше, и разберём это по шагам.";
