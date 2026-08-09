@@ -25,6 +25,26 @@ type ConversationPayload = {
   messages: Array<{ senderType: string; message: string; messageType?: string; source?: string; clientMessageId?: string | null; createdAt: string }>;
 };
 
+type StoredTrackingLink = { publicNumber: string; trackingUrl: string; savedAt: number };
+const trackingLinksKey = "opero-support-tracking-links";
+
+function readStoredTrackingLinks(): StoredTrackingLink[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(trackingLinksKey) || "[]") as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is StoredTrackingLink => Boolean(item) && typeof item === "object" && typeof (item as StoredTrackingLink).publicNumber === "string" && typeof (item as StoredTrackingLink).trackingUrl === "string" && typeof (item as StoredTrackingLink).savedAt === "number") : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeTrackingLink(publicNumber: string, trackingUrl: string) {
+  try {
+    const links = readStoredTrackingLinks().filter((item) => item.publicNumber !== publicNumber).slice(-4);
+    localStorage.setItem(trackingLinksKey, JSON.stringify([...links, { publicNumber, trackingUrl, savedAt: Date.now() }]));
+  } catch {
+  }
+}
+
 function initialSuggestions(isGuest: boolean): string[] {
   return isGuest ? ["Найти жильё", "Показать мои заявки", "Проверить свободные даты"] : ["Что требует внимания сегодня?", "Показать новые заявки", "Есть ли просроченные задачи?"];
 }
@@ -86,6 +106,7 @@ export default function OperoAI() {
   const [contactPhone, setContactPhone] = useState("");
   const [contactConsent, setContactConsent] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>("bot_active");
   const [connectionState, setConnectionState] = useState<"online" | "offline">("online");
   const recentEvents = useRef(new Set<string>());
@@ -125,6 +146,22 @@ export default function OperoAI() {
     }));
   }, []);
 
+  const loadAnonymousConversation = useCallback(async (url: string) => {
+    const target = new URL(url, window.location.origin);
+    const publicNumber = target.pathname.split("/").filter(Boolean).pop() || "";
+    const response = await fetch(`/api/support/anonymous/${encodeURIComponent(publicNumber)}${target.search}`, { cache: "no-store" });
+    const payload = await response.json() as ConversationPayload & { ok?: boolean; conversation?: string };
+    if (!response.ok || !payload.ok || !payload.conversation) return;
+    setTrackingUrl(url);
+    setConversationId(payload.conversation);
+    setConversationState(payload.state);
+    recentEvents.current.clear();
+    setMessages(payload.messages.map((item) => {
+      recentEvents.current.add(eventKey(item.senderType, item.message, item.createdAt));
+      return { id: `conversation-${item.clientMessageId || eventKey(item.senderType, item.message, item.createdAt)}`, role: item.senderType === "client" ? "user" : "assistant", text: item.message, senderType: item.senderType, source: item.source, clientMessageId: item.clientMessageId ?? undefined, status: "sent" as const };
+    }));
+  }, []);
+
   useEffect(() => {
     if (!currentUser || conversationId) return;
     void fetch("/api/support/tickets", { cache: "no-store" }).then((response) => response.json()).then((payload: { data?: Array<{ public_number: string; conversation_state?: ConversationState }> }) => {
@@ -132,6 +169,14 @@ export default function OperoAI() {
       if (ticket) void loadConversation(ticket.public_number);
     });
   }, [conversationId, currentUser, loadConversation]);
+
+  useEffect(() => {
+    if (currentUser || conversationId) return;
+    const latest = readStoredTrackingLinks().sort((left, right) => right.savedAt - left.savedAt)[0];
+    if (!latest) return;
+    const timer = window.setTimeout(() => void loadAnonymousConversation(latest.trackingUrl), 0);
+    return () => window.clearTimeout(timer);
+  }, [conversationId, currentUser, loadAnonymousConversation]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -142,9 +187,9 @@ export default function OperoAI() {
       .on("broadcast", { event: "state" }, ({ payload }) => { setConnectionState("online"); if (payload?.state) setConversationState(payload.state as ConversationState); })
       .on("broadcast", { event: "typing" }, () => setConnectionState("online"));
     channel.subscribe((status) => { const next = status === "SUBSCRIBED" ? "online" : "offline"; connectionRef.current = next; setConnectionState(next); });
-    const fallback = window.setInterval(() => { if (connectionRef.current === "offline") void loadConversation(conversationId); }, 15_000);
+    const fallback = window.setInterval(() => { if (connectionRef.current === "offline") void (trackingUrl ? loadAnonymousConversation(trackingUrl) : loadConversation(conversationId)); }, 15_000);
     return () => { window.clearInterval(fallback); void supabase.removeChannel(channel); };
-  }, [conversationId, appendConversationMessage, loadConversation]);
+  }, [conversationId, appendConversationMessage, loadConversation, loadAnonymousConversation, trackingUrl]);
 
   useEffect(() => {
     if (!open) return;
@@ -183,7 +228,9 @@ export default function OperoAI() {
     setMessages((current) => [...current, userMessage]);
     try {
       if (conversationId && conversationState !== "bot_active") {
-        const response = await fetch(`/api/support/conversations/${encodeURIComponent(conversationId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, clientMessageId }) });
+        const target = trackingUrl ? new URL(trackingUrl, window.location.origin) : null;
+        const publicNumber = target?.pathname.split("/").filter(Boolean).pop() || "";
+        const response = await fetch(target ? `/api/support/anonymous/${encodeURIComponent(publicNumber)}${target.search}` : `/api/support/conversations/${encodeURIComponent(conversationId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, clientMessageId }) });
         const payload = await response.json() as { ok?: boolean; error?: string; result?: string; state?: ConversationState; createdAt?: string; clientMessageId?: string };
         if (!response.ok) throw new Error(payload.error || "Не удалось отправить сообщение.");
         if (payload.createdAt) appendConversationMessage({ senderType: "client", message: value, createdAt: payload.createdAt, clientMessageId });
@@ -216,9 +263,17 @@ export default function OperoAI() {
   async function confirmHandoff() {
     if (!handoff) return;
     const response = await fetch("/api/support/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: handoff.prompt, route: pathname, confirmed: true, idempotencyKey: handoff.details.actionId, actionId: handoff.details.actionId, expiresAt: handoff.details.expiresAt, email: contactEmail, phone: contactPhone, consent: currentUser ? true : contactConsent }) });
-    const payload = await response.json() as { ok?: boolean; message?: string; error?: string; publicNumber?: string; conversationState?: ConversationState };
+    const payload = await response.json() as { ok?: boolean; message?: string; error?: string; publicNumber?: string; conversationState?: ConversationState; trackingUrl?: string | null };
     setMessages((current) => [...current, { id: `handoff-${Date.now()}`, role: "assistant", text: payload.ok ? payload.message || `Обращение ${payload.publicNumber} передано менеджеру.` : payload.error || "Не удалось передать обращение. Попробуйте ещё раз." }]);
-    if (payload.ok) { setHandoff(null); setContactEmail(""); setContactPhone(""); setContactConsent(false); if (payload.publicNumber) { setConversationId(payload.publicNumber); setConversationState(payload.conversationState ?? "waiting_manager"); void loadConversation(payload.publicNumber); } }
+    if (payload.ok) {
+      setHandoff(null); setContactEmail(""); setContactPhone(""); setContactConsent(false);
+      if (payload.publicNumber) {
+        setConversationId(payload.publicNumber);
+        setConversationState(payload.conversationState ?? "waiting_manager");
+        if (payload.trackingUrl) { setTrackingUrl(payload.trackingUrl); storeTrackingLink(payload.publicNumber, payload.trackingUrl); }
+        if (currentUser) void loadConversation(payload.publicNumber);
+      }
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -257,6 +312,7 @@ export default function OperoAI() {
             {pending ? <p className="text-sm text-slate-500">Проверяю данные…</p> : null}
             {conversationId && conversationState === "waiting_manager" ? <p className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">Менеджер скоро подключится.</p> : null}
             {conversationId && conversationState === "manager_active" ? <p className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs text-emerald-100">Связь с менеджером · {connectionState === "online" ? "онлайн" : "переподключение"}</p> : null}
+            {trackingUrl ? <Link href={trackingUrl} className="inline-flex rounded-xl border border-cyan-300/30 px-3 py-2 text-sm text-cyan-100 hover:bg-cyan-300/10">Открыть диалог</Link> : null}
             {handoff ? <div className="rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4"><p className="text-sm text-amber-100">Для решения вопроса краткая информация будет передана сотруднику Opero Homes.</p>{!currentUser ? <div className="mt-3 space-y-2"><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} type="email" placeholder="Email для связи" aria-label="Email для связи" className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white" /><input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} type="tel" placeholder="Телефон для связи" aria-label="Телефон для связи" className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-white" /><label className="flex gap-2 text-xs text-amber-100/80"><input checked={contactConsent} onChange={(event) => setContactConsent(event.target.checked)} type="checkbox" /> Согласен на связь по этому вопросу</label></div> : null}<button type="button" disabled={!currentUser && (!contactConsent || (!contactEmail.trim() && !contactPhone.trim()))} onClick={() => void confirmHandoff()} className="mt-3 rounded-xl bg-amber-200 px-3 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">Передать менеджеру</button></div> : null}
             {!pending && lastFailedPrompt ? <button type="button" onClick={() => void send(lastFailedPrompt, failedClientMessageId ?? undefined)} className="rounded-lg border border-rose-300/30 px-3 py-2 text-sm text-rose-200 hover:bg-rose-300/10">Повторить запрос</button> : null}
           </div>

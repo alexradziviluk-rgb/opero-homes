@@ -8,9 +8,13 @@ test.describe("Opero Telegram handoff T1", () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, message: "Я не могу решить этот вопрос автоматически. Передать его менеджеру?", role: "anonymous", tools: [], results: [], suggestions: [], handoff: { offered: true, requiresConfirmation: true, critical: false, category: "booking", priority: "high", subject: "Вопрос по бронированию", summary: "Автоматическое изменение не выполнялось.", actionId: "action-1042", expiresAt: "2099-01-01T00:00:00.000Z" } }) });
     });
     await page.route("**/api/support/tickets", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
       ticketCreates += 1;
       expect(route.request().postDataJSON()).toMatchObject({ confirmed: true, consent: true, idempotencyKey: "action-1042" });
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, publicNumber: "OP-1042", message: "Обращение OP-1042 передано менеджеру.", deliveryStatus: "failed" }) });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, publicNumber: "OP-1042", message: "Обращение OP-1042 передано менеджеру.", deliveryStatus: "failed", trackingUrl: "/support/conversation/OP-1042?access=opaque-test-token" }) });
     });
 
     await page.goto("/");
@@ -23,7 +27,15 @@ test.describe("Opero Telegram handoff T1", () => {
     await page.getByRole("checkbox", { name: "Согласен на связь по этому вопросу" }).check();
     await page.getByRole("button", { name: "Передать менеджеру" }).click();
     await expect(page.getByText("Обращение OP-1042 передано менеджеру.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Открыть диалог" })).toHaveAttribute("href", "/support/conversation/OP-1042?access=opaque-test-token");
     expect(ticketCreates).toBe(1);
+
+    await page.route("**/api/support/anonymous/OP-1042?access=opaque-test-token", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, conversation: "OP-1042", state: "manager_active", messages: [{ senderType: "client", message: "Хочу изменить даты бронирования", createdAt: new Date().toISOString() }] }) });
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Открыть Opero AI" }).click();
+    await expect(page.getByText("Хочу изменить даты бронирования", { exact: true })).toBeVisible();
   });
 
   test("sanitizes Telegram text and keeps the Opero link production-only", () => {
