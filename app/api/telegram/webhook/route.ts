@@ -72,13 +72,32 @@ export async function POST(request: Request) {
     const { error: replayError } = await supabase.from("support_telegram_updates").insert({ update_id: updateId });
     if (replayError?.code === "23505") return NextResponse.json({ ok: true, result: "noop", replay: true });
     if (replayError) return NextResponse.json({ ok: true, result: "rejected" });
+    await supabase.from("support_telegram_updates").update({ rpc_called: false, rpc_result_present: false, linked: false, token_consumed: false, binding_created: false }).eq("update_id", updateId);
     const start = normalizedText.match(/^\/start(?:@[A-Za-z0-9_]+)?[\s\u00a0]+([^\s\u00a0]{10,200})$/iu);
     console.info("[telegram-link-check]", { update_id_hash: hashTelegramUpdateId(updateId), has_text: Boolean(text), has_user: Boolean(telegramUserId), has_chat: Boolean(chatId), start_format_valid: Boolean(start) });
     if (start && telegramUserId && chatId) {
       const tokenHash = hashTelegramLinkToken(start[1]);
       const { data: tokenRows, error: tokenError } = await supabase.rpc("support_accept_telegram_link_token", { target_token_hash: tokenHash, target_telegram_user_id: telegramUserId, target_telegram_chat_id: chatId });
-      const token = Array.isArray(tokenRows) ? tokenRows[0] as { organization_id: string; user_id: string } | undefined : undefined;
-      console.info("[telegram-link-result]", { update_id_hash: hashTelegramUpdateId(updateId), rpc_error: Boolean(tokenError), linked: Boolean(token) });
+      const token = Array.isArray(tokenRows)
+        ? tokenRows[0] as { organization_id: string; user_id: string } | undefined
+        : tokenRows && typeof tokenRows === "object"
+          ? tokenRows as { organization_id: string; user_id: string }
+          : undefined;
+      const { count: consumedTokenCount } = await supabase.from("support_telegram_link_tokens").select("id", { count: "exact", head: true }).eq("token_hash", tokenHash).not("used_at", "is", null);
+      const { count: bindingCount } = await supabase.from("support_telegram_bindings").select("organization_id", { count: "exact", head: true }).eq("telegram_user_id", telegramUserId).eq("telegram_chat_id", chatId).is("revoked_at", null);
+      const linkDiagnostics = {
+        update_id_hash: hashTelegramUpdateId(updateId),
+        rpc_called: true,
+        rpc_error_code: tokenError?.code ?? null,
+        rpc_error_class: tokenError ? (tokenError.code?.startsWith("PGRST") ? "postgrest" : tokenError.code?.startsWith("23") ? "constraint" : "database") : null,
+        rpc_result_present: Boolean(tokenRows),
+        rpc_result_array: Array.isArray(tokenRows),
+        linked: Boolean(token),
+        token_consumed: (consumedTokenCount ?? 0) > 0,
+        binding_created: (bindingCount ?? 0) > 0,
+      };
+      await supabase.from("support_telegram_updates").update({ rpc_called: linkDiagnostics.rpc_called, rpc_error_code: linkDiagnostics.rpc_error_code, rpc_error_class: linkDiagnostics.rpc_error_class, rpc_result_present: linkDiagnostics.rpc_result_present, linked: linkDiagnostics.linked, token_consumed: linkDiagnostics.token_consumed, binding_created: linkDiagnostics.binding_created }).eq("update_id", updateId);
+      console.info("[telegram-link-result]", linkDiagnostics);
       if (!token) return NextResponse.json({ ok: true, result: "rejected" });
       await sendTelegramText(chatId, "Telegram подключён к Opero Homes.");
       return NextResponse.json({ ok: true, result: "linked" });
