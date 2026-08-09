@@ -38,6 +38,11 @@ test.describe("Telegram callback contract", () => {
     expect(isAllowedTelegramChat(null, "manager-chat", "manager-chat")).toBe(true);
   });
 
+  test("keeps the global anonymous ticket callback contract on the current token", () => {
+    const keyboard = buildTelegramKeyboard("OP-0008", "b".repeat(36));
+    expect(keyboard.inline_keyboard[0][0]).toEqual({ text: "Принять", callback_data: `support:accept:${"b".repeat(36)}` });
+  });
+
   test("unauthenticated callback audit is denied without a server error", async ({ request }) => {
     const response = await request.get("/api/admin/telegram/callback-audit?ticket=OP-0004");
     expect(response.status()).toBe(401);

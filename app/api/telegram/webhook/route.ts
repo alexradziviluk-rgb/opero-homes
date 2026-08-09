@@ -19,6 +19,13 @@ async function findLegacyManagerUserId(supabase: ReturnType<typeof createSupabas
   return members.find((member) => member.role_code.trim().toLowerCase() === "manager")?.user_id ?? members.find((member) => member.role_code.trim().toLowerCase() === "owner")?.user_id ?? null;
 }
 
+async function findGlobalManagerUserId(supabase: ReturnType<typeof createSupabaseServiceRoleClient>): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.from("organization_members").select("user_id,role_code").eq("status", "active").in("role_code", ["owner", "manager"]).limit(100);
+  const members = (data ?? []) as Array<{ user_id: string; role_code: string }>;
+  return members.find((member) => member.role_code.trim().toLowerCase() === "manager")?.user_id ?? members.find((member) => member.role_code.trim().toLowerCase() === "owner")?.user_id ?? null;
+}
+
 async function findLegacyReplyTicket(supabase: ReturnType<typeof createSupabaseServiceRoleClient>, organizationId: string | null, chatId: string, replyMessageId: string) {
   if (!supabase || !replyMessageId) return null;
   let refsQuery = supabase.from("support_telegram_message_refs").select("ticket_id").eq("telegram_chat_id", chatId).eq("telegram_message_id", replyMessageId);
@@ -134,7 +141,8 @@ export async function POST(request: Request) {
   const transition = transitionTelegramCallback(parsedCallback.action, ticket.status);
   let result: "applied" | "noop" | "rejected" = transition.result;
   const legacyManagerUserId = legacyConversation && !linkedBinding ? await findLegacyManagerUserId(supabase, ticket.organization_id) : null;
-  const managerUserId = linkedBinding?.user_id ?? legacyManagerUserId;
+  const globalManagerUserId = !ticket.organization_id && !linkedBinding ? await findGlobalManagerUserId(supabase) : null;
+  const managerUserId = linkedBinding?.user_id ?? legacyManagerUserId ?? globalManagerUserId;
   if (isLiveConversationT2Enabled() && parsedCallback.action === "accept" && effectiveState === "waiting_manager") {
     if (!managerUserId || managerUserId === ticket.assigned_to) result = "rejected";
     else {
