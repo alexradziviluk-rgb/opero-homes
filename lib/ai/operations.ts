@@ -20,6 +20,7 @@ export type AiOperationalActionResult = {
 
 type BookingContext = {
   id: string;
+  organization_id: string;
   apartment_id: string;
   check_in_date: string;
   check_out_date: string;
@@ -78,13 +79,15 @@ async function audit(params: {
 }
 
 async function findBooking(supabase: SupabaseClient, context: AIContext): Promise<BookingContext | null> {
-  if (!context.userId || !context.organizationId || !context.email) return null;
-  const { data: guest } = await supabase.from("guests").select("id").eq("organization_id", context.organizationId).ilike("email", context.email).maybeSingle();
+  if (!context.userId || !context.email) return null;
+  const guestQuery = supabase.from("guests").select("id,organization_id").ilike("email", context.email);
+  if (context.organizationId) guestQuery.eq("organization_id", context.organizationId);
+  const { data: guest } = await guestQuery.maybeSingle();
   if (!guest?.id) return null;
   const { data } = await supabase
     .from("bookings")
-    .select("id,apartment_id,check_in_date,check_out_date,status,payment_status,guest_name,total_amount")
-    .eq("organization_id", context.organizationId)
+    .select("id,organization_id,apartment_id,check_in_date,check_out_date,status,payment_status,guest_name,total_amount")
+    .eq("organization_id", guest.organization_id)
     .eq("primary_guest_id", guest.id)
     .not("apartment_id", "is", null)
     .not("status", "in", "(cancelled,rejected,declined)")
@@ -144,20 +147,21 @@ export async function executeAiOperationalAction(params: {
     await audit({ ...params, actionResult: "booking_not_found", fallbackUsed: true });
     return { ok: false, intent: classification.intent, action: classification.action, fallbackUsed: true, reason: "booking_not_found" };
   }
-  const apartment = await findApartment(supabase, context, booking.apartment_id);
+  const actionContext: AIContext = { ...context, organizationId: booking.organization_id };
+  const apartment = await findApartment(supabase, actionContext, booking.apartment_id);
   if (!apartment) {
     await audit({ ...params, actionResult: "apartment_not_found", fallbackUsed: true });
     return { ok: false, intent: classification.intent, action: classification.action, fallbackUsed: true, reason: "apartment_not_found" };
   }
   const kind = categoryForIntent(classification.intent);
-  const assigneeId = await findAssignee(supabase, context.organizationId, apartment, kind);
+  const assigneeId = await findAssignee(supabase, booking.organization_id, apartment, kind);
   if (!assigneeId) {
     await audit({ ...params, actionResult: "assignee_not_found", fallbackUsed: true });
     return { ok: false, intent: classification.intent, action: classification.action, fallbackUsed: true, reason: "assignee_not_found" };
   }
 
   const idempotencyKey = `ai-phase2:${context.userId}:${booking.id}:${classification.intent}`;
-  const { data: existingTask } = await supabase.from("operational_tasks").select("id,support_ticket_id,status").eq("organization_id", context.organizationId).eq("ai_idempotency_key", idempotencyKey).not("status", "in", "(completed,verified,cancelled)").maybeSingle();
+  const { data: existingTask } = await supabase.from("operational_tasks").select("id,support_ticket_id,status").eq("organization_id", actionContext.organizationId).eq("ai_idempotency_key", idempotencyKey).not("status", "in", "(completed,verified,cancelled)").maybeSingle();
   if (existingTask) {
     await audit({ ...params, actionResult: "duplicate", taskReference: existingTask.id.slice(0, 8), fallbackUsed: false, metadata: { status: existingTask.status } });
     return { ok: true, intent: classification.intent, action: classification.action, taskReference: existingTask.id.slice(0, 8), ticketReference: existingTask.support_ticket_id ? String(existingTask.support_ticket_id).slice(0, 8) : undefined, duplicate: true };
@@ -165,12 +169,12 @@ export async function executeAiOperationalAction(params: {
 
   let ticketReference: string | undefined;
   try {
-    const ticket = await createSupportTicket({ supabase, context, message, route: context.route, handoff: makeHandoff(classification, message), idempotencyKey, apartmentId: apartment.id, bookingId: booking.id });
+    const ticket = await createSupportTicket({ supabase, context: actionContext, message, route: actionContext.route, handoff: makeHandoff(classification, message), idempotencyKey, apartmentId: apartment.id, bookingId: booking.id });
     ticketReference = ticket.ticket.public_number;
-    const { data: task, error: taskError } = await supabase.from("operational_tasks").insert({ organization_id: context.organizationId, apartment_id: apartment.id, booking_id: booking.id, support_ticket_id: ticket.ticket.id, title: safeTaskTitle(classification), description: actionSummary(classification, message), task_type: taskTypeForIntent(classification.intent), priority: classification.priority as SupportPriority, status: "assigned", assigned_user_id: assigneeId, due_at: new Date(Date.now() + (classification.priority === "urgent" ? 30 : 120) * 60 * 1000).toISOString(), created_by: context.userId, ai_idempotency_key: idempotencyKey }).select("id").single();
+    const { data: task, error: taskError } = await supabase.from("operational_tasks").insert({ organization_id: actionContext.organizationId, apartment_id: apartment.id, booking_id: booking.id, support_ticket_id: ticket.ticket.id, title: safeTaskTitle(classification), description: actionSummary(classification, message), task_type: taskTypeForIntent(classification.intent), priority: classification.priority as SupportPriority, status: "assigned", assigned_user_id: assigneeId, due_at: new Date(Date.now() + (classification.priority === "urgent" ? 30 : 120) * 60 * 1000).toISOString(), created_by: actionContext.userId, ai_idempotency_key: idempotencyKey }).select("id").single();
     if (taskError || !task) throw new Error("task_create_failed");
     await supabase.from("operational_task_assignees").upsert({ task_id: task.id, user_id: assigneeId }, { onConflict: "task_id,user_id" });
-    await audit({ ...params, actionResult: "created", ticketReference: ticket.ticket.public_number, taskReference: task.id.slice(0, 8), fallbackUsed: false });
+    await audit({ ...params, context: actionContext, actionResult: "created", ticketReference: ticket.ticket.public_number, taskReference: task.id.slice(0, 8), fallbackUsed: false });
     return { ok: true, intent: classification.intent, action: classification.action, taskReference: task.id.slice(0, 8), ticketReference: ticket.ticket.public_number, duplicate: false };
   } catch {
     await audit({ ...params, actionResult: "failed", ticketReference, fallbackUsed: true });
