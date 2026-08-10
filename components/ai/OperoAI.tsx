@@ -163,12 +163,12 @@ export default function OperoAI() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser || conversationId) return;
+    if (!currentUser || conversationId || !pathname.startsWith("/support/conversation/")) return;
     void fetch("/api/support/tickets", { cache: "no-store" }).then((response) => response.json()).then((payload: { data?: Array<{ public_number: string; conversation_state?: ConversationState }> }) => {
       const ticket = payload.data?.find((item) => item.conversation_state && item.conversation_state !== "closed") ?? payload.data?.[0];
       if (ticket) void loadConversation(ticket.public_number);
     });
-  }, [conversationId, currentUser, loadConversation]);
+  }, [conversationId, currentUser, loadConversation, pathname]);
 
   useEffect(() => {
     if (currentUser || conversationId) return;
