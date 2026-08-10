@@ -7,7 +7,7 @@ const REASONS = new Set(["owner_stay", "family_or_guests", "renovation", "mainte
 
 type RouteContext = { params: Promise<{ id: string }> };
 type PeriodRow = { start_date: string; end_date: string; status: string };
-type BlockRow = { id: string; apartment_id: string; start_date: string; end_date: string; reason_code: string; status: string; created_at: string; updated_at: string };
+type BlockRow = { id: string; apartment_id: string; start_date: string; end_date: string; reason_code: string; status: string; created_at: string; updated_at: string; owner_guest_name?: string | null; owner_guest_count?: number | null; owner_comment?: string | null };
 
 function publicBlock(block: BlockRow) {
   return {
@@ -16,6 +16,9 @@ function publicBlock(block: BlockRow) {
     startDate: block.start_date,
     endDate: block.end_date,
     reasonCode: block.reason_code,
+    guestName: block.owner_guest_name ?? null,
+    guestCount: block.owner_guest_count ?? null,
+    comment: block.owner_comment ?? null,
     status: block.status,
     createdAt: block.created_at,
     updatedAt: block.updated_at,
@@ -42,7 +45,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const [periods, blocks] = await Promise.all([
     resolved.supabase.rpc("get_property_owner_occupied_periods", { target_apartment_id: resolved.id }),
-    resolved.supabase.from("availability_blocks").select("id,apartment_id,start_date,end_date,reason_code,private_note,status,created_by,created_by_role,created_at,updated_at").eq("apartment_id", resolved.id).eq("created_by", resolved.auth.context.authUserId).order("start_date", { ascending: true }),
+    resolved.supabase.from("availability_blocks").select("id,apartment_id,start_date,end_date,reason_code,private_note,status,created_by,created_by_role,owner_guest_name,owner_guest_count,owner_comment,created_at,updated_at").eq("apartment_id", resolved.id).eq("created_by", resolved.auth.context.authUserId).eq("block_source", "owner").order("start_date", { ascending: true }),
   ]);
 
   if (periods.error) return errorResponse(periods.error.message, 422);
@@ -61,7 +64,7 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   const resolved = await getContext(context);
   if (resolved.response || !resolved.supabase) return resolved.response;
-  const body = await request.json().catch(() => null) as { startDate?: string; endDate?: string; reasonCode?: string; privateNote?: string } | null;
+  const body = await request.json().catch(() => null) as { startDate?: string; endDate?: string; reasonCode?: string; privateNote?: string; guestName?: string; guestCount?: number; comment?: string } | null;
   if (!body?.startDate || !body.endDate || !body.reasonCode || !REASONS.has(body.reasonCode)) return errorResponse("Invalid block payload");
 
   const { data, error } = await resolved.supabase.rpc("create_property_owner_block", {
@@ -70,10 +73,13 @@ export async function POST(request: Request, context: RouteContext) {
     target_end_date: body.endDate,
     target_reason_code: body.reasonCode,
     target_private_note: body.privateNote ?? null,
+    target_guest_name: body.guestName ?? null,
+    target_guest_count: body.guestCount ?? null,
+    target_owner_comment: body.comment ?? null,
   });
   if (error) {
     const conflict = error.message.toLowerCase().includes("conflict");
-    return errorResponse(conflict ? "На выбранные даты уже существует бронирование или блокировка. Свяжитесь с Opero Homes." : error.message, conflict ? 409 : 422);
+    return errorResponse(conflict ? "Эти даты уже заняты." : error.message, conflict ? 409 : 422);
   }
   return NextResponse.json({ ok: true, data: publicBlock(data as BlockRow) }, { status: 201 });
 }
@@ -81,7 +87,7 @@ export async function POST(request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   const resolved = await getContext(context);
   if (resolved.response || !resolved.supabase) return resolved.response;
-  const body = await request.json().catch(() => null) as { blockId?: string; startDate?: string; endDate?: string; reasonCode?: string; privateNote?: string } | null;
+  const body = await request.json().catch(() => null) as { blockId?: string; startDate?: string; endDate?: string; reasonCode?: string; privateNote?: string; guestName?: string; guestCount?: number; comment?: string } | null;
   if (!body?.blockId || !UUID.test(body.blockId) || !body.startDate || !body.endDate || !body.reasonCode || !REASONS.has(body.reasonCode)) return errorResponse("Invalid block payload");
 
   const { data, error } = await resolved.supabase.rpc("update_property_owner_block", {
@@ -90,10 +96,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     target_end_date: body.endDate,
     target_reason_code: body.reasonCode,
     target_private_note: body.privateNote ?? null,
+    target_guest_name: body.guestName ?? null,
+    target_guest_count: body.guestCount ?? null,
+    target_owner_comment: body.comment ?? null,
   });
   if (error) {
     const conflict = error.message.toLowerCase().includes("conflict");
-    return errorResponse(conflict ? "На выбранные даты уже существует бронирование или блокировка. Свяжитесь с Opero Homes." : error.message, conflict ? 409 : 422);
+    return errorResponse(conflict ? "Эти даты уже заняты." : error.message, conflict ? 409 : 422);
   }
   return NextResponse.json({ ok: true, data: publicBlock(data as BlockRow) });
 }

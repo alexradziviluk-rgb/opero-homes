@@ -12,7 +12,10 @@ export async function GET() {
   const auth = await requirePropertyOwnerApiAuth();
   if (!auth.ok) return auth.response;
 
-  const { data, error } = await supabase.rpc("get_property_owner_properties");
+  const [{ data, error }, { data: profile }] = await Promise.all([
+    supabase.rpc("get_property_owner_properties"),
+    supabase.from("profiles").select("owner_public_number").eq("id", auth.context.authUserId).maybeSingle(),
+  ]);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
 
   const properties = await Promise.all(((data ?? []) as PropertyRow[]).map(async (property) => {
@@ -31,5 +34,5 @@ export async function GET() {
     };
   }));
 
-  return NextResponse.json({ ok: true, data: properties });
+  return NextResponse.json({ ok: true, ownerPublicNumber: profile?.owner_public_number ?? null, data: properties });
 }

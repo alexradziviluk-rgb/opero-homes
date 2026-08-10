@@ -81,6 +81,7 @@ test("active property owner sees only related apartment and no private or financ
   expect(response.status()).toBe(200);
   const body = await response.json();
   expect(body.ok).toBe(true);
+  expect(body.ownerPublicNumber).toMatch(/^OWN-\d{4,}$/);
   expect(body.data.map((property: { id: string }) => property.id)).toEqual([fixture.apartmentA]);
   const serialized = JSON.stringify(body);
   for (const forbidden of ["price", "daily_price", "total_amount", "guest_name", "guest_email", "guest_phone", "payment_status"]) expect(serialized).not.toContain(forbidden);
@@ -96,7 +97,7 @@ test("dual-role client can book a foreign apartment without owner access", async
   await expect(page).toHaveURL(/\/guest(?:\?|$)/);
 
   await page.goto("/account/properties");
-  await expect(page.getByRole("heading", { name: "Моя недвижимость", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Мои объекты", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Таур Fixture A", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Foreign Fixture B", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Найти жильё для поездки" })).toBeVisible();
@@ -121,10 +122,11 @@ test("dual-role client can book a foreign apartment without owner access", async
 
 test("active owner can create, edit and cancel only own block", async ({ page }) => {
   await login(page, fixture.activeOwner.email);
-  const create = await page.request.post(`/api/owner/properties/${fixture.apartmentA}/blocks`, { data: { startDate: "2030-06-10", endDate: "2030-06-12", reasonCode: "owner_stay", privateNote: "Do not expose" } });
-  expect(create.status()).toBe(201);
+  const create = await page.request.post(`/api/owner/properties/${fixture.apartmentA}/blocks`, { data: { startDate: "2030-06-10", endDate: "2030-06-12", reasonCode: "owner_stay", guestName: "Fixture Guest", guestCount: 2, comment: "Owner test stay", privateNote: "Do not expose" } });
+  expect(create.status(), await create.text()).toBe(201);
   const created = await create.json();
   expect(created.data).toMatchObject({ apartmentId: fixture.apartmentA, startDate: "2030-06-10", endDate: "2030-06-12", reasonCode: "owner_stay", status: "active" });
+  expect(created.data).toMatchObject({ guestName: "Fixture Guest", guestCount: 2, comment: "Owner test stay" });
   expect(JSON.stringify(created)).not.toContain("Do not expose");
   expect(JSON.stringify(created)).not.toContain("privateNote");
 

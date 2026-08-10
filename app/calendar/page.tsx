@@ -75,6 +75,9 @@ type AvailabilityBlock = {
   private_note: string | null;
   created_by: string | null;
   created_by_role: string | null;
+  block_source?: string | null;
+  owner_public_number?: string | null;
+  owner_name?: string | null;
 };
 
 function getApartmentCalendarLabel(booking: Booking, apartments: Apartment[]): string {
@@ -537,7 +540,7 @@ export default function CalendarPage() {
                                 const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
                                 return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto min-w-0 h-8 truncate rounded px-1.5 py-1 text-left text-[9px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
                               })}
-                              {apartmentBlocks.map((block) => <div key={block.id} title={`${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className="pointer-events-auto min-w-0 h-8 truncate rounded bg-violet-400 px-1.5 py-1 text-[9px] font-semibold text-slate-950 shadow-lg" style={periodPosition(block.start_date, block.end_date)}>Недоступно · {formatPeriod(block.start_date, block.end_date)}</div>)}
+                              {apartmentBlocks.map((block) => { const ownerBooking = block.block_source === "owner"; const ownerLabel = block.owner_public_number ?? block.owner_name ?? "Собственник"; return <div key={block.id} title={ownerBooking ? `${ownerLabel}\n${formatPeriod(block.start_date, block.end_date)}` : `${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className={`pointer-events-auto min-w-0 h-8 truncate rounded px-1.5 py-1 text-[9px] font-semibold text-slate-950 shadow-lg ${ownerBooking ? "bg-amber-300" : "bg-violet-400"}`} style={periodPosition(block.start_date, block.end_date)}>{ownerBooking ? `OWNER BOOKING · ${formatPeriod(block.start_date, block.end_date)}` : `Недоступно · ${formatPeriod(block.start_date, block.end_date)}`}</div>; })}
                             </div>
                           </div>
                         </div>
