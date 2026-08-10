@@ -40,7 +40,7 @@ function has(message: string, patterns: RegExp): boolean {
 
 export function classifyAiIntent(rawMessage: string): AiIntentClassification {
   const message = rawMessage.toLocaleLowerCase("ru-RU");
-  if (has(message, /пожар|дым|запах газа|газ\b|затоп|серьёзн.*утеч|serious leak|fire|smoke|gas leak|flood|yangın|gaz kokusu|su bas/iu)) return { intent: "URGENT_MAINTENANCE", action: "URGENT_HANDOFF", priority: "urgent", subject: "Срочная проблема на объекте", operational: true };
+  if (has(message, /пожар|дым|запах газа|газ\b|затоп|затап|серьёзн.*утеч|serious leak|fire|smoke|gas leak|flood|yangın|gaz kokusu|su bas/iu)) return { intent: "URGENT_MAINTENANCE", action: "URGENT_HANDOFF", priority: "urgent", subject: "Срочная проблема на объекте", operational: true };
   if (has(message, /заперт|заперта|не могу попасть|не попасть|locked out|cannot enter|can't enter|kapıda kald|giremiyorum/iu)) return { intent: "LOCKED_OUT", action: "URGENT_HANDOFF", priority: "urgent", subject: "Гость не может попасть в объект", operational: true };
   if (has(message, /не работает замок|ключ не|не открывается|access problem|access issue|cannot access|giriş sorunu/iu)) return { intent: "ACCESS_PROBLEM", action: "URGENT_HANDOFF", priority: "urgent", subject: "Проблема с доступом в объект", operational: true };
   if (has(message, /нет электр|нет света|обесточ|no power|no electricity|electricity is out|elektrik yok/iu)) return { intent: "NO_POWER", action: "URGENT_HANDOFF", priority: "urgent", subject: "Нет электричества на объекте", operational: true };
