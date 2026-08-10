@@ -39,6 +39,8 @@ type OperationalTaskRow = {
   task_type: string;
   status: string;
   due_at: string;
+  sla_warning_at?: string | null;
+  sla_due_at?: string | null;
 };
 
 type AvailabilityBlockRow = { apartment_id: string; start_date: string; end_date: string };
@@ -102,6 +104,8 @@ function buildDefaultMetrics(): DashboardMetrics {
     overdueCleaningCount: 0,
     overdueMaintenanceCount: 0,
     tasksDueTodayCount: 0,
+    slaWarningsCount: 0,
+    overdueOperationalTasksCount: 0,
     unreadNotificationsCount: 0,
     bookingsTotal: 0,
     bookingsActiveFuture: 0,
@@ -330,7 +334,7 @@ export async function GET() {
 
   const { data: operationalTasksData, error: operationalTasksError } = await supabase
     .from("operational_tasks")
-    .select("task_type,status,due_at")
+    .select("task_type,status,due_at,sla_warning_at,sla_due_at")
     .eq("organization_id", organizationId);
 
   if (!operationalTasksError) {
@@ -339,6 +343,9 @@ export async function GET() {
     metrics.overdueCleaningCount = operationalTasks.filter((task) => task.task_type === "cleaning" && task.due_at.slice(0, 10) < todayIso && incompleteStatuses.has(normalize(task.status))).length;
     metrics.overdueMaintenanceCount = operationalTasks.filter((task) => task.task_type === "technical" && task.due_at.slice(0, 10) < todayIso && incompleteStatuses.has(normalize(task.status))).length;
     metrics.tasksDueTodayCount = operationalTasks.filter((task) => task.due_at.slice(0, 10) === todayIso && incompleteStatuses.has(normalize(task.status))).length;
+    const nowIso = new Date().toISOString();
+    metrics.slaWarningsCount = operationalTasks.filter((task) => task.sla_warning_at && task.sla_warning_at <= nowIso && task.sla_due_at && task.sla_due_at > nowIso && incompleteStatuses.has(normalize(task.status))).length;
+    metrics.overdueOperationalTasksCount = operationalTasks.filter((task) => task.sla_due_at && task.sla_due_at <= nowIso && incompleteStatuses.has(normalize(task.status))).length;
   }
 
   const { count: unreadNotificationsCount, error: unreadNotificationsError } = await supabase

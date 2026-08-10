@@ -25,6 +25,8 @@ export type DashboardMetrics = {
   overdueCleaningCount: number;
   overdueMaintenanceCount: number;
   tasksDueTodayCount: number;
+  slaWarningsCount: number;
+  overdueOperationalTasksCount: number;
   unreadNotificationsCount: number;
   bookingsTotal: number;
   bookingsActiveFuture: number;
