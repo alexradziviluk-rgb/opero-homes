@@ -60,10 +60,19 @@ export async function POST(request: Request) {
     const update: Record<string, string | number> = { sla_due_at: sla.dueAt, sla_warning_at: sla.warningAt };
     const nextLevel = nextEscalationLevel(task.escalation_level, sla.state);
     if (nextLevel > task.escalation_level) {
-      update.escalation_level = nextLevel;
+      const escalationClaim = await supabase
+        .from("operational_tasks")
+        .update({ ...update, escalation_level: nextLevel })
+        .eq("id", task.id)
+        .eq("organization_id", task.organization_id)
+        .eq("escalation_level", task.escalation_level)
+        .select("id")
+        .maybeSingle();
+      if (escalationClaim.error || !escalationClaim.data) continue;
       escalations += 1;
+    } else {
+      await supabase.from("operational_tasks").update(update).eq("id", task.id).eq("organization_id", task.organization_id);
     }
-    await supabase.from("operational_tasks").update(update).eq("id", task.id).eq("organization_id", task.organization_id);
     if (sla.state === "ok") continue;
     const kind = sla.state === "expired" ? "overdue" : "sla_warning";
     const level = sla.state === "expired" ? nextLevel : task.escalation_level;
@@ -74,7 +83,7 @@ export async function POST(request: Request) {
     }
     const title = kind === "overdue" ? `Просрочена задача: ${task.title}` : `SLA близок к истечению: ${task.title}`;
     const eventType = kind === "overdue" ? "task_overdue" : "task_due_soon";
-    const eventWrite = await supabase.from("notification_events").upsert({ organization_id: task.organization_id, event_type: eventType, entity_type: "operational_task", entity_id: task.id, booking_id: null, apartment_id: null, payload: { taskId: task.id, taskType: task.task_type, priority: task.priority, escalationLevel: level, reminderType: kind }, idempotency_key: key, created_by_user_id: null }, { onConflict: "organization_id,idempotency_key" });
+    const eventWrite = await supabase.from("notification_events").upsert({ organization_id: task.organization_id, event_type: eventType, entity_type: "operational_task", entity_id: task.id, booking_id: null, apartment_id: null, payload: { taskId: task.id, taskType: task.task_type, priority: task.priority, escalationLevel: level, reminderType: kind }, idempotency_key: key, created_by_user_id: null }, { onConflict: "organization_id,idempotency_key", ignoreDuplicates: true });
     if (eventWrite.error) continue;
     const recipients = level === 0 ? [task.assigned_user_id] : (await supabase.from("organization_members").select("user_id").eq("organization_id", task.organization_id).eq("status", "active").in("role_code", level === 1 ? ["manager", "owner"] : ["owner"])).data?.map((row) => row.user_id) ?? [];
     const event = await supabase.from("notification_events").select("id").eq("organization_id", task.organization_id).eq("idempotency_key", key).single();
