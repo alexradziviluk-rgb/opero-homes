@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { getAIContext } from "@/lib/ai/context";
 import { answerWithTools } from "@/lib/ai/assistant";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
@@ -8,6 +9,11 @@ import { executeAiOperationalAction } from "@/lib/ai/operations";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
+
+function fallbackIdempotencyKey(userId: string, intent: string, message: string): string {
+  const messageHash = createHash("sha256").update(message.replace(/\s+/g, " ").trim().toLocaleLowerCase("ru-RU")).digest("hex").slice(0, 24);
+  return `ai-phase2-fallback:${userId}:${intent}:${messageHash}`;
+}
 
 function allowedByRateLimit(key: string): boolean {
   const now = Date.now();
@@ -62,7 +68,8 @@ export async function POST(request: Request) {
         response.handoff = undefined;
       } else if (response.handoff && context.userId) {
         try {
-          const ticket = await createSupportTicket({ supabase, context, message, route: context.route, handoff: response.handoff, idempotencyKey: response.handoff.actionId });
+          const ticket = await createSupportTicket({ supabase, context, message, route: context.route, handoff: response.handoff, idempotencyKey: fallbackIdempotencyKey(context.userId, classification.intent, message) });
+          await supabase.from("ai_operation_audit").insert({ organization_id: context.organizationId, actor_user_id: context.userId, conversation_id: ticket.ticket.id, intent: classification.intent, action: classification.action, action_result: ticket.duplicate ? "fallback_duplicate" : "fallback_created", ticket_reference: ticket.ticket.public_number, task_reference: null, fallback_used: true, metadata: { reason: operationalAction.reason ?? "action_failed", route: context.route } });
           response.message = `Не удалось автоматически зарегистрировать операционную задачу. Я передал вопрос менеджеру: ${ticket.ticket.public_number}.`;
           response.handoff = { ...response.handoff, offered: false, requiresConfirmation: false, critical: false };
         } catch {
