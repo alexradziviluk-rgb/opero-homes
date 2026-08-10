@@ -21,5 +21,16 @@ export default async function handler() {
     return new Response("Operations watcher failed", { status: 502 });
   }
 
+  const result = await response.json().catch(() => null);
+  if (result?.ok) {
+    console.info("operations-watch result", JSON.stringify({
+      inspected: result.inspected ?? 0,
+      remindersCreated: result.remindersCreated ?? 0,
+      notificationsCreated: result.notificationsCreated ?? 0,
+      escalations: result.escalations ?? 0,
+      reminderInsertFailures: result.reminderInsertFailures ?? 0,
+    }));
+  }
+
   return new Response("Operations watcher completed", { status: 200 });
 }
