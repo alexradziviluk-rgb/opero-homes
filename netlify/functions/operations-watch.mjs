@@ -13,7 +13,12 @@ export default async function handler() {
 
   const response = await fetch(`${siteUrl}/api/operations/watch`, {
     method: "POST",
-    headers: { "x-operations-worker-secret": workerSecret },
+    headers: {
+      "x-operations-worker-secret": workerSecret,
+      ...(process.env.OPERATIONS_ALLOW_TEST_FAILURE_INJECTION === "true" && process.env.OPERATIONS_TEST_FAILURE_TASK_ID
+        ? { "x-operations-test-failure-task": process.env.OPERATIONS_TEST_FAILURE_TASK_ID }
+        : {}),
+    },
   });
 
   if (!response.ok) {
