@@ -137,7 +137,7 @@ export async function executeAiOperationalAction(params: {
   classification: AiIntentClassification;
 }): Promise<AiOperationalActionResult> {
   const { context, classification, message, supabase } = params;
-  if (!context.userId || !context.organizationId) {
+  if (!context.userId) {
     await audit({ ...params, actionResult: "not_authenticated", fallbackUsed: true });
     return { ok: false, intent: classification.intent, action: classification.action, fallbackUsed: true, reason: "not_authenticated" };
   }
