@@ -51,5 +51,5 @@ export async function PATCH(request: Request, context: Context) {
     return errorResponse(422, emailResult.errorMessage ?? "Не удалось отправить приглашение.", "EMAIL_DELIVERY_FAILED");
   }
   await supabase.rpc("set_property_owner_invitation_delivery", { target_invitation_id: id, target_status: "sent", target_error: null });
-  return NextResponse.json({ ok: true, data: { invitationId: id, expiresAt: reinvite.expires_at } });
+  return NextResponse.json({ ok: true, data: { invitationId: id, expiresAt: reinvite.expires_at, inviteUrl } });
 }

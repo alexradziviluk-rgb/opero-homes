@@ -51,5 +51,5 @@ export async function POST(request: Request) {
     return jsonError(422, emailResult.errorMessage ?? "Не удалось отправить приглашение.", "EMAIL_DELIVERY_FAILED");
   }
   await supabase.rpc("set_property_owner_invitation_delivery", { target_invitation_id: invitation.invitation_id, target_status: "sent", target_error: null });
-  return NextResponse.json({ ok: true, data: { invitationId: invitation.invitation_id, email: invitation.normalized_email, apartmentIds, expiresAt: invitation.expires_at } }, { status: 201 });
+  return NextResponse.json({ ok: true, data: { invitationId: invitation.invitation_id, email: invitation.normalized_email, apartmentIds, expiresAt: invitation.expires_at, inviteUrl } }, { status: 201 });
 }

@@ -21,6 +21,7 @@ export default function ApartmentOwnersPage() {
   const [lookup, setLookup] = useState("");
   const [searchResults, setSearchResults] = useState<SearchOwner[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState("");
 
   const load = useCallback(async () => {
     const [ownersResponse, invitationsResponse] = await Promise.all([
@@ -48,7 +49,7 @@ export default function ApartmentOwnersPage() {
     const response = await fetch("/api/owner/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, apartmentIds: [id] }) });
     const result = await response.json();
     if (!response.ok || !result.ok) setError(result.error ?? "Не удалось отправить приглашение");
-    else { setMessage("Приглашение отправлено."); setForm({ firstName: "", lastName: "", email: "", phone: "" }); await load(); }
+    else { setMessage("Приглашение отправлено. Скопируйте ссылку и передайте её тестовому собственнику."); setInviteLink(result.data?.inviteUrl ?? ""); setForm({ firstName: "", lastName: "", email: "", phone: "" }); await load(); }
     setSaving(false);
   }
 
@@ -57,7 +58,7 @@ export default function ApartmentOwnersPage() {
     const response = await fetch(`/api/owner/invitations/${invitation.invitationId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "resend" }) });
     const result = await response.json();
     if (!response.ok || !result.ok) setError(result.error ?? "Не удалось повторно отправить приглашение");
-    else { setMessage("Новое приглашение отправлено."); await load(); }
+    else { setMessage("Новое приглашение отправлено. Скопируйте ссылку и передайте её тестовому собственнику."); setInviteLink(result.data?.inviteUrl ?? ""); await load(); }
     setReinviting(null);
   }
 
@@ -109,6 +110,7 @@ export default function ApartmentOwnersPage() {
             <button disabled={saving} className="rounded-xl bg-cyan-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50 sm:col-span-2">{saving ? "Отправляем..." : "Отправить приглашение"}</button>
           </form>
           {message ? <p className="mt-3 text-sm text-emerald-300">{message}</p> : null}
+          {inviteLink ? <div className="mt-3 flex flex-wrap gap-2"><input readOnly value={inviteLink} aria-label="Одноразовая ссылка приглашения" className="min-w-0 flex-1 rounded-xl border border-emerald-300/30 bg-white/5 px-3 py-2 text-sm text-emerald-100" /><button type="button" onClick={() => void navigator.clipboard.writeText(inviteLink)} className="rounded-xl border border-emerald-300/40 px-3 py-2 text-sm text-emerald-200">Скопировать ссылку</button></div> : null}
           {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
         </section>
         <section className="mt-6 rounded-2xl border border-white/10 bg-slate-900 p-5">
