@@ -48,6 +48,22 @@ function sanitizeAvailability(value: unknown): RecordValue {
   };
 }
 
+function sanitizePropertyKnowledge(value: unknown): RecordValue {
+  const record = asRecord(value);
+  const property = asRecord(record?.property);
+  if (!property) return errorOnly(value);
+  return { property: {
+    ...(typeof property.title === "string" ? { title: property.title } : {}),
+    ...(typeof property.city === "string" ? { city: property.city } : {}),
+    ...(typeof property.district === "string" ? { district: property.district } : {}),
+    amenities: Array.isArray(property.amenities) ? property.amenities.filter((item): item is string => typeof item === "string").slice(0, 30) : [],
+    ...(typeof property.pets === "string" ? { pets: property.pets } : {}),
+    ...(typeof property.smoking === "string" ? { smoking: property.smoking } : {}),
+    ...(typeof property.checkIn === "string" ? { checkIn: property.checkIn } : {}),
+    ...(typeof property.checkOut === "string" ? { checkOut: property.checkOut } : {}),
+  } };
+}
+
 function sanitizeQuote(value: unknown): RecordValue {
   const record = asRecord(value);
   if (!record) return {};
@@ -88,6 +104,7 @@ function sanitizeTaskList(value: unknown): unknown {
 function sanitizeToolData(role: AIAssistantRole, tool: string, value: unknown): unknown {
   if (tool === "searchPublishedProperties") return sanitizeProperties(value);
   if (tool === "getPublicAvailability") return sanitizeAvailability(value);
+  if (tool === "getPublicPropertyKnowledge") return sanitizePropertyKnowledge(value);
   if (tool === "calculatePublicQuote") return sanitizeQuote(value);
   if (tool === "getMyProfile") {
     if (role !== "client") return errorOnly(value);

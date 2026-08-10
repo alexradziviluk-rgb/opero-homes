@@ -48,7 +48,7 @@ export function classifyAiIntent(rawMessage: string): AiIntentClassification {
   if (has(message, /менеджер|человек|оператор|сотрудник|manager|human|agent|insan/iu)) return { intent: "HUMAN_MANAGER", action: "MANAGER_HANDOFF", priority: "normal", subject: "Запрос менеджера", operational: false };
   if (has(message, /отмен|cancel|cancellation|отменить брон/iu)) return { intent: "CANCELLATION", action: "MANAGER_HANDOFF", priority: "high", subject: "Запрос на отмену бронирования", operational: false };
   if (has(message, /возврат|refund|вернуть деньги|iade/iu)) return { intent: "REFUND", action: "MANAGER_HANDOFF", priority: "high", subject: "Запрос на возврат", operational: false };
-  if (has(message, /оплат|платёж|payment|card|карта/iu)) return { intent: "PAYMENT", action: "MANAGER_HANDOFF", priority: "high", subject: "Финансовый вопрос", operational: false };
+  if (has(message, /оплат|платёж|платеж|списал|снял|payment|charge|card|карта/iu)) return { intent: "PAYMENT", action: "MANAGER_HANDOFF", priority: "high", subject: "Финансовый вопрос", operational: false };
   if (has(message, /брон|брониров|booking|reservation|rezervasyon/iu) && has(message, /измен|перенес|дата|change|modify/iu)) return { intent: "BOOKING_CHANGE", action: "MANAGER_HANDOFF", priority: "high", subject: "Изменение бронирования", operational: false };
   if (has(message, /брон|брониров|booking|reservation|rezervasyon/iu)) return { intent: "BOOKING_QUESTION", action: "BOOKING_DATA", priority: "normal", subject: "Вопрос по бронированию", operational: false };
   if (has(message, /заезд|заселен|check.?in|giriş/iu)) return { intent: "CHECK_IN", action: "BOOKING_DATA", priority: "normal", subject: "Вопрос по заезду", operational: false };

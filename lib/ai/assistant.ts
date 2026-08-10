@@ -14,6 +14,7 @@ import {
   getOrganizationSummary,
   getPendingRequests,
   getPublicAvailability,
+  getPublicPropertyKnowledge,
   searchPublishedProperties,
 } from "./tools/read";
 import { sanitizeAiToolResultForClient } from "./sanitize";
@@ -76,6 +77,14 @@ function propertyAnswer(language: "ru" | "en" | "tr", properties: unknown[]): st
 }
 
 function dataAnswer(language: "ru" | "en" | "tr", count: number | null, results: AIToolResult[]): string {
+  if (results[0]?.tool === "getPublicPropertyKnowledge") {
+    const property = (results[0].data as { property?: Record<string, unknown> } | undefined)?.property;
+    if (!property) return language === "en" ? "This property information is not available." : language === "tr" ? "Bu konutun bilgileri mevcut değil." : "Информация об этом объекте недоступна.";
+    const label = (key: string, fallback: string) => property[key] === "not_specified" ? fallback : String(property[key] ?? fallback);
+    if (language === "en") return `${String(property.title)}. Pets: ${label("pets", "not specified")}. Smoking: ${label("smoking", "not specified")}. Check-in: ${label("checkIn", "not specified")}. Check-out: ${label("checkOut", "not specified")}. Amenities: ${Array.isArray(property.amenities) && property.amenities.length ? property.amenities.join(", ") : "not specified"}.`;
+    if (language === "tr") return `${String(property.title)}. Evcil hayvan: ${label("pets", "belirtilmemiş")}. Sigara: ${label("smoking", "belirtilmemiş")}. Giriş: ${label("checkIn", "belirtilmemiş")}. Çıkış: ${label("checkOut", "belirtilmemiş")}. Olanaklar: ${Array.isArray(property.amenities) && property.amenities.length ? property.amenities.join(", ") : "belirtilmemiş"}.`;
+    return `${String(property.title)}. Животные: ${label("pets", "не указано")}. Курение: ${label("smoking", "не указано")}. Заезд: ${label("checkIn", "не указано")}. Выезд: ${label("checkOut", "не указано")}. Удобства: ${Array.isArray(property.amenities) && property.amenities.length ? property.amenities.join(", ") : "не указано"}.`;
+  }
   if (count !== null) return propertyAnswer(language, (results[0]?.data as { properties?: unknown[] } | undefined)?.properties ?? []);
   if (language === "en") return "I checked the Opero Homes data available to your account. Tell me what you want to inspect next, and I’ll work through it with you.";
   if (language === "tr") return "Hesabınız için mevcut Opero Homes verilerini kontrol ettim. Sırada neyi incelememi istediğinizi yazın, birlikte ilerleyelim.";
@@ -98,8 +107,12 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
   const wantsApartments = hasAny(lower, ["объекты организации", "все квартиры", "apartments"]);
   const wantsTaskDetails = hasAny(lower, ["детали задачи", "что сделать", "task details"]);
   const wantsCalendar = hasAny(lower, ["календарь", "занятые даты", "occupied dates"]);
+  const wantsPropertyKnowledge = hasAny(lower, ["животн", "курить", "парков", "выезд", "заезд", "wifi", "wi-fi", "вайфай", "удобств", "amenit", "pet", "parking"]);
+  const routeApartmentId = context.route.match(/^\/properties\/([0-9a-f-]{36})$/i)?.[1] ?? "";
 
-  if (wantsBookings && canUseTool(context.role, "getMyBookingRequests")) {
+  if (wantsPropertyKnowledge && routeApartmentId && canUseTool(context.role, "getPublicPropertyKnowledge")) {
+    results.push(await getPublicPropertyKnowledge(context, routeApartmentId));
+  } else if (wantsBookings && canUseTool(context.role, "getMyBookingRequests")) {
     results.push(await getMyBookingRequests(context));
   } else if (wantsBookings && canUseTool(context.role, "getBookings")) {
     results.push(await getBookings(context));

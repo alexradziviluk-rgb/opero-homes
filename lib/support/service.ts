@@ -13,7 +13,7 @@ function detectLanguage(message: string): string { return /\b(hello|refund|booki
 function classify(message: string): { category: SupportCategory; priority: SupportPriority; subject: string; critical: boolean } {
   const lower = message.toLocaleLowerCase("ru-RU");
   if (/авари|пожар|затоп|затап|нет воды|нет электр|gas leak|fire|flood|no water|no electricity|yangın|su yok|elektrik yok/i.test(lower)) return { category: "maintenance", priority: "urgent", subject: "Критическая проблема на объекте", critical: true };
-  if (/возврат|refund|iade|оплат|payment|платеж|деньг|money/i.test(lower)) return { category: /возврат|refund|iade/i.test(lower) ? "refund" : "payment", priority: "high", subject: "Финансовый вопрос", critical: false };
+  if (/возврат|refund|iade|оплат|payment|платеж|списал|снял|charge|деньг|money/i.test(lower)) return { category: /возврат|refund|iade/i.test(lower) ? "refund" : "payment", priority: "high", subject: "Финансовый вопрос", critical: false };
   if (/брон|booking|rezervasyon|дат|cancel|отмен|измен|change/i.test(lower)) return { category: "booking", priority: "high", subject: "Вопрос по бронированию", critical: false };
   if (/уборк|clean|temiz/i.test(lower)) return { category: "cleaning", priority: "normal", subject: "Вопрос по уборке", critical: false };
   if (/полом|ремонт|maintenance|слом|broken/i.test(lower)) return { category: "maintenance", priority: "high", subject: "Вопрос по обслуживанию объекта", critical: false };

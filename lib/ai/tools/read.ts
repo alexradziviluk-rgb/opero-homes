@@ -62,6 +62,32 @@ export async function searchPublishedProperties(context: AIContext, message: str
   return { tool: "searchPublishedProperties", data: { properties: await publicProperties(message) }, source: "Публичный каталог Opero Homes" };
 }
 
+export async function getPublicPropertyKnowledge(context: AIContext, apartmentId: string): Promise<AIToolResult> {
+  if (!canUseTool(context.role, "getPublicPropertyKnowledge")) return unauthorized("getPublicPropertyKnowledge");
+  const supabase = await createSupabaseServerClient();
+  if (!supabase || !apartmentId) return { tool: "getPublicPropertyKnowledge", data: { status: "insufficient_data" } };
+  const { data, error } = await supabase.from("apartments").select("id,name,city,district,amenities,house_rules,publication_status").eq("id", apartmentId).eq("publication_status", "published").maybeSingle();
+  if (error || !data) return { tool: "getPublicPropertyKnowledge", data: { status: "not_found" }, source: "Публичные данные объекта" };
+  const rules = data.house_rules && typeof data.house_rules === "object" ? data.house_rules as Record<string, unknown> : {};
+  return {
+    tool: "getPublicPropertyKnowledge",
+    data: {
+      property: {
+        title: String(data.name ?? "Объект"),
+        city: String(data.city ?? ""),
+        district: String(data.district ?? ""),
+        amenities: Array.isArray(data.amenities) ? data.amenities.filter((item): item is string => typeof item === "string") : [],
+        pets: typeof rules.pets === "string" ? rules.pets : "not_specified",
+        smoking: typeof rules.smoking === "string" ? rules.smoking : "not_specified",
+        checkIn: typeof rules.checkIn === "string" ? rules.checkIn : "not_specified",
+        checkOut: typeof rules.checkOut === "string" ? rules.checkOut : "not_specified",
+        notes: typeof rules.notes === "string" ? rules.notes.slice(0, 300) : "not_specified",
+      },
+    },
+    source: "Публичные данные объекта",
+  };
+}
+
 export async function getPublicAvailability(context: AIContext, apartmentId: string, checkIn: string, checkOut: string): Promise<AIToolResult> {
   if (!canUseTool(context.role, "getPublicAvailability")) return unauthorized("getPublicAvailability");
   const supabase = await createSupabaseServerClient();

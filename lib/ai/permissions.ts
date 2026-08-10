@@ -1,8 +1,8 @@
 import type { AIAssistantRole } from "./types";
 
 export const AI_TOOL_PERMISSIONS: Record<AIAssistantRole, readonly string[]> = {
-  anonymous: ["searchPublishedProperties", "getPublicAvailability", "calculatePublicQuote", "startBookingFlow"],
-  client: ["searchPublishedProperties", "getPublicAvailability", "calculatePublicQuote", "startBookingFlow", "getMyProfile", "getMyBookingRequests"],
+  anonymous: ["searchPublishedProperties", "getPublicAvailability", "calculatePublicQuote", "getPublicPropertyKnowledge", "startBookingFlow"],
+  client: ["searchPublishedProperties", "getPublicAvailability", "calculatePublicQuote", "getPublicPropertyKnowledge", "startBookingFlow", "getMyProfile", "getMyBookingRequests"],
   property_owner: ["getMyProperties", "getMyPropertyCalendar"],
   employee: ["getMyTasks", "getTaskDetails"],
   cleaner: ["getMyTasks", "getTaskDetails"],
