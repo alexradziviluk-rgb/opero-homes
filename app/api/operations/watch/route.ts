@@ -81,16 +81,6 @@ export async function POST(request: Request) {
       reminderInsertFailures += 1;
       continue;
     }
-    const title = kind === "overdue" ? `Просрочена задача: ${task.title}` : `SLA близок к истечению: ${task.title}`;
-    const eventType = kind === "overdue" ? "task_overdue" : "task_due_soon";
-    const eventWrite = await supabase.from("notification_events").upsert({ organization_id: task.organization_id, event_type: eventType, entity_type: "operational_task", entity_id: task.id, booking_id: null, apartment_id: null, payload: { taskId: task.id, taskType: task.task_type, priority: task.priority, escalationLevel: level, reminderType: kind }, idempotency_key: key, created_by_user_id: null }, { onConflict: "organization_id,idempotency_key", ignoreDuplicates: true });
-    if (eventWrite.error) continue;
-    const recipients = level === 0 ? [task.assigned_user_id] : (await supabase.from("organization_members").select("user_id").eq("organization_id", task.organization_id).eq("status", "active").in("role_code", level === 1 ? ["manager", "owner"] : ["owner"])).data?.map((row) => row.user_id) ?? [];
-    const event = await supabase.from("notification_events").select("id").eq("organization_id", task.organization_id).eq("idempotency_key", key).single();
-    if (!event.data || recipients.length === 0) continue;
-    const notificationWrite = await supabase.from("notifications").upsert(recipients.map((userId) => ({ organization_id: task.organization_id, recipient_user_id: userId, event_id: event.data.id, title, message: kind === "overdue" ? "Требуется реакция и обновление статуса задачи." : "Проверьте задачу до истечения SLA.", action_url: "/tasks" })), { onConflict: "organization_id,event_id,recipient_user_id", ignoreDuplicates: true }).select("id");
-    if (notificationWrite.error) continue;
-    notificationsCreated += notificationWrite.data?.length ?? 0;
     const reminder = await supabase.from("operation_reminders").insert({ organization_id: task.organization_id, task_id: task.id, reminder_type: kind, escalation_level: level, idempotency_key: key }).select("id").maybeSingle();
     if (reminder.error?.code === "23505") continue;
     if (reminder.error || !reminder.data) {
@@ -98,6 +88,28 @@ export async function POST(request: Request) {
       continue;
     }
     remindersCreated += 1;
+    const title = kind === "overdue" ? `Просрочена задача: ${task.title}` : `SLA близок к истечению: ${task.title}`;
+    const eventType = kind === "overdue" ? "task_overdue" : "task_due_soon";
+    const eventWrite = await supabase.from("notification_events").upsert({ organization_id: task.organization_id, event_type: eventType, entity_type: "operational_task", entity_id: task.id, booking_id: null, apartment_id: null, payload: { taskId: task.id, taskType: task.task_type, priority: task.priority, escalationLevel: level, reminderType: kind }, idempotency_key: key, created_by_user_id: null }, { onConflict: "organization_id,idempotency_key", ignoreDuplicates: true });
+    if (eventWrite.error) {
+      await supabase.from("operation_reminders").delete().eq("id", reminder.data.id).eq("organization_id", task.organization_id);
+      remindersCreated -= 1;
+      continue;
+    }
+    const recipients = level === 0 ? [task.assigned_user_id] : (await supabase.from("organization_members").select("user_id").eq("organization_id", task.organization_id).eq("status", "active").in("role_code", level === 1 ? ["manager", "owner"] : ["owner"])).data?.map((row) => row.user_id) ?? [];
+    const event = await supabase.from("notification_events").select("id").eq("organization_id", task.organization_id).eq("idempotency_key", key).single();
+    if (!event.data || recipients.length === 0) {
+      await supabase.from("operation_reminders").delete().eq("id", reminder.data.id).eq("organization_id", task.organization_id);
+      remindersCreated -= 1;
+      continue;
+    }
+    const notificationWrite = await supabase.from("notifications").upsert(recipients.map((userId) => ({ organization_id: task.organization_id, recipient_user_id: userId, event_id: event.data.id, title, message: kind === "overdue" ? "Требуется реакция и обновление статуса задачи." : "Проверьте задачу до истечения SLA.", action_url: "/tasks" })), { onConflict: "organization_id,event_id,recipient_user_id", ignoreDuplicates: true }).select("id");
+    if (notificationWrite.error) {
+      await supabase.from("operation_reminders").delete().eq("id", reminder.data.id).eq("organization_id", task.organization_id);
+      remindersCreated -= 1;
+      continue;
+    }
+    notificationsCreated += notificationWrite.data?.length ?? 0;
   }
   return NextResponse.json({ ok: true, inspected, remindersCreated, notificationsCreated, escalations, reminderInsertFailures }, { headers: { "Cache-Control": "no-store" } });
 }
