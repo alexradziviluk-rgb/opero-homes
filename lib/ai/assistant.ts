@@ -107,7 +107,7 @@ export async function answerWithTools(context: AIContext, rawMessage: string): P
   const wantsApartments = hasAny(lower, ["объекты организации", "все квартиры", "apartments"]);
   const wantsTaskDetails = hasAny(lower, ["детали задачи", "что сделать", "task details"]);
   const wantsCalendar = hasAny(lower, ["календарь", "занятые даты", "occupied dates"]);
-  const wantsPropertyKnowledge = hasAny(lower, ["животн", "курить", "парков", "выезд", "заезд", "wifi", "wi-fi", "вайфай", "удобств", "amenit", "pet", "parking"]);
+  const wantsPropertyKnowledge = hasAny(lower, ["животн", "питом", "курить", "парков", "выезд", "заезд", "wifi", "wi-fi", "вайфай", "удобств", "amenit", "pet", "parking"]);
   const routeApartmentId = context.route.match(/^\/properties\/([0-9a-f-]{36})$/i)?.[1] ?? "";
 
   if (wantsPropertyKnowledge && routeApartmentId && canUseTool(context.role, "getPublicPropertyKnowledge")) {
