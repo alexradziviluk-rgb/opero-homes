@@ -9,11 +9,15 @@ export async function GET(request: Request) {
   const auth = await requireStaffApiAuth(); if (!auth.ok) return auth.response;
   const supabase = createSupabaseServiceRoleClient(); if (!supabase) return NextResponse.json({ ok: false, error: "Supabase is not configured" }, { status: 503 });
   const url = new URL(request.url); const status = url.searchParams.get("status");
-  let query = supabase.from("support_tickets").select("public_number,requester_name,requester_language,category,priority,status,conversation_state,conversation_summary,assigned_to,manager_joined_at,first_response_at,resolved_at,closed_at,subject,customer_message,ai_summary,delivery_status,created_at,updated_at").or(`organization_id.eq.${auth.context.organization.id},organization_id.is.null`).order("created_at", { ascending: false }).limit(100);
+  let query = supabase.from("support_tickets").select("public_number,requester_name,requester_language,category,priority,status,conversation_state,conversation_summary,assigned_to,manager_joined_at,first_response_at,resolved_at,closed_at,subject,customer_message,ai_summary,delivery_status,apartment_id,booking_id,created_at,updated_at").or(`organization_id.eq.${auth.context.organization.id},organization_id.is.null`).order("created_at", { ascending: false }).limit(100);
   if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 422 });
-  return NextResponse.json({ ok: true, data: (data ?? []).map((ticket: { conversation_state?: string | null; status?: string | null; assigned_to?: string | null; resolved_at?: string | null; closed_at?: string | null }) => ({ ...ticket, conversation_state: effectiveConversationState(ticket) ?? ticket.conversation_state })) });
+  const numbers = (data ?? []).map((ticket) => ticket.public_number).filter(Boolean);
+  const { data: audits } = numbers.length ? await supabase.from("ai_operation_audit").select("ticket_reference,intent,action,action_result,task_reference,fallback_used,created_at").in("ticket_reference", numbers).order("created_at", { ascending: false }) : { data: [] };
+  const latestAudit = new Map<string, Record<string, unknown>>();
+  for (const audit of audits ?? []) if (audit.ticket_reference && !latestAudit.has(audit.ticket_reference)) latestAudit.set(audit.ticket_reference, audit as Record<string, unknown>);
+  return NextResponse.json({ ok: true, data: (data ?? []).map((ticket: { public_number: string; conversation_state?: string | null; status?: string | null; assigned_to?: string | null; resolved_at?: string | null; closed_at?: string | null }) => ({ ...ticket, conversation_state: effectiveConversationState(ticket) ?? ticket.conversation_state, ai: latestAudit.get(ticket.public_number) ?? null })) });
 }
 
 export async function PATCH(request: Request) {
