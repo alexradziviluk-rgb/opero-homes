@@ -24,6 +24,12 @@ function authorized(request: Request): boolean {
   return Boolean(configured && request.headers.get("x-operations-worker-secret") === configured);
 }
 
+function failureInjectionTaskId(request: Request): string | null {
+  if (process.env.OPERATIONS_ALLOW_TEST_FAILURE_INJECTION !== "true") return null;
+  const requestedTaskId = request.headers.get("x-operations-test-failure-task")?.trim();
+  return requestedTaskId || null;
+}
+
 function reminderKey(task: TaskRow, level: number, kind: string): string {
   return `phase3:${task.id}:${kind}:${level}`;
 }
@@ -32,6 +38,7 @@ export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   const supabase = createSupabaseServiceRoleClient();
   if (!supabase) return NextResponse.json({ ok: false, error: "Operations worker is not configured" }, { status: 503 });
+  const injectedFailureTaskId = failureInjectionTaskId(request);
 
   const { data, error } = await supabase.from("operational_tasks").select("id,organization_id,title,task_type,priority,status,assigned_user_id,due_at,created_at,sla_due_at,sla_warning_at,escalation_level").in("status", OPEN_STATUSES).limit(500);
   if (error) return NextResponse.json({ ok: false, error: "Unable to load operational tasks" }, { status: 422 });
@@ -61,6 +68,10 @@ export async function POST(request: Request) {
     const kind = sla.state === "expired" ? "overdue" : "sla_warning";
     const level = sla.state === "expired" ? nextLevel : task.escalation_level;
     const key = reminderKey(task, level, kind);
+    if (task.id === injectedFailureTaskId) {
+      reminderInsertFailures += 1;
+      continue;
+    }
     const title = kind === "overdue" ? `Просрочена задача: ${task.title}` : `SLA близок к истечению: ${task.title}`;
     const eventType = kind === "overdue" ? "task_overdue" : "task_due_soon";
     const eventWrite = await supabase.from("notification_events").upsert({ organization_id: task.organization_id, event_type: eventType, entity_type: "operational_task", entity_id: task.id, booking_id: null, apartment_id: null, payload: { taskId: task.id, taskType: task.task_type, priority: task.priority, escalationLevel: level, reminderType: kind }, idempotency_key: key, created_by_user_id: null }, { onConflict: "organization_id,idempotency_key" });
