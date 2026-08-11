@@ -22,6 +22,7 @@ export function resolvePublicSiteUrl(configuredUrl = process.env.NEXT_PUBLIC_SIT
 
 export function buildPasswordResetUrl(inviteToken?: string): string {
   const resetUrl = new URL(`${resolvePublicSiteUrl()}/reset-password`);
+  resetUrl.searchParams.set("mode", "reset");
   if (inviteToken?.trim()) {
     resetUrl.searchParams.set("invite", inviteToken.trim());
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase/client";
 
@@ -8,10 +8,22 @@ function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite")?.trim() ?? "";
+  const isPasswordReset = searchParams.get("mode") === "reset";
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isPasswordReset) return;
+
+    const supabase = createSupabaseClient();
+    if (!supabase) return;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) router.replace("/guest");
+    });
+  }, [isPasswordReset, router]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,37 +60,43 @@ function ResetPasswordContent() {
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] px-6 py-16 text-slate-100">
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl shadow-cyan-950/30">
         <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Opero Homes</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Сброс пароля</h1>
-        <p className="mt-2 text-sm text-slate-400">Введите новый пароль для продолжения.</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white">
+          {isPasswordReset ? "Сброс пароля" : "Вход выполнен"}
+        </h1>
+        <p className="mt-2 text-sm text-slate-400">
+          {isPasswordReset ? "Введите новый пароль для продолжения." : "Переходим в ваш аккаунт."}
+        </p>
 
-        <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-          <label className="block text-sm text-slate-300">
-            Новый пароль
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
-            />
-          </label>
+        {isPasswordReset ? (
+          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+            <label className="block text-sm text-slate-300">
+              Новый пароль
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none"
+              />
+            </label>
 
-          {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-          {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
+            {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+            {message ? <p className="text-sm text-emerald-300">{message}</p> : null}
 
-          <button type="submit" disabled={loading} className="w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white transition disabled:opacity-60">
-            {loading ? "Обновляем..." : "Обновить пароль"}
-          </button>
+            <button type="submit" disabled={loading} className="w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white transition disabled:opacity-60">
+              {loading ? "Обновляем..." : "Обновить пароль"}
+            </button>
 
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => router.replace("/guest")}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-60"
-          >
-            Войти без изменения пароля
-          </button>
-        </form>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => router.replace("/guest")}
+              className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-60"
+            >
+              Войти без изменения пароля
+            </button>
+          </form>
+        ) : null}
       </div>
     </main>
   );
