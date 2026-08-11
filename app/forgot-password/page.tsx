@@ -68,7 +68,7 @@ function ForgotPasswordContent() {
         </form>
 
         <div className="mt-6 text-sm text-slate-400">
-          <Link href="/login" className="hover:text-cyan-300">Вернуться к входу</Link>
+          <Link href="/guest/login" className="hover:text-cyan-300">Вернуться ко входу гостя</Link>
         </div>
       </div>
     </main>

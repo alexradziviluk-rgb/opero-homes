@@ -13,7 +13,7 @@ function normalizeAuthError(message: string | undefined): string {
   }
 
   if (message.toLowerCase().includes("invalid login credentials")) {
-    return "Неверный email или пароль.";
+    return "Неверный email или пароль. Проверьте данные или восстановите пароль ниже.";
   }
 
   return message;
@@ -251,6 +251,14 @@ function GuestLoginPageContent() {
             onChange={(event) => setPassword(event.target.value)}
             className="mt-1 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none"
           />
+          <div className="mt-2 text-right text-sm">
+            <Link
+              href={`/forgot-password?email=${encodeURIComponent(email.trim())}`}
+              className="text-cyan-300 hover:text-cyan-200"
+            >
+              Забыли пароль?
+            </Link>
+          </div>
         </label>
 
         <button
