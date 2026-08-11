@@ -50,7 +50,7 @@ export default function NewClientPage() {
         setErrors((previous) => ({ ...previous, email: result?.error ?? "Не удалось зарегистрировать клиента" }));
         return;
       }
-      createClient({ ...form, emailVerified: false });
+      createClient(form);
       setConfirmationEmail(result.data?.email ?? form.email.trim().toLowerCase());
       setPendingEmail(result.data?.email ?? form.email.trim().toLowerCase());
       if (result.data?.notificationSent === false) setResendMessage("Клиент создан и добавлен в список, но письмо не отправилось. Проверьте настройки email или отправьте письмо повторно.");
