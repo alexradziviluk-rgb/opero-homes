@@ -42,6 +42,26 @@ test("organization owner can open apartment owner management and duplicate invit
   expect(duplicate.status(), duplicateBody).toBe(409);
 });
 
+test("manager binds an existing owner to an apartment without sending an invitation", async ({ page }) => {
+  await login(page, fixture.manager.email);
+  await page.goto(`/apartments/${fixture.apartmentC}/owners`);
+  await expect(page.getByRole("heading", { name: "Собственники", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Пригласить собственника", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Ожидающие приглашения", exact: true })).toHaveCount(0);
+
+  await page.getByPlaceholder("OWN-0001, email или телефон").fill(fixture.bindingOwner.email);
+  await page.getByRole("button", { name: "Найти", exact: true }).click();
+  const ownerResult = page.getByText(fixture.bindingOwner.email).first();
+  await expect(ownerResult).toBeVisible();
+  await ownerResult.locator("xpath=../..").getByRole("button", { name: "Привязать", exact: true }).click();
+
+  await expect(page.getByText(/Собственник привязан к объекту/)).toBeVisible();
+  const relations = await page.request.get(`/api/owner/relations?apartmentId=${fixture.apartmentC}`);
+  expect(relations.status(), await relations.text()).toBe(200);
+  const relationsBody = await relations.json();
+  expect(relationsBody.data).toEqual(expect.arrayContaining([expect.objectContaining({ userId: fixture.bindingOwner.id, status: "active", email: fixture.bindingOwner.email })]));
+});
+
 test("invitation canonicalizes email and reinvite rotates the token", async ({ page }) => {
   await login(page, fixture.organizationOwner.email);
   const email = `  Rotate-${fixture.organizationA}@LOCAL.TEST `;

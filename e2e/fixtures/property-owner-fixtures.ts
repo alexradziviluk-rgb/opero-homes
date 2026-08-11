@@ -15,9 +15,11 @@ export type OwnerFixture = {
   organizationB: string;
   apartmentA: string;
   apartmentB: string;
+  apartmentC: string;
   organizationOwner: { id: string; email: string };
   manager: { id: string; email: string };
   activeOwner: { id: string; email: string };
+  bindingOwner: { id: string; email: string };
   pausedOwner: { id: string; email: string };
   confirmedBooking: string;
   pendingBooking: string;
@@ -87,6 +89,7 @@ export async function seedPropertyOwnerFixtures(): Promise<OwnerFixture> {
   const owner = await createAuthUser(admin, `owner-${suffix}@local.test`, "Organization", "owner");
   const manager = await createAuthUser(admin, `manager-${suffix}@local.test`, "Manager", "manager");
   const activeOwner = await createAuthUser(admin, `active-owner-${suffix}@local.test`, "Active", "property_owner");
+  const bindingOwner = await createAuthUser(admin, `binding-owner-${suffix}@local.test`, "Binding", "property_owner");
   const pausedOwner = await createAuthUser(admin, `paused-owner-${suffix}@local.test`, "Paused", "property_owner");
 
   const organizationA = randomUUID();
@@ -96,6 +99,7 @@ export async function seedPropertyOwnerFixtures(): Promise<OwnerFixture> {
     (${sql(organizationB)},'Fixture Organization B',${sql(`fixture-b-${suffix}`)},${sql(owner.id)});`);
   const apartmentA = randomUUID();
   const apartmentB = randomUUID();
+  const apartmentC = randomUUID();
   const client = randomUUID();
   const confirmedBooking = randomUUID();
   const pendingBooking = randomUUID();
@@ -106,9 +110,10 @@ export async function seedPropertyOwnerFixtures(): Promise<OwnerFixture> {
     (${sql(organizationB)},${sql(owner.id)},'owner','owner','active',null);
     insert into public.apartments (id,organization_id,title,name,city,address,price,daily_price,rental_types,max_guests,status,availability,publication_status,publish_status) values
     (${sql(apartmentA)},${sql(organizationA)},'Таур Fixture A','Таур Fixture A','Test City','Local A',100,100,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
+    (${sql(apartmentC)},${sql(organizationA)},'Binding Fixture C','Binding Fixture C','Test City','Local C',150,150,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
     (${sql(apartmentB)},${sql(organizationB)},'Foreign Fixture B','Foreign Fixture B','Other City','Local B',200,200,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published');
     insert into public.apartment_owner_access (organization_id,apartment_id,user_id,owner_name,owner_email,status) values
-    (${sql(organizationA)},${sql(apartmentA)},${sql(activeOwner.id)},'Active Fixture',${sql(activeOwner.email)},'active'),(${sql(organizationA)},${sql(apartmentA)},${sql(pausedOwner.id)},'Paused Fixture',${sql(pausedOwner.email)},'paused');
+    (${sql(organizationA)},${sql(apartmentA)},${sql(activeOwner.id)},'Active Fixture',${sql(activeOwner.email)},'active'),(${sql(organizationA)},${sql(apartmentA)},${sql(bindingOwner.id)},'Binding Fixture',${sql(bindingOwner.email)},'active'),(${sql(organizationA)},${sql(apartmentA)},${sql(pausedOwner.id)},'Paused Fixture',${sql(pausedOwner.email)},'paused');
     insert into public.clients (id,organization_id,name,email,phone) values (${sql(client)},${sql(organizationA)},'Private Fixture Guest','guest-private@local.test','+79990000000');
     insert into public.bookings (id,organization_id,apartment_id,client_id,guest_name,guest_email,guest_phone,check_in,check_out,check_in_date,check_out_date,total_amount,payment_status,status) values
     (${sql(confirmedBooking)},${sql(organizationA)},${sql(apartmentA)},${sql(client)},'Private Guest','private-booking@local.test','+79990000001','2030-02-10','2030-02-12','2030-02-10','2030-02-12',99999,'paid','confirmed'),
@@ -117,7 +122,7 @@ export async function seedPropertyOwnerFixtures(): Promise<OwnerFixture> {
     (${sql(ownerBlock)},${sql(organizationA)},${sql(apartmentA)},'2030-04-10','2030-04-12','owner_block','owner_stay','owner_stay','Private owner fixture note',(select id from public.apartment_owner_access where user_id=${sql(activeOwner.id)} and apartment_id=${sql(apartmentA)}),'owner',${sql(activeOwner.id)},'active'),
     (${sql(adminBlock)},${sql(organizationA)},${sql(apartmentA)},'2030-05-10','2030-05-12','maintenance','maintenance','maintenance','Private staff fixture note',null,'staff',${sql(owner.id)},'active');`);
 
-  return { organizationA, organizationB, apartmentA, apartmentB, organizationOwner: owner, manager, activeOwner, pausedOwner, confirmedBooking, pendingBooking, ownerBlock, adminBlock };
+  return { organizationA, organizationB, apartmentA, apartmentB, apartmentC, organizationOwner: owner, manager, activeOwner, bindingOwner, pausedOwner, confirmedBooking, pendingBooking, ownerBlock, adminBlock };
 }
 
 export async function signInClient(email: string) {
@@ -131,7 +136,7 @@ export async function signInClient(email: string) {
 export async function cleanupPropertyOwnerFixtures(fixture: OwnerFixture) {
   const admin = adminClient();
   runLocalSql(`delete from public.organizations where id in (${sql(fixture.organizationA)},${sql(fixture.organizationB)});`);
-  for (const user of [fixture.organizationOwner, fixture.manager, fixture.activeOwner, fixture.pausedOwner]) {
+  for (const user of [fixture.organizationOwner, fixture.manager, fixture.activeOwner, fixture.bindingOwner, fixture.pausedOwner]) {
     const result = await admin.auth.admin.deleteUser(user.id);
     if (result.error && result.error.status !== 404) throw new Error(`fixture auth cleanup failed: ${result.error.message}`);
   }
