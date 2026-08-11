@@ -18,14 +18,15 @@ export async function PATCH(request: Request, context: Context) {
   if (!manager(auth.context.organizationMember.role_code)) return errorResponse(403, "Недостаточно прав.", "FORBIDDEN");
   const supabase = await createSupabaseServerClient();
   if (!supabase) return errorResponse(500, "Supabase is not configured", "CONFIGURATION_MISSING");
-  const body = await request.json().catch(() => null) as { action?: string; apartmentId?: string; userId?: string } | null;
+  const body = await request.json().catch(() => null) as { action?: string; apartmentId?: string; userId?: string; guestId?: string } | null;
   const action = body?.action;
   if (action === "pause" || action === "restore" || action === "remove") {
     const apartmentId = body?.apartmentId ?? "";
     const userId = body?.userId ?? "";
-    if (!UUID.test(apartmentId) || !UUID.test(userId)) return errorResponse(400, "Нужны apartmentId и userId.");
+    const guestId = body?.guestId ?? "";
+    if (!UUID.test(apartmentId) || (!UUID.test(userId) && !UUID.test(guestId))) return errorResponse(400, "Нужны apartmentId и userId или guestId.");
     const status = action === "pause" ? "paused" : action === "restore" ? "active" : "revoked";
-    const { data, error } = await supabase.rpc("set_property_owner_access", { target_organization_id: auth.context.organization.id, target_apartment_id: apartmentId, target_user_id: userId, target_status: status });
+    const { data, error } = await supabase.rpc(UUID.test(userId) ? "set_property_owner_access" : "set_property_owner_access_by_guest", UUID.test(userId) ? { target_organization_id: auth.context.organization.id, target_apartment_id: apartmentId, target_user_id: userId, target_status: status } : { target_organization_id: auth.context.organization.id, target_apartment_id: apartmentId, target_guest_id: guestId, target_status: status });
     if (error) return errorResponse(422, error.message, "OWNER_ACCESS_UPDATE_FAILED");
     if (!data) return errorResponse(404, "Связь собственника с квартирой не найдена.", "OWNER_RELATION_NOT_FOUND");
     return NextResponse.json({ ok: true, data: { status } });
