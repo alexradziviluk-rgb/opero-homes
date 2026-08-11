@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import ClientForm from "@/app/clients/client-form";
-import { getClientById, updateClient } from "@/lib/clients/client-repository";
+import { getClientById, loadClientFromSupabase, updateClient, updateClientInSupabase } from "@/lib/clients/client-repository";
 import { initialClientDraft, type Client, type ClientDraft } from "@/types/client";
 
 export default function EditClientPage() {
@@ -14,7 +14,8 @@ export default function EditClientPage() {
   const clientId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
 
-  const [client] = useState<Client | null>(() => (clientId ? getClientById(clientId) : null));
+  const [client, setClient] = useState<Client | null>(() => (clientId ? getClientById(clientId) : null));
+  const [isLoading, setIsLoading] = useState(Boolean(clientId));
   const [form, setForm] = useState<ClientDraft>(() =>
     client
       ? {
@@ -32,6 +33,31 @@ export default function EditClientPage() {
       : initialClientDraft,
   );
   const [errors, setErrors] = useState<Partial<Record<keyof ClientDraft, string>>>({});
+
+  useEffect(() => {
+    if (!clientId) return;
+
+    void loadClientFromSupabase(clientId)
+      .then((remoteClient) => {
+        if (remoteClient) {
+          setClient(remoteClient);
+          setForm({
+            firstName: remoteClient.firstName,
+            lastName: remoteClient.lastName,
+            phone: remoteClient.phone,
+            email: remoteClient.email,
+            nationality: remoteClient.nationality,
+            documentType: remoteClient.documentType,
+            documentNumber: remoteClient.documentNumber,
+            dateOfBirth: remoteClient.dateOfBirth,
+            language: remoteClient.language,
+            notes: remoteClient.notes,
+          });
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => setIsLoading(false));
+  }, [clientId]);
 
   function update<K extends keyof ClientDraft>(key: K, value: ClientDraft[K]) {
     setForm((previous) => ({ ...previous, [key]: value }));
@@ -57,7 +83,17 @@ export default function EditClientPage() {
       ...form,
     });
 
-    router.replace(`/clients/${updated.id}`);
+    void updateClientInSupabase(updated)
+      .then((remoteClient) => {
+        router.replace(`/clients/${remoteClient.id}`);
+      })
+      .catch(() => {
+        router.replace(`/clients/${updated.id}`);
+      });
+  }
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-slate-950 p-6 text-slate-300">Загрузка клиента...</div>;
   }
 
   if (!client) {
