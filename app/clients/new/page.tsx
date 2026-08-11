@@ -12,11 +12,14 @@ import { initialClientDraft, type ClientDraft } from "@/types/client";
 export default function NewClientPage() {
   const router = useRouter();
   const [form, setForm] = useState<ClientDraft>(initialClientDraft);
+  const [emailConfirmation, setEmailConfirmation] = useState("");
   const [errors, setErrors] = useState<Partial<Record<keyof ClientDraft, string>>>({});
+  const [emailConfirmationError, setEmailConfirmationError] = useState("");
 
   function update<K extends keyof ClientDraft>(key: K, value: ClientDraft[K]) {
     setForm((previous) => ({ ...previous, [key]: value }));
     setErrors((previous) => ({ ...previous, [key]: undefined }));
+    if (key === "email") setEmailConfirmationError("");
   }
 
   function validate(): boolean {
@@ -25,8 +28,12 @@ export default function NewClientPage() {
     if (!form.lastName.trim()) nextErrors.lastName = "Введите фамилию";
     if (!form.phone.trim()) nextErrors.phone = "Введите телефон";
     if (!form.email.trim()) nextErrors.email = "Введите email";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) nextErrors.email = "Введите корректный email";
+    if (!form.dateOfBirth) nextErrors.dateOfBirth = "Укажите дату рождения";
+    const emailsMatch = form.email.trim().toLowerCase() === emailConfirmation.trim().toLowerCase();
+    setEmailConfirmationError(emailConfirmation.trim() && !emailsMatch ? "Email не совпадает" : emailConfirmation.trim() ? "" : "Подтвердите email");
     setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    return Object.keys(nextErrors).length === 0 && emailsMatch;
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -50,7 +57,7 @@ export default function NewClientPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="rounded-2xl border border-white/10 bg-slate-900/80 p-6">
-              <ClientForm value={form} errors={errors} onChange={update} />
+              <ClientForm value={form} errors={errors} onChange={update} emailConfirmation={emailConfirmation} emailConfirmationError={emailConfirmationError} onEmailConfirmationChange={(value) => { setEmailConfirmation(value); setEmailConfirmationError(""); }} />
 
               <div className="mt-6 flex gap-2">
                 <button type="submit" className="rounded-2xl bg-cyan-500/20 px-4 py-2 font-semibold text-cyan-200">Сохранить</button>
