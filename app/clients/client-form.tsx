@@ -44,7 +44,7 @@ export default function ClientForm({ value, errors, onChange, emailConfirmation,
 
       <label>
         <div className="text-sm text-slate-300">Телефон</div>
-        <PhoneInput value={value.phone} onChange={(nextValue) => onChange("phone", nextValue)} />
+        <PhoneInput required value={value.phone} onChange={(nextValue) => onChange("phone", nextValue)} />
         {errors.phone ? <p className="mt-1 text-sm text-rose-400">{errors.phone}</p> : null}
       </label>
 
