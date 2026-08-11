@@ -69,6 +69,15 @@ function ResetPasswordContent() {
           <button type="submit" disabled={loading} className="w-full rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-semibold text-white transition disabled:opacity-60">
             {loading ? "Обновляем..." : "Обновить пароль"}
           </button>
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => router.replace("/guest")}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-60"
+          >
+            Войти без изменения пароля
+          </button>
         </form>
       </div>
     </main>
