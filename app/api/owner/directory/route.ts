@@ -8,6 +8,8 @@ function errorResponse(status: number, error: string) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+type DirectoryOwner = { user_id: string | null };
+
 export async function GET(request: Request) {
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q") ?? "";
   const { data, error } = await supabase.rpc("search_property_owners", { target_organization_id: auth.context.organization.id, target_query: query });
   if (error) return errorResponse(422, error.message);
-  return NextResponse.json({ ok: true, data: data ?? [] });
+  return NextResponse.json({ ok: true, data: (data as DirectoryOwner[] | null ?? []).filter((owner) => owner.user_id) });
 }
 
 export async function POST(request: Request) {

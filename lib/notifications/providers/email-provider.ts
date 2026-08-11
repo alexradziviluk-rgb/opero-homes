@@ -28,8 +28,11 @@ class ResendCompatibleEmailProvider implements EmailProvider {
 
   async send(input: EmailSendInput): Promise<EmailSendResult> {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
       const response = await fetch(`${this.apiUrl.replace(/\/$/, "")}/emails`, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
@@ -42,6 +45,7 @@ class ResendCompatibleEmailProvider implements EmailProvider {
           html: input.html,
         }),
       });
+        clearTimeout(timeout);
 
       const payload = (await response.json().catch(() => null)) as { id?: string; message?: string } | null;
 
