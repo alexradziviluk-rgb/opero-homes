@@ -47,7 +47,9 @@ export async function GET(request: Request) {
   }
 
   const code = url.searchParams.get("code");
-  if (!code) {
+  const tokenHash = url.searchParams.get("token_hash");
+  const tokenType = url.searchParams.get("type") ?? "magiclink";
+  if (!code && !tokenHash) {
     return NextResponse.redirect(toLoginUrl(url, "callback_code_missing", safeNext));
   }
 
@@ -56,7 +58,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(toLoginUrl(url, "callback_exchange_failed", safeNext));
   }
 
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  const { error: exchangeError } = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: tokenType as "magiclink" });
 
   if (exchangeError) {
     return NextResponse.redirect(toLoginUrl(url, "callback_exchange_failed", safeNext));
