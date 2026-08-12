@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import { expect, test, type Page } from "@playwright/test";
-import { cleanupPropertyOwnerFixtures, seedPropertyOwnerFixtures, TEST_PASSWORD, type OwnerFixture, assertLocalFixtureEnv } from "./fixtures/property-owner-fixtures";
+import { cleanupPropertyOwnerFixtures, seedPropertyOwnerFixtures, TEST_PASSWORD, type OwnerFixture, assertLocalFixtureEnv, LOCAL_SUPABASE_URL, LOCAL_SERVICE_ROLE_KEY } from "./fixtures/property-owner-fixtures";
 
 test.describe.configure({ mode: "serial" });
 let fixture: OwnerFixture;
@@ -60,6 +62,65 @@ test("manager binds an existing owner to an apartment without sending an invitat
   expect(relations.status(), await relations.text()).toBe(200);
   const relationsBody = await relations.json();
   expect(relationsBody.data).toEqual(expect.arrayContaining([expect.objectContaining({ userId: fixture.bindingOwner.id, status: "active", email: fixture.bindingOwner.email })]));
+});
+
+test("cross-organization guest binding is rejected and identity is not reassigned", async ({ page }) => {
+  assertLocalFixtureEnv();
+  const admin = createClient(LOCAL_SUPABASE_URL, LOCAL_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const crossOrgGuestEmail = `cross-org-${Date.now()}@local.test`;
+  const foreignGuestId = randomUUID();
+  const { error: guestError } = await admin.from("guests").insert({
+    id: foreignGuestId,
+    organization_id: fixture.organizationB,
+    first_name: "Cross",
+    last_name: "Organization",
+    email: crossOrgGuestEmail,
+    phone: "+79990002222",
+  });
+  expect(guestError).toBeNull();
+
+  await login(page, fixture.organizationOwner.email);
+  const response = await page.request.post("/api/owner/directory", {
+    data: { apartmentId: fixture.apartmentA, ownerEmail: crossOrgGuestEmail },
+  });
+  expect(response.status()).toBe(400);
+
+  const { data: guestRow, error: lookupError } = await admin.from("guests").select("id, organization_id").eq("id", foreignGuestId).maybeSingle();
+  expect(lookupError).toBeNull();
+  expect(guestRow?.organization_id).toBe(fixture.organizationB);
+  const assignmentResponse = await page.request.get(`/api/owner/relations?apartmentId=${fixture.apartmentA}`);
+  const assignmentBody = await assignmentResponse.json();
+  expect(assignmentBody.data.some((row: { email?: string }) => row.email === crossOrgGuestEmail)).toBe(false);
+});
+
+test("legacy null-org guest can be bound without mutating its identity record", async ({ page }) => {
+  assertLocalFixtureEnv();
+  const admin = createClient(LOCAL_SUPABASE_URL, LOCAL_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const legacyEmail = `legacy-null-${Date.now()}@local.test`;
+  const legacyGuestId = randomUUID();
+  const { error: guestError } = await admin.from("guests").insert({
+    id: legacyGuestId,
+    organization_id: null,
+    first_name: "Legacy",
+    last_name: "Null",
+    email: legacyEmail,
+    phone: "+79990003333",
+  });
+  expect(guestError).toBeNull();
+
+  await login(page, fixture.organizationOwner.email);
+  const response = await page.request.post("/api/owner/directory", {
+    data: { apartmentId: fixture.apartmentA, ownerEmail: legacyEmail },
+  });
+  expect(response.status()).toBe(201);
+
+  const { data: guestRow, error: lookupError } = await admin.from("guests").select("id, organization_id").eq("id", legacyGuestId).maybeSingle();
+  expect(lookupError).toBeNull();
+  expect(guestRow?.organization_id).toBeNull();
+
+  const relationsResponse = await page.request.get(`/api/owner/relations?apartmentId=${fixture.apartmentA}`);
+  const relationsBody = await relationsResponse.json();
+  expect(relationsBody.data.some((row: { email?: string }) => row.email === legacyEmail)).toBe(true);
 });
 
 test("invitation canonicalizes email and reinvite rotates the token", async ({ page }) => {
