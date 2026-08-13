@@ -5,6 +5,7 @@ import {
   getLocalApartments,
   normalizeApartment,
   normalizeLocalApartments,
+  toPublicApartment,
   saveLocalApartments,
   slugify,
   toNullableInteger,
@@ -61,6 +62,51 @@ const apartmentSelect = [
   "created_at",
   "updated_at",
 ].join(",");
+
+const publicApartmentSelect = [
+  "id",
+  "slug",
+  "title:name",
+  "type",
+  "google_link",
+  "country",
+  "city",
+  "district",
+  "address",
+  "latitude",
+  "longitude",
+  "short_desc",
+  "rooms",
+  "bedrooms",
+  "beds",
+  "bathrooms",
+  "floor",
+  "area",
+  "max_guests",
+  "price",
+  "deposit",
+  "cleaning_fee",
+  "rental_types",
+  "daily_price",
+  "weekly_price",
+  "monthly_price",
+  "minimum_nights",
+  "minimum_weeks",
+  "minimum_months",
+  "status",
+  "availability",
+  "publish_status",
+  "publication_status",
+  "bookings",
+  "cover_photo_url",
+  "amenities",
+  "house_rules",
+  "created_at",
+  "updated_at",
+].join(",");
+
+const publicApartmentRelation = "public_apartments";
+const publicApartmentPhotoRelation = "public_apartment_photos";
 
 const apartmentPhotoSelect = [
   "id",
@@ -175,14 +221,17 @@ function mapApartmentRow(row: Record<string, unknown>, photos: ApartmentPhoto[])
   return normalized;
 }
 
-async function loadPhotoRows(apartmentIds: string[], supabase = createSupabaseClient()) {
+async function loadPhotoRows(apartmentIds: string[], publicOnly: boolean, supabase = createSupabaseClient()) {
   if (!supabase || apartmentIds.length === 0) {
     return [] as Array<Record<string, unknown>>;
   }
 
+  const photoSelect = publicOnly
+    ? apartmentPhotoSelect.replace("organization_id,", "")
+    : apartmentPhotoSelect;
   const { data, error } = await supabase
-    .from("apartment_photos")
-    .select(apartmentPhotoSelect)
+    .from(publicOnly ? publicApartmentPhotoRelation : "apartment_photos")
+    .select(photoSelect)
     .in("apartment_id", apartmentIds)
     .order("sort_order", { ascending: true });
 
@@ -196,12 +245,18 @@ async function loadPhotoRows(apartmentIds: string[], supabase = createSupabaseCl
 export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolean }): Promise<Apartment[]> {
   const supabase = createSupabaseClient();
   if (!supabase) {
-    return options?.publicOnly ? normalizeLocalApartments(getAllApartments().filter((item) => item.publicationStatus === "published")) : getAllApartments();
+    return options?.publicOnly
+      ? normalizeLocalApartments(getAllApartments().filter((item) => item.publicationStatus === "published")).map(toPublicApartment)
+      : getAllApartments();
   }
 
-  let query = supabase.from("apartments").select(apartmentSelect).order("created_at", { ascending: false });
+  const publicOnly = options?.publicOnly === true;
+  let query = supabase
+    .from(publicOnly ? publicApartmentRelation : "apartments")
+    .select(publicOnly ? publicApartmentSelect : apartmentSelect)
+    .order("created_at", { ascending: false });
 
-  if (options?.publicOnly) {
+  if (publicOnly) {
     query = query.eq("publication_status", "published");
   }
 
@@ -212,7 +267,7 @@ export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolea
 
   const apartmentRows = (data as unknown as Array<Record<string, unknown>>) ?? [];
   const apartmentIds = apartmentRows.map((row) => safeString(row.id)).filter(Boolean);
-  const photoRows = await loadPhotoRows(apartmentIds, supabase);
+  const photoRows = await loadPhotoRows(apartmentIds, publicOnly, supabase);
   const photoMap = new Map<string, ApartmentPhoto[]>();
 
   photoRows.forEach((row) => {
@@ -224,7 +279,8 @@ export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolea
     photoMap.set(apartmentId, list);
   });
 
-  return apartmentRows.map((row) => mapApartmentRow(row, photoMap.get(safeString(row.id)) ?? []));
+  const apartments = apartmentRows.map((row) => mapApartmentRow(row, photoMap.get(safeString(row.id)) ?? []));
+  return options?.publicOnly ? apartments.map(toPublicApartment) : apartments;
 }
 
 export async function loadApartmentFromSupabase(id: string, options?: { publicOnly?: boolean }): Promise<Apartment | null> {

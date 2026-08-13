@@ -1,0 +1,49 @@
+-- Anonymous clients must use explicit public views/RPCs, never operational tables.
+-- Keep intentional public booking/support RPCs unchanged.
+revoke all on table public.apartment_images from anon;
+revoke all on table public.apartment_owner_access from anon;
+revoke all on table public.apartments from anon;
+revoke all on table public.audit_logs from anon;
+revoke all on table public.availability_blocks from anon;
+revoke all on table public.booking_guests from anon;
+revoke all on table public.booking_operation_checklists from anon;
+revoke all on table public.cleaning_tasks from anon;
+revoke all on table public.conversations from anon;
+revoke all on table public.daily_property_metrics from anon;
+revoke all on table public.documents from anon;
+revoke all on table public.external_calendar_feeds from anon;
+revoke all on table public.external_property_mappings from anon;
+revoke all on table public.integration_accounts from anon;
+revoke all on table public.maintenance_requests from anon;
+revoke all on table public.messages from anon;
+revoke all on table public.notification_deliveries from anon;
+revoke all on table public.notification_events from anon;
+revoke all on table public.notification_preferences from anon;
+revoke all on table public.notifications from anon;
+revoke all on table public.operational_task_archive from anon;
+revoke all on table public.operational_task_assignees from anon;
+revoke all on table public.operational_task_items from anon;
+revoke all on table public.operational_tasks from anon;
+revoke all on table public.organization_invitations from anon;
+revoke all on table public.organization_members from anon;
+revoke all on table public.organization_notification_settings from anon;
+revoke all on table public.organization_settings from anon;
+revoke all on table public.organizations from anon;
+revoke all on table public.payments from anon;
+revoke all on table public.permissions from anon;
+revoke all on table public.profiles from anon;
+revoke all on table public.property_owner_audit_log from anon;
+revoke all on table public.property_owner_invitations from anon;
+revoke all on table public.role_permissions from anon;
+revoke all on table public.roles from anon;
+revoke all on table public.subscriptions from anon;
+revoke all on table public.support_audit_log from anon;
+revoke all on table public.support_telegram_deliveries from anon;
+revoke all on table public.support_telegram_message_refs from anon;
+revoke all on table public.support_tickets from anon;
+revoke all on table public.user_permissions from anon;
+revoke all on table public.user_roles from anon;
+revoke all on table public.webhook_events from anon;
+
+-- The public catalog reads only the column-safe views.
+grant select on table public.public_apartments, public.public_apartment_photos to anon;

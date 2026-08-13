@@ -111,8 +111,17 @@ function hasLegacyArchivedStatus(apartment: Apartment): boolean {
   );
 }
 
+function isInternalOrTestListing(apartment: Apartment): boolean {
+  const identity = [apartment.slug, apartment.title, apartment.shortDesc]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("en-US");
+
+  return /internal|do[-\s]?not[-\s]?book|test[-\s]?only|dogfood|sample|mock/.test(identity);
+}
+
 export function isApartmentPublic(apartment: Apartment): boolean {
-  if (hasLegacyArchivedStatus(apartment)) {
+  if (hasLegacyArchivedStatus(apartment) || isInternalOrTestListing(apartment)) {
     return false;
   }
 

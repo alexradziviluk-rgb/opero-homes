@@ -350,6 +350,18 @@ export function normalizeLocalApartments(apartments: Apartment[]) {
   });
 }
 
+export function toPublicApartment(apartment: Apartment): Apartment {
+  return {
+    ...apartment,
+    internalNumber: undefined,
+    ownerName: "",
+    ownerPhone: "",
+    ownerEmail: "",
+    responsibleUserId: null,
+    backupManagerUserId: null,
+  };
+}
+
 export function getLocalApartments(): Apartment[] {
   if (typeof window === "undefined") return [];
   try {
