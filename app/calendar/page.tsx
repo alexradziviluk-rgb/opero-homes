@@ -7,12 +7,14 @@ import Header from "@/components/Header";
 import { useCurrentUser, getHomeRouteForUser } from "@/components/auth/current-user-provider";
 import { fetchStaffBookings } from "@/lib/bookings/staff-bookings";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
-import { bookingsOverlap, findBookingConflict, isBlockingBooking } from "@/lib/bookings/booking-conflicts";
+import { bookingsOverlap, findBookingConflict } from "@/lib/bookings/booking-conflicts";
 import { getBookingStatusPresentation } from "@/lib/bookings/status-presentation";
 import { hasEffectivePermission } from "@/lib/permissions";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
 import { deleteRemoteBooking, persistBookingStatus } from "@/lib/bookings/remote-bookings";
 import { createRemoteBookingTasks } from "@/lib/bookings/remote-booking-tasks";
+import BookingCalendar from "@/components/booking/BookingCalendar";
+import type { CanonicalAvailabilityPeriod } from "@/lib/bookings/canonical-availability";
 import type { Apartment } from "@/types/apartment";
 import type { Booking } from "@/types/booking";
 
@@ -28,19 +30,6 @@ function addDays(d: Date, n: number) {
   const next = new Date(d);
   next.setDate(next.getDate() + n);
   return next;
-}
-
-function toIsoDate(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function dateOffset(fromDate: string, toDate: string): number {
-  const from = fromDate.split("-").map(Number);
-  const to = toDate.split("-").map(Number);
-  return Math.round((Date.UTC(to[0], to[1] - 1, to[2]) - Date.UTC(from[0], from[1] - 1, from[2])) / 86400000);
 }
 
 function formatPeriod(checkIn: string, checkOut: string): string {
@@ -116,12 +105,14 @@ export default function CalendarPage() {
   const [rangeCheckOut, setRangeCheckOut] = useState<string>("");
   const [rangeError, setRangeError] = useState<string>("");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string>("");
   const [actionSuccess, setActionSuccess] = useState<string>("");
   const [isConfirming, setIsConfirming] = useState(false);
   const [version, setVersion] = useState(0);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [canonicalPeriods, setCanonicalPeriods] = useState<CanonicalAvailabilityPeriod[]>([]);
   const [availabilityBlocks, setAvailabilityBlocks] = useState<AvailabilityBlock[]>([]);
 
   const canViewCalendar = currentUser ? hasEffectivePermission(currentUser, "calendar.view") : false;
@@ -150,14 +141,36 @@ export default function CalendarPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchStaffBookings(), loadApartmentsFromSupabase(), fetch("/api/availability/blocks", { cache: "no-store" }).then((response) => response.json())]).then(([nextBookings, nextApartments, blocksResult]) => {
-      if (cancelled) return;
-      setBookings(nextBookings);
-      setApartments(nextApartments);
-      setAvailabilityBlocks(blocksResult.ok ? (blocksResult.data ?? []) : []);
-    }).catch(() => {
-      if (!cancelled) setActionError("Не удалось загрузить календарь");
-    });
+    async function loadCalendar() {
+      try {
+        const [nextBookings, nextApartments] = await Promise.all([fetchStaffBookings(), loadApartmentsFromSupabase()]);
+        const canonicalResults = await Promise.all(nextApartments.map(async (apartment) => {
+          const response = await fetch(`/api/availability/calendar/${apartment.id}`, { cache: "no-store" });
+          return response.ok ? response.json() as Promise<{ ok: boolean; data?: Array<{ id: string; apartmentId: string; startDate: string; endDate: string; kind: string; status: string }> }> : { ok: false, data: [] };
+        }));
+        const detailsResponse = await fetch("/api/availability/blocks", { cache: "no-store" });
+        const detailsResult = detailsResponse.ok ? await detailsResponse.json() as { ok: boolean; data?: AvailabilityBlock[] } : { ok: false };
+        if (cancelled) return;
+        setBookings(nextBookings);
+        setApartments(nextApartments);
+        const nextCanonicalPeriods = canonicalResults.flatMap((result) => (result.ok ? result.data ?? [] : [])) as CanonicalAvailabilityPeriod[];
+        setCanonicalPeriods(nextCanonicalPeriods);
+        setAvailabilityBlocks(detailsResult.ok && detailsResult.data ? detailsResult.data : nextCanonicalPeriods.filter((period) => period.kind !== "customer_booking").map((period) => ({
+          id: period.id,
+          apartment_id: period.apartmentId,
+          start_date: period.startDate,
+          end_date: period.endDate,
+          reason_code: period.kind,
+          private_note: null,
+          created_by: null,
+          created_by_role: null,
+          block_source: period.kind === "owner_block" ? "owner" : "staff",
+        })));
+      } catch {
+        if (!cancelled) setActionError("Не удалось загрузить календарь");
+      }
+    }
+    void loadCalendar();
     return () => { cancelled = true; };
   }, [version]);
 
@@ -181,11 +194,6 @@ export default function CalendarPage() {
     setCursor((c) => addMonths(c, 1));
   }
 
-  const visibleBookings = bookings.filter((booking) => {
-    if (!isBlockingBooking(booking)) return false;
-    if (filterApartment) return booking.apartmentId === filterApartment;
-    return true;
-  });
   const visibleBlocks = availabilityBlocks.filter((block) => !filterApartment || block.apartment_id === filterApartment);
 
   const visibleApartments = apartments.filter((apartment) => {
@@ -195,57 +203,12 @@ export default function CalendarPage() {
     return `${apartment.title} ${apartment.city}`.toLocaleLowerCase().includes(query);
   });
 
-  const calendarStart = toIsoDate(days[0]);
-  const calendarEnd = toIsoDate(addDays(days[days.length - 1], 1));
-  const demoCheckIn = "2026-08-03";
-  const demoCheckOut = "2026-08-07";
-
-  function bookingPosition(booking: Booking) {
-    const calendarStartDate = toIsoDate(days[0]);
-    const startOffset = Math.max(0, dateOffset(calendarStartDate, booking.checkIn));
-    const endOffset = Math.min(days.length, dateOffset(calendarStartDate, booking.checkOut));
-    return { gridColumn: `${startOffset + 1} / ${Math.max(startOffset + 2, endOffset + 1)}`, gridRow: "1" };
-  }
-
-  function periodPosition(checkIn: string, checkOut: string) {
-    const calendarStartDate = toIsoDate(days[0]);
-    const startOffset = Math.max(0, dateOffset(calendarStartDate, checkIn));
-    const endOffset = Math.min(days.length, dateOffset(calendarStartDate, checkOut));
-    return { gridColumn: `${startOffset + 1} / ${Math.max(startOffset + 2, endOffset + 1)}`, gridRow: "1" };
+  function getCanonicalPeriods(apartmentId: string): CanonicalAvailabilityPeriod[] {
+    return canonicalPeriods.filter((period) => period.apartmentId === apartmentId);
   }
 
   const selectedBooking = selectedBookingId ? bookings.find((booking) => booking.id === selectedBookingId) ?? null : null;
-
-  function statusColor(booking: Booking): string {
-    const status = getBookingStatusPresentation(booking.status).status;
-    if (status === "pending") return "bg-amber-400 text-slate-900";
-    if (status === "confirmed" || status === "checked_in") return "bg-rose-400 text-slate-900";
-    return "bg-slate-400 text-slate-900";
-  }
-
-  function beginQuickRangeFromDay(day: Date) {
-    if (!canCreateBookings) {
-      return;
-    }
-
-    const selectedStart = toIsoDate(day);
-    if (!rangeCheckIn || (rangeCheckIn && rangeCheckOut)) {
-      setRangeCheckIn(selectedStart);
-      setRangeCheckOut("");
-      setRangeError("");
-      return;
-    }
-
-    if (selectedStart < rangeCheckIn) {
-      setRangeCheckIn(selectedStart);
-      setRangeCheckOut("");
-      setRangeError("");
-      return;
-    }
-
-    setRangeCheckOut(toIsoDate(addDays(day, 1)));
-    setRangeError("");
-  }
+  const selectedBlock = selectedBlockId ? availabilityBlocks.find((block) => block.id === selectedBlockId) ?? null : null;
 
   function openCreateBookingWithRange() {
     if (!canCreateBookings) {
@@ -496,59 +459,25 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-white/10">
-                <div className="max-h-[70vh] overflow-auto">
-                  <div className="min-w-[680px]">
-                    <div className="grid border-b border-white/10 bg-black/20" style={{ gridTemplateColumns: "150px minmax(992px, 1fr)" }}>
-                      <div className="sticky left-0 z-10 border-r border-white/10 bg-slate-900/95 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Объект</div>
-                      <div className="grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(32px, 1fr))` }}>
-                        {days.map((day) => (
-                          <button key={day.toISOString()} type="button" onClick={() => beginQuickRangeFromDay(day)} className={`border-r border-white/5 px-1 py-3 text-center text-xs ${toIsoDate(day) === toIsoDate(new Date()) ? "font-bold text-emerald-300" : "text-slate-400"}`}>
-                            <span className="block">{day.toLocaleDateString("ru-RU", { weekday: "short" }).replace(".", "")}</span>
-                            <span className="mt-1 block text-sm text-slate-200">{day.getDate()}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    {visibleApartments.map((apartment) => {
-                      const apartmentBookings = visibleBookings.filter((booking) => booking.apartmentId === apartment.id && bookingsOverlap(calendarStart, calendarEnd, booking.checkIn, booking.checkOut));
-                      const apartmentBlocks = visibleBlocks.filter((block) => block.apartment_id === apartment.id && bookingsOverlap(calendarStart, calendarEnd, block.start_date, block.end_date));
-                      const showDemoOccupancy = showDemoTemplate && bookingsOverlap(calendarStart, calendarEnd, demoCheckIn, demoCheckOut);
-                      return (
-                        <div key={apartment.id} className="grid min-h-[52px] border-b border-white/5 last:border-b-0" style={{ gridTemplateColumns: "150px minmax(992px, 1fr)" }}>
-                          <div className="sticky left-0 z-10 min-w-0 border-r border-white/10 bg-slate-900/95 px-2 py-1.5">
-                            <p className="truncate text-xs font-medium text-white">{apartment.title}</p>
-                            <p className="truncate text-[10px] text-slate-500">{apartment.city}</p>
-                          </div>
-                          <div className="relative grid min-w-0" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(32px, 1fr))` }}>
-                            {days.map((day) => {
-                              const isoDay = toIsoDate(day);
-                              return <button key={isoDay} type="button" onClick={() => { setRangeApartmentId(apartment.id); beginQuickRangeFromDay(day); }} className={`border-r border-white/5 ${rangeCheckIn === isoDay || rangeCheckOut === isoDay ? "bg-cyan-400/10" : "hover:bg-white/5"}`} aria-label={`${apartment.title}, ${isoDay}`} />;
-                            })}
-                            <div className="pointer-events-none absolute inset-x-0 top-1 grid h-8" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(32px, 1fr))` }}>
-                              {showDemoOccupancy ? (
-                                <div
-                                  className="pointer-events-auto min-w-0 flex h-8 items-center truncate rounded bg-cyan-400 px-1.5 py-1 text-left text-[9px] font-semibold text-slate-950 shadow-lg"
-                                  style={bookingPosition({ checkIn: demoCheckIn, checkOut: demoCheckOut } as Booking)}
-                                  title="Тестовый шаблон: объект занят с 3 по 7 августа"
-                                >
-                                  Занято · 3-7 августа
-                                </div>
-                              ) : null}
-                              {apartmentBookings.map((booking) => {
-                                const apartmentLabel = getApartmentCalendarLabel(booking, apartments);
-                                const periodLabel = formatPeriod(booking.checkIn, booking.checkOut);
-                                return <button key={booking.id} type="button" onClick={(event) => { event.stopPropagation(); setSelectedBookingId(booking.id); setActionError(""); setActionSuccess(""); }} title={canViewClients ? `${apartmentLabel}\n${booking.guestName}\n${periodLabel}` : `${apartmentLabel}\n${periodLabel}`} className={`pointer-events-auto min-w-0 h-8 truncate rounded px-1.5 py-1 text-left text-[9px] leading-tight text-slate-900 shadow-lg ${statusColor(booking)}`} style={bookingPosition(booking)}><span className="font-semibold">{periodLabel}</span>{canViewClients ? <span className="ml-1 hidden md:inline">{booking.guestName}</span> : null}</button>;
-                              })}
-                              {apartmentBlocks.map((block) => { const ownerBooking = block.block_source === "owner"; const ownerLabel = block.owner_public_number ?? block.owner_name ?? "Собственник"; return <div key={block.id} title={ownerBooking ? `${ownerLabel}\n${formatPeriod(block.start_date, block.end_date)}` : `${block.reason_code ?? "Недоступно"}${block.private_note ? `: ${block.private_note}` : ""}`} className={`pointer-events-auto min-w-0 h-8 truncate rounded px-1.5 py-1 text-[9px] font-semibold text-slate-950 shadow-lg ${ownerBooking ? "bg-amber-300" : "bg-violet-400"}`} style={periodPosition(block.start_date, block.end_date)}>{ownerBooking ? `OWNER BOOKING · ${formatPeriod(block.start_date, block.end_date)}` : `Недоступно · ${formatPeriod(block.start_date, block.end_date)}`}</div>; })}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {visibleApartments.length === 0 ? <div className="p-8 text-center text-sm text-slate-400">Объекты не найдены</div> : null}
-                  </div>
-                </div>
+              <div className="grid gap-5">
+                {visibleApartments.map((apartment) => (
+                  <article key={apartment.id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                    <div className="mb-3"><p className="font-medium text-white">{apartment.title}</p><p className="text-xs text-slate-500">{apartment.city}</p></div>
+                    <BookingCalendar
+                      apartmentId={apartment.id}
+                      periods={getCanonicalPeriods(apartment.id)}
+                      startDate={rangeApartmentId === apartment.id ? rangeCheckIn : ""}
+                      endDate={rangeApartmentId === apartment.id ? rangeCheckOut : ""}
+                      capabilities={{ canBook: canCreateBookings, canCreateStaffBlock: canViewCalendar, canSeeOperationalDetails: canViewCalendar }}
+                      actionLabel={canCreateBookings ? "Открыть форму брони" : undefined}
+                      onChange={({ startDate, endDate }) => { setRangeApartmentId(apartment.id); setRangeCheckIn(startDate); setRangeCheckOut(endDate); setRangeError(""); }}
+                      onAction={openCreateBookingWithRange}
+                      onConflict={setRangeError}
+                      onPeriodClick={(period) => { setSelectedBookingId(period.kind === "customer_booking" ? period.id : null); setSelectedBlockId(period.kind === "customer_booking" ? null : period.id); setActionError(""); setActionSuccess(""); }}
+                    />
+                  </article>
+                ))}
+                {visibleApartments.length === 0 ? <div className="p-8 text-center text-sm text-slate-400">Объекты не найдены</div> : null}
               </div>
             </div>
 
@@ -634,6 +563,21 @@ export default function CalendarPage() {
                       </button>
                     ) : null}
                   </div>
+                </div>
+              </div>
+            ) : null}
+            {selectedBlock ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-5">
+                  <div className="mb-3 flex items-start justify-between">
+                    <h2 className="text-lg font-semibold text-white">Операционная блокировка</h2>
+                    <button type="button" onClick={() => setSelectedBlockId(null)} className="text-slate-300">✕</button>
+                  </div>
+                  <p className="text-sm text-slate-300">Тип: {selectedBlock.block_source === "owner" ? "Блокировка собственника" : "Системная блокировка"}</p>
+                  <p className="text-sm text-slate-300">{formatPeriod(selectedBlock.start_date, selectedBlock.end_date)}</p>
+                  {selectedBlock.reason_code ? <p className="mt-2 text-sm text-slate-300">Причина: {selectedBlock.reason_code}</p> : null}
+                  {selectedBlock.block_source === "owner" && selectedBlock.owner_public_number ? <p className="mt-2 text-sm text-slate-300">Собственник: {selectedBlock.owner_public_number}</p> : null}
+                  {selectedBlock.private_note && selectedBlock.block_source !== "owner" ? <p className="mt-2 text-sm text-slate-300">Заметка: {selectedBlock.private_note}</p> : null}
                 </div>
               </div>
             ) : null}

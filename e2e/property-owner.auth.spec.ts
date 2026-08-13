@@ -258,3 +258,22 @@ test("mobile owner calendar has no server errors", async ({ browser }) => {
   expect(errors.filter((message) => message.toLowerCase().includes("hydration"))).toEqual([]);
   await context.close();
 });
+
+test("guest owner and manager render the shared calendar grid", async ({ page }) => {
+  async function assertSharedCalendar() {
+    const calendar = page.locator('section[aria-label="Календарь доступности"]').first();
+    await expect(calendar).toBeVisible();
+    await expect(calendar.locator('button[aria-label*=" — "]')).toHaveCount(42);
+  }
+
+  await login(page, fixture.activeOwner.email);
+  await page.goto(`/guest/properties/${fixture.apartmentA}?openBooking=1`);
+  await assertSharedCalendar();
+
+  await page.goto(`/owner/properties/${fixture.apartmentA}/calendar`);
+  await assertSharedCalendar();
+
+  await login(page, fixture.manager.email);
+  await page.goto("/calendar");
+  await assertSharedCalendar();
+});

@@ -107,10 +107,10 @@ export default function GuestPropertyDetailsPage() {
     async function loadAvailability() {
       if (!apartmentId) return;
 
-      const response = await fetch(`/api/guest/availability?apartmentId=${encodeURIComponent(apartmentId)}`, { cache: "no-store" });
-      const payload = (await response.json()) as { ok: boolean; data?: AvailabilityBooking[] };
+      const response = await fetch(`/api/availability/calendar/${encodeURIComponent(apartmentId)}`, { cache: "no-store" });
+      const payload = (await response.json()) as { ok: boolean; data?: Array<{ id: string; apartmentId: string; startDate: string; endDate: string; kind: string; status?: string }> };
       if (!cancelled && response.ok && payload.ok) {
-        setBookings(payload.data ?? []);
+        setBookings((payload.data ?? []).map((period) => ({ id: period.id, apartmentId: period.apartmentId, checkIn: period.startDate, checkOut: period.endDate, status: (period.kind === "customer_booking" ? period.status ?? "confirmed" : "blocked") as AvailabilityBooking["status"] })));
       }
     }
 

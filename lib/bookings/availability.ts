@@ -1,24 +1,15 @@
 import type { Booking } from "@/types/booking";
 import { normalizeBookingStatus } from "@/lib/bookings/status-presentation";
+import { addCanonicalDays, getCanonicalDayKind, isCanonicalDateRangeOverlap } from "@/lib/bookings/canonical-availability";
 
 export type PublicAvailabilityStatus = "available" | "pending" | "occupied" | "unavailable";
 export type AvailabilityBooking = Pick<Booking, "id" | "apartmentId" | "checkIn" | "checkOut"> & { status: Booking["status"] | "blocked" };
 
 function toIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function fromIsoDate(value: string): Date {
-  return new Date(`${value}T00:00:00`);
-}
-
-function addDays(value: Date, days: number): Date {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
 }
 
 export function hasBookingOverlap(
@@ -27,29 +18,7 @@ export function hasBookingOverlap(
   existingCheckIn: string,
   existingCheckOut: string,
 ): boolean {
-  const requestedStart = fromIsoDate(requestedCheckIn);
-  const requestedEnd = fromIsoDate(requestedCheckOut);
-  const existingStart = fromIsoDate(existingCheckIn);
-  const existingEnd = fromIsoDate(existingCheckOut);
-
-  return requestedStart < existingEnd && requestedEnd > existingStart;
-}
-
-function getBookingImpact(booking: AvailabilityBooking): PublicAvailabilityStatus {
-  if (booking.status === "blocked") {
-    return "unavailable";
-  }
-  const status = normalizeBookingStatus(booking.status);
-
-  if (status === "confirmed" || status === "checked_in") {
-    return "occupied";
-  }
-
-  if (status === "pending") {
-    return "pending";
-  }
-
-  return "available";
+  return isCanonicalDateRangeOverlap(requestedCheckIn, requestedCheckOut, existingCheckIn, existingCheckOut);
 }
 
 export function getApartmentDateAvailability(
@@ -58,36 +27,12 @@ export function getApartmentDateAvailability(
   bookings: AvailabilityBooking[],
 ): PublicAvailabilityStatus {
   const dayStart = toIsoDate(date);
-  const dayEnd = toIsoDate(addDays(date, 1));
-
-  const sameApartment = bookings.filter((booking) => booking.apartmentId === apartmentId);
-
-  const hasUnavailable = sameApartment.some((booking) => getBookingImpact(booking) === "unavailable" && hasBookingOverlap(dayStart, dayEnd, booking.checkIn, booking.checkOut));
-  if (hasUnavailable) {
-    return "unavailable";
-  }
-
-  const hasOccupied = sameApartment.some((booking) => {
-    const impact = getBookingImpact(booking);
-    if (impact !== "occupied") return false;
-    return hasBookingOverlap(dayStart, dayEnd, booking.checkIn, booking.checkOut);
-  });
-
-  if (hasOccupied) {
-    return "occupied";
-  }
-
-  const hasPending = sameApartment.some((booking) => {
-    const impact = getBookingImpact(booking);
-    if (impact !== "pending") return false;
-    return hasBookingOverlap(dayStart, dayEnd, booking.checkIn, booking.checkOut);
-  });
-
-  if (hasPending) {
-    return "pending";
-  }
-
-  return "available";
+  const dayEnd = addCanonicalDays(dayStart, 1);
+  const periods = bookings.map((booking) => ({ id: booking.id, apartmentId: booking.apartmentId, startDate: booking.checkIn, endDate: booking.checkOut, kind: booking.status === "blocked" ? "staff_block" as const : "customer_booking" as const }));
+  const kind = getCanonicalDayKind(apartmentId, dayStart, periods);
+  if (kind === "staff_block") return "unavailable";
+  if (kind === "customer_booking" && bookings.some((booking) => booking.apartmentId === apartmentId && booking.status !== "blocked" && normalizeBookingStatus(booking.status) === "pending" && hasBookingOverlap(dayStart, dayEnd, booking.checkIn, booking.checkOut))) return "pending";
+  return kind === "customer_booking" ? "occupied" : "available";
 }
 
 export function getRangeAvailability(
@@ -96,15 +41,14 @@ export function getRangeAvailability(
   checkOut: string,
   bookings: AvailabilityBooking[],
 ): PublicAvailabilityStatus[] {
-  const start = fromIsoDate(checkIn);
-  const end = fromIsoDate(checkOut);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+  if (!checkIn || !checkOut || checkIn >= checkOut) {
     return [];
   }
 
   const statuses: PublicAvailabilityStatus[] = [];
-  for (let cursor = new Date(start); cursor < end; cursor = addDays(cursor, 1)) {
-    statuses.push(getApartmentDateAvailability(apartmentId, cursor, bookings));
+  for (let cursor = checkIn; cursor < checkOut; cursor = addCanonicalDays(cursor, 1)) {
+    const [year, month, day] = cursor.split("-").map(Number);
+    statuses.push(getApartmentDateAvailability(apartmentId, new Date(Date.UTC(year, month - 1, day)), bookings));
   }
 
   return statuses;
