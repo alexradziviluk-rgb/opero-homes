@@ -124,7 +124,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [pathname, router]);
+  }, [router]);
 
   const setAuthenticatedUser = useCallback((user: User, context: CurrentUserContext | null) => {
     authGeneration.current += 1;
@@ -169,8 +169,13 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       }
 
       try {
-        const apartments = await loadApartmentsFromSupabase({ publicOnly: currentUser?.role === "Гость" || !currentUser });
-        saveLocalApartments(apartments);
+        const publicOnly = currentUser?.role === "Гость" || !currentUser;
+        const apartments = await loadApartmentsFromSupabase({ publicOnly });
+        if (publicOnly) {
+          window.localStorage.setItem("apartments", JSON.stringify(apartments));
+        } else {
+          saveLocalApartments(apartments);
+        }
       } catch {
         saveLocalApartments([]);
       }
