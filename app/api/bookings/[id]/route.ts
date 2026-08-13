@@ -124,7 +124,7 @@ export async function GET(
     ok: true,
     data: {
       id: booking.id,
-      bookingNumber: booking.booking_number ?? formatBookingReference(String(booking.id)),
+      bookingNumber: formatBookingReference(String(booking.id)),
       apartmentId: booking.apartment_id,
       apartmentTitle: apartment?.title ?? "Объект",
       clientId: booking.client_id ?? null,

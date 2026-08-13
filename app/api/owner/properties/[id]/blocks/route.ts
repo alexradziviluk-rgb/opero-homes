@@ -36,6 +36,9 @@ async function getContext(context: RouteContext) {
   if (!supabase) return { id, auth: null, supabase: null, response: errorResponse("Supabase is not configured", 500) };
   const auth = await requirePropertyOwnerApiAuth();
   if (!auth.ok) return { id, auth: null, supabase, response: auth.response };
+    const { data: ownership, error: ownershipError } = await supabase.rpc("is_active_property_owner_for_apartment", { target_apartment_id: id });
+    if (ownershipError) return { id, auth, supabase, response: errorResponse(ownershipError.message, 422) };
+    if (!ownership) return { id, auth, supabase, response: errorResponse("Apartment ownership required", 403) };
   return { id, auth, supabase, response: null };
 }
 

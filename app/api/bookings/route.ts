@@ -118,7 +118,7 @@ export async function GET() {
       const guest = booking.primary_guest_id ? guestById.get(booking.primary_guest_id) : undefined;
       return {
       id: booking.id,
-      bookingNumber: booking.booking_number ?? formatBookingReference(String(booking.id)),
+      bookingNumber: formatBookingReference(String(booking.id)),
       apartmentId: booking.apartment_id,
       apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
       clientId: booking.client_id ?? null,
