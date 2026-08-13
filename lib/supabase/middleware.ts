@@ -43,7 +43,7 @@ export function isProtectedPath(pathname: string) {
 }
 
 export function isClientProtectedPath(pathname: string) {
-  if (pathname === "/guest" || pathname === "/account" || pathname.startsWith("/account/")) {
+  if (pathname === "/guest" || pathname === "/account" || pathname.startsWith("/account/") || pathname === "/guest/properties") {
     return true;
   }
 
@@ -65,7 +65,6 @@ export function isPublicPath(pathname: string) {
     "/forgot-password",
     "/reset-password",
     "/stay",
-    "/guest/properties",
     "/properties",
   ];
 

@@ -157,7 +157,7 @@ function ApartmentCard({
   );
 }
 
-export default function PublicCatalog() {
+export default function PublicCatalog({ embedded = false }: { embedded?: boolean }) {
   const [language, setLanguage] = useLanguage();
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
@@ -264,9 +264,9 @@ export default function PublicCatalog() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
+    <div className={embedded ? "text-slate-100" : "min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0f172a_100%)] text-slate-100"}>
       <main className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-        <PublicCatalogHeader language={language} isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} onLanguageChange={setLanguage} />
+        {!embedded ? <PublicCatalogHeader language={language} isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} onLanguageChange={setLanguage} /> : null}
         <section className="space-y-12">
           <section id="catalog-results" aria-labelledby="catalog-heading">
             <div className="mb-6"><p className="text-sm font-medium text-cyan-300">{copy.resort}</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">{copy.allProperties}</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">{copy.catalogIntro}</p></div>

@@ -1,5 +1,5 @@
-import { permanentRedirect } from "next/navigation";
+import PublicCatalog from "@/components/guest/PublicCatalog";
 
-export default function LegacyGuestPropertiesPage() {
-  permanentRedirect("/");
+export default function GuestPropertiesPage() {
+  return <PublicCatalog embedded />;
 }

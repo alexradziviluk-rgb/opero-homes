@@ -31,8 +31,8 @@ test.describe("public catalog routing", () => {
     await expect(page.getByRole("link", { name: "Начать бесплатно" }).first()).toHaveAttribute("href", "/register");
   });
 
-  test("legacy catalog routes permanently resolve to home", async ({ page }) => {
-    for (const path of ["/guest/pro", "/guest/properties", "/stay"]) {
+  test("legacy public routes resolve to home", async ({ page }) => {
+    for (const path of ["/guest/pro", "/stay"]) {
       const response = await page.request.get(path, { maxRedirects: 0 });
       expect(response.status()).toBe(308);
       expect(response.headers().location).toBe("/");
@@ -40,6 +40,12 @@ test.describe("public catalog routing", () => {
       await expect(page).toHaveURL(/\/$/);
       await expect(page.getByRole("heading", { name: "Все доступные объекты" })).toBeVisible();
     }
+  });
+
+  test("authenticated catalog route requires the guest account", async ({ page }) => {
+    const response = await page.request.get("/guest/properties", { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers().location).toContain("/guest/login?next=%2Fguest%2Fproperties");
   });
 
   test("partner CTA leads from the catalog to business", async ({ page }) => {

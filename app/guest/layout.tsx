@@ -9,7 +9,7 @@ import { useCurrentUser } from "@/components/auth/current-user-provider";
 export default function GuestLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { currentUser, isAuthLoading } = useCurrentUser();
+  const { currentUser, hasPropertyAccess, isAuthLoading } = useCurrentUser();
 
   const isPublicGuestRoute = pathname === "/guest/login" || pathname === "/guest/register";
 
@@ -28,16 +28,16 @@ export default function GuestLayout({ children }: { children: React.ReactNode })
       return;
     }
 
-    if (currentUser.role !== "Гость") {
+    if (currentUser.role !== "Гость" && !hasPropertyAccess && !pathname.startsWith("/guest/")) {
       router.replace("/admin");
     }
-  }, [currentUser, isAuthLoading, isPublicGuestRoute, router]);
+  }, [currentUser, hasPropertyAccess, isAuthLoading, isPublicGuestRoute, pathname, router]);
 
   if (isAuthLoading && !isPublicGuestRoute) {
     return <div className="p-6 text-slate-300">Загрузка...</div>;
   }
 
-  if (!isPublicGuestRoute && (!currentUser || currentUser.role !== "Гость")) {
+  if (!isPublicGuestRoute && !currentUser) {
     return null;
   }
 

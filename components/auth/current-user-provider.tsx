@@ -77,10 +77,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       bootstrapSettled = true;
       setCurrentUser(resolved.currentUser);
       setCurrentUserContext(resolved.currentUserContext);
-      const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
-      if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
-        void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
-      }
+      void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
       setAuthStatus("authenticated");
     }
 
@@ -116,10 +113,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
           userRepository.upsert(resolved.currentUser);
           setCurrentUser(resolved.currentUser);
           setCurrentUserContext(resolved.currentUserContext);
-          const isOwnerRoute = pathname === "/owner" || pathname.startsWith("/owner/") || pathname === "/account/properties" || pathname.startsWith("/account/properties/");
-          if (resolved.currentUser.role === "Гость" && isOwnerRoute) {
-            void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
-          }
+          void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
           setAuthStatus("authenticated");
         });
       });
@@ -194,7 +188,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     const isAuthRoute = authRoutes.includes(pathname);
     const internalRoots = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users", "/owner", "/account"];
     const isInternalRoute = internalRoots.some((route) => routeMatches(route));
-    const guestProtectedRoots = ["/guest/bookings", "/guest/messages"];
+    const guestProtectedRoots = ["/guest/bookings", "/guest/messages", "/guest/properties"];
     const isGuestProtectedRoute = pathname === "/guest" || guestProtectedRoots.some((route) => routeMatches(route));
 
     if (authStatus === "anonymous" && !currentUser && isInternalRoute && !isAuthRoute) {

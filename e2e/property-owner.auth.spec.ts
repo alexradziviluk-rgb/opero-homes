@@ -158,6 +158,13 @@ test("invitation canonicalizes email and reinvite rotates the token", async ({ p
 test("active property owner sees only related apartment and no private or financial fields", async ({ page }) => {
   await login(page, fixture.activeOwner.email);
   await expect(page).toHaveURL(/\/guest(?:\?|$)/);
+  await expect(page.getByRole("link", { name: "Найти жильё", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Мои бронирования", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Мои квартиры", exact: true })).toBeVisible();
+  await page.goto("/guest/properties");
+  await expect(page).toHaveURL(/\/guest\/properties(?:\?|$)/);
+  await expect(page.getByRole("link", { name: "Найти жильё", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Все доступные объекты", exact: true })).toBeVisible();
   const response = await page.request.get("/api/owner/properties");
   expect(response.status()).toBe(200);
   const body = await response.json();
