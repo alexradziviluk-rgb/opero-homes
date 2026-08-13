@@ -59,9 +59,9 @@ export async function POST(request: Request) {
     checkOut: String(body.checkOut ?? "").trim(),
     guests: parseGuests(body.guests),
     rentalType: body.rentalType === "weekly" || body.rentalType === "monthly" ? body.rentalType : "daily",
-    guestName: authenticatedProfile ? authenticatedName || currentUser.currentUserContext?.authEmail || "Гость" : String(body.guestName ?? "").trim(),
-    guestEmail: authenticatedProfile ? (authenticatedProfile.email ?? currentUser.currentUserContext?.authEmail ?? "").trim() : String(body.guestEmail ?? "").trim(),
-    guestPhone: authenticatedProfile ? (authenticatedProfile.phone ?? "").trim() : String(body.guestPhone ?? "").trim(),
+    guestName: String(body.guestName ?? "").trim() || authenticatedName || currentUser.currentUserContext?.authEmail || "Гость",
+    guestEmail: String(body.guestEmail ?? "").trim() || (authenticatedProfile?.email ?? currentUser.currentUserContext?.authEmail ?? "").trim(),
+    guestPhone: String(body.guestPhone ?? "").trim() || (authenticatedProfile?.phone ?? "").trim(),
     guestComment: String(body.guestComment ?? "").trim(),
   };
 

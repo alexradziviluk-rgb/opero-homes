@@ -263,6 +263,7 @@ export default function GuestPropertyDetailsPage() {
     if (checkIn) nextParams.set("checkIn", checkIn);
     if (checkOut) nextParams.set("checkOut", checkOut);
     if (guests) nextParams.set("guests", guests);
+    window.sessionStorage.setItem("opero-booking-contact", JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(), email: email.trim() }));
 
     setIsSubmitting(true);
     try {

@@ -121,9 +121,16 @@ function GuestBookingForm() {
           return;
         }
 
-        setGuestName([payload.data.firstName, payload.data.lastName].filter(Boolean).join(" "));
-        setGuestPhone(payload.data.phone ?? "");
-        setGuestEmail(payload.data.email ?? "");
+        let draft: { firstName?: string; lastName?: string; phone?: string; email?: string } = {};
+        try {
+          draft = JSON.parse(window.sessionStorage.getItem("opero-booking-contact") ?? "{}");
+          window.sessionStorage.removeItem("opero-booking-contact");
+        } catch {
+          draft = {};
+        }
+        setGuestName(draft.firstName || draft.lastName ? [draft.firstName, draft.lastName].filter(Boolean).join(" ") : [payload.data.firstName, payload.data.lastName].filter(Boolean).join(" "));
+        setGuestPhone(draft.phone || payload.data.phone || "");
+        setGuestEmail(draft.email || payload.data.email || "");
         setProfileError(null);
       } catch {
         if (!controller.signal.aborted) {
