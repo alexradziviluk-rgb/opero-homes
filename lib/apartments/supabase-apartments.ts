@@ -11,7 +11,7 @@ import {
   toNullableInteger,
   toNullableNumber,
 } from "@/app/apartments/apartment-utils";
-import type { Apartment, ApartmentPhoto } from "@/types/apartment";
+import type { Apartment, ApartmentPhoto, PublicApartment } from "@/types/apartment";
 
 const apartmentSelect = [
   "id",
@@ -242,7 +242,9 @@ async function loadPhotoRows(apartmentIds: string[], publicOnly: boolean, supaba
   return (data as unknown as Array<Record<string, unknown>>) ?? [];
 }
 
-export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolean }): Promise<Apartment[]> {
+export function loadApartmentsFromSupabase(options: { publicOnly: true }): Promise<PublicApartment[]>;
+export function loadApartmentsFromSupabase(options?: { publicOnly?: false }): Promise<Apartment[]>;
+export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolean }): Promise<Array<Apartment | PublicApartment>> {
   const supabase = createSupabaseClient();
   if (!supabase) {
     return options?.publicOnly
@@ -283,8 +285,12 @@ export async function loadApartmentsFromSupabase(options?: { publicOnly?: boolea
   return options?.publicOnly ? apartments.map(toPublicApartment) : apartments;
 }
 
-export async function loadApartmentFromSupabase(id: string, options?: { publicOnly?: boolean }): Promise<Apartment | null> {
-  const apartments = await loadApartmentsFromSupabase(options);
+export function loadApartmentFromSupabase(id: string, options: { publicOnly: true }): Promise<PublicApartment | null>;
+export function loadApartmentFromSupabase(id: string, options?: { publicOnly?: false }): Promise<Apartment | null>;
+export async function loadApartmentFromSupabase(id: string, options?: { publicOnly?: boolean }): Promise<Apartment | PublicApartment | null> {
+  const apartments = options?.publicOnly
+    ? await loadApartmentsFromSupabase({ publicOnly: true })
+    : await loadApartmentsFromSupabase();
   return apartments.find((item) => item.id === id) ?? null;
 }
 

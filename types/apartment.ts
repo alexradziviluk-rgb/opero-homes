@@ -51,9 +51,9 @@ export type Apartment = {
   minimumNights: number | null;
   minimumWeeks: number | null;
   minimumMonths: number | null;
-  ownerName: string;
-  ownerPhone: string;
-  ownerEmail: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
   responsibleUserId?: string | null;
   backupManagerUserId?: string | null;
   status: "Свободно" | "Занято" | "Черновик";
@@ -74,3 +74,8 @@ export type Apartment = {
     notes: string;
   };
 };
+
+export type PublicApartment = Omit<
+  Apartment,
+  "internalNumber" | "ownerName" | "ownerPhone" | "ownerEmail" | "responsibleUserId" | "backupManagerUserId"
+>;

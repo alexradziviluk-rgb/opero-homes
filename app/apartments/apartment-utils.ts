@@ -1,4 +1,4 @@
-import type { Apartment, RentalTypes } from "@/types/apartment";
+import type { Apartment, PublicApartment, RentalTypes } from "@/types/apartment";
 
 export type ApartmentForm = {
   title: string;
@@ -350,19 +350,17 @@ export function normalizeLocalApartments(apartments: Apartment[]) {
   });
 }
 
-export function toPublicApartment(apartment: Apartment): Apartment {
+export function toPublicApartment(apartment: Apartment): PublicApartment {
   const publicApartment = { ...apartment };
 
   delete publicApartment.internalNumber;
+  delete publicApartment.ownerName;
+  delete publicApartment.ownerPhone;
+  delete publicApartment.ownerEmail;
   delete publicApartment.responsibleUserId;
   delete publicApartment.backupManagerUserId;
 
-  return {
-    ...publicApartment,
-    ownerName: "",
-    ownerPhone: "",
-    ownerEmail: "",
-  };
+  return publicApartment;
 }
 
 export function getLocalApartments(): Apartment[] {
@@ -588,9 +586,9 @@ export function apartmentToForm(apartment: Apartment): ApartmentForm {
     minimumNights: apartment.minimumNights !== null && apartment.minimumNights !== undefined ? String(apartment.minimumNights) : "",
     minimumWeeks: apartment.minimumWeeks !== null && apartment.minimumWeeks !== undefined ? String(apartment.minimumWeeks) : "",
     minimumMonths: apartment.minimumMonths !== null && apartment.minimumMonths !== undefined ? String(apartment.minimumMonths) : "",
-    ownerName: apartment.ownerName,
-    ownerPhone: apartment.ownerPhone,
-    ownerEmail: apartment.ownerEmail,
+    ownerName: apartment.ownerName ?? "",
+    ownerPhone: apartment.ownerPhone ?? "",
+    ownerEmail: apartment.ownerEmail ?? "",
     responsibleUserId: apartment.responsibleUserId ?? "",
     backupManagerUserId: apartment.backupManagerUserId ?? "",
     publishStatus: apartment.publishStatus,

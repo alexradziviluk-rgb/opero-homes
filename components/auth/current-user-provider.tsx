@@ -169,9 +169,11 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       }
 
       try {
-        const publicOnly = currentUser?.role === "Гость" || !currentUser;
-        const apartments = await loadApartmentsFromSupabase({ publicOnly });
-        if (publicOnly) {
+        const isPublicOnly = currentUser?.role === "Гость" || !currentUser;
+        const apartments = isPublicOnly
+          ? await loadApartmentsFromSupabase({ publicOnly: true })
+          : await loadApartmentsFromSupabase();
+        if (isPublicOnly) {
           window.localStorage.setItem("apartments", JSON.stringify(apartments));
         } else {
           saveLocalApartments(apartments);

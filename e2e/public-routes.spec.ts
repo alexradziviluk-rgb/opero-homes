@@ -30,6 +30,7 @@ test.describe("public catalog routing", () => {
     const result = await page.evaluate(() => {
       const cached = JSON.parse(window.localStorage.getItem("apartments") ?? "[]") as Array<Record<string, unknown>>;
       return {
+        privateKeysPresent: cached.flatMap((apartment) => ["ownerName", "ownerPhone", "ownerEmail", "internalNumber", "responsibleUserId", "backupManagerUserId"].filter((key) => Object.prototype.hasOwnProperty.call(apartment, key))),
         contactValues: cached.flatMap((apartment) => [apartment.ownerName, apartment.ownerPhone, apartment.ownerEmail].filter(Boolean)),
         assignmentValues: cached.flatMap((apartment) => [apartment.responsibleUserId, apartment.backupManagerUserId].filter(Boolean)),
         body: document.body.innerText,
@@ -38,6 +39,7 @@ test.describe("public catalog routing", () => {
 
     expect(result.contactValues).toEqual([]);
     expect(result.assignmentValues).toEqual([]);
+    expect(result.privateKeysPresent).toEqual([]);
     expect(result.body).not.toMatch(/alexandrov|oleksandrrad010@gmail\.com|\+48\s*453201956/i);
     expect(result.body).not.toMatch(/internal|do not book|dogfood|test only/i);
   });

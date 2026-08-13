@@ -18,7 +18,7 @@ import {
   isApartmentPublic,
   matchesApartmentLocation,
 } from "@/lib/apartments/public-catalog";
-import type { Apartment } from "@/types/apartment";
+import type { Apartment, PublicApartment } from "@/types/apartment";
 import LanguageSwitcher, { useLanguage, type Language } from "@/components/LanguageSwitcher";
 
 const PublicCatalogMap = dynamic(() => import("@/components/guest/PublicCatalogMap"), {
@@ -39,7 +39,7 @@ const cardCopy = {
   tr: { guests: "misafir", bedrooms: "yatak odası", beds: "yatak", bathrooms: "banyo", daily: "Günlük", weekly: "Haftalık", monthly: "Aylık", available: "Müsait", occupied: "Dolu", addressPending: "Adres bekleniyor", unavailable: "Fotoğraf yok", busy: "Seçilen tarihlerde dolu", open: "Aç", book: "Rezervasyon" },
 } as const;
 
-function getAmenities(apartment: Apartment, language: Language): string[] {
+function getAmenities(apartment: PublicApartment, language: Language): string[] {
   const copy = cardCopy[language];
   const amenities: string[] = [];
 
@@ -172,7 +172,7 @@ export default function PublicCatalog({ embedded = false }: { embedded?: boolean
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("recommended");
   const [viewMode, setViewMode] = useState<CatalogViewMode>("map");
-  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [apartments, setApartments] = useState<PublicApartment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bookings, setBookings] = useState<ReturnType<typeof getBookings>>([]);
   const [loadError, setLoadError] = useState(false);
