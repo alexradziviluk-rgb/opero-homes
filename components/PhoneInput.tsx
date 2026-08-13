@@ -51,9 +51,10 @@ type PhoneInputProps = {
   className?: string;
   placeholder?: string;
   required?: boolean;
+  autoComplete?: string;
 };
 
-export default function PhoneInput({ value, onChange, className = "", placeholder = "Номер телефона", required }: PhoneInputProps) {
+export default function PhoneInput({ value, onChange, className = "", placeholder = "Номер телефона", required, autoComplete = "tel-local" }: PhoneInputProps) {
   const parsed = getPhoneParts(value);
   const countryCode = parsed.countryCode;
   const selectedCode = countryCodes.some((item) => item.code === countryCode) ? countryCode : "";
@@ -103,7 +104,7 @@ export default function PhoneInput({ value, onChange, className = "", placeholde
       <input
         type="tel"
         inputMode="tel"
-        autoComplete="tel-local"
+        autoComplete={autoComplete}
         aria-label="Телефон"
         value={parsed.localNumber}
         onChange={(event) => updateLocalNumber(event.target.value)}

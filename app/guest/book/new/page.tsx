@@ -12,6 +12,10 @@ import {
 import type { Apartment } from "@/types/apartment";
 import PhoneInput from "@/components/PhoneInput";
 import { formatBookingReference } from "@/lib/bookings/booking-reference";
+import { useCurrentUser } from "@/components/auth/current-user-provider";
+
+const BOOKING_CONTACT_DRAFT_KEY = "opero-booking-contact";
+const BOOKING_CONTACT_DRAFT_TTL_MS = 10 * 60 * 1000;
 
 type QuoteResult = {
   ok: boolean;
@@ -63,11 +67,13 @@ function formatDate(value: string): string {
 function GuestBookingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { currentUser, isAuthLoading } = useCurrentUser();
 
   const apartmentIdFromUrl = searchParams.get("apartmentId") ?? "";
   const checkInFromUrl = searchParams.get("checkIn") ?? "";
   const checkOutFromUrl = searchParams.get("checkOut") ?? "";
   const guestsFromUrl = searchParams.get("guests") ?? "1";
+  const flowIdFromUrl = searchParams.get("flowId") ?? "";
 
   const [apartments, setApartments] = useState<Apartment[]>([]);
 
@@ -104,6 +110,17 @@ function GuestBookingForm() {
     async function loadProfile() {
       setIsLoadingProfile(true);
       setProfileError(null);
+      if (isAuthLoading) {
+        return;
+      }
+      if (!isAuthLoading && !currentUser) {
+        window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY);
+        setGuestName("");
+        setGuestPhone("");
+        setGuestEmail("");
+        setIsLoadingProfile(false);
+        return;
+      }
       try {
         const response = await fetch("/api/guest/profile", { signal: controller.signal });
         if (response.status === 401) {
@@ -121,16 +138,21 @@ function GuestBookingForm() {
           return;
         }
 
-        let draft: { firstName?: string; lastName?: string; phone?: string; email?: string } = {};
+        let draft: { userId?: string; apartmentId?: string; flowId?: string; createdAt?: number; firstName?: string; lastName?: string; phone?: string; email?: string } = {};
         try {
-          draft = JSON.parse(window.sessionStorage.getItem("opero-booking-contact") ?? "{}");
-          window.sessionStorage.removeItem("opero-booking-contact");
+          draft = JSON.parse(window.sessionStorage.getItem(BOOKING_CONTACT_DRAFT_KEY) ?? "{}");
+          window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY);
         } catch {
           draft = {};
         }
-        setGuestName(draft.firstName || draft.lastName ? [draft.firstName, draft.lastName].filter(Boolean).join(" ") : [payload.data.firstName, payload.data.lastName].filter(Boolean).join(" "));
-        setGuestPhone(draft.phone || payload.data.phone || "");
-        setGuestEmail(draft.email || payload.data.email || "");
+        const draftIsValid = draft.userId === currentUser?.id
+          && draft.apartmentId === apartmentId
+          && draft.flowId === flowIdFromUrl
+          && typeof draft.createdAt === "number"
+          && Date.now() - draft.createdAt <= BOOKING_CONTACT_DRAFT_TTL_MS;
+        setGuestName(draftIsValid && (draft.firstName || draft.lastName) ? [draft.firstName, draft.lastName].filter(Boolean).join(" ") : [payload.data.firstName, payload.data.lastName].filter(Boolean).join(" "));
+        setGuestPhone(draftIsValid ? draft.phone || payload.data.phone || "" : payload.data.phone || "");
+        setGuestEmail(draftIsValid ? draft.email || payload.data.email || "" : payload.data.email || "");
         setProfileError(null);
       } catch {
         if (!controller.signal.aborted) {
@@ -145,7 +167,7 @@ function GuestBookingForm() {
 
     void loadProfile();
     return () => controller.abort();
-  }, []);
+  }, [apartmentId, currentUser, flowIdFromUrl, isAuthLoading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -298,6 +320,7 @@ function GuestBookingForm() {
         return;
       }
 
+      window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY);
       setSuccess(`Запрос отправлен. Номер заявки: ${formatBookingReference(payload.data.id)}. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
     } finally {
       setIsSubmitting(false);
@@ -369,17 +392,17 @@ function GuestBookingForm() {
 
           <label>
             <div className="text-sm text-slate-300">Ваше имя</div>
-            <input value={guestName} onChange={(event) => setGuestName(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+            <input name="guest-name" autoComplete="off" value={guestName} onChange={(event) => setGuestName(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
           </label>
 
           <label>
             <div className="text-sm text-slate-300">Телефон</div>
-            <PhoneInput value={guestPhone} onChange={setGuestPhone} />
+            <PhoneInput value={guestPhone} onChange={setGuestPhone} autoComplete="off" />
           </label>
 
           <label className="sm:col-span-2">
             <div className="text-sm text-slate-300">Email</div>
-            <input value={guestEmail} onChange={(event) => setGuestEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
+            <input name="guest-email" autoComplete="off" value={guestEmail} onChange={(event) => setGuestEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none" />
           </label>
 
           <label className="sm:col-span-2">
@@ -407,7 +430,7 @@ function GuestBookingForm() {
           >
             {isSubmitting ? "Отправляем..." : "Отправить запрос на бронирование"}
           </button>
-          <Link href="/" className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
+          <Link href="/" onClick={() => window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY)} className="rounded-xl border border-white/10 px-4 py-2 text-sm text-slate-200 hover:bg-white/10">
             Назад в каталог
           </Link>
         </div>

@@ -82,6 +82,17 @@ test("unauthenticated booking preserves apartment and dates through login redire
   expect(new URL(page.url()).searchParams.get("next")).toBe(bookingPath());
 });
 
+test("anonymous booking does not retain a previous contact draft", async ({ page }) => {
+  await page.goto(`/properties/${fixture.apartmentPublishedId}`);
+  await page.evaluate(() => window.sessionStorage.setItem("opero-booking-contact", JSON.stringify({ userId: "old-user", apartmentId: "old-apartment", flowId: "old-flow", createdAt: Date.now(), firstName: "Previous", lastName: "Guest", phone: "+90 555 000 0000", email: "previous@example.com" })));
+  await page.reload();
+
+  await expect(page).toHaveURL(new RegExp(`/properties/${fixture.apartmentPublishedId}`));
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem("opero-booking-contact"))).toBeNull();
+  await expect(page.locator('input[type="tel"]')).toHaveCount(0);
+  await expect(page.locator('input[type="text"]')).toHaveCount(0);
+});
+
 test("guest login returns to booking and autofills the existing profile", async ({ page }) => {
   await signInFromBookingRedirect(page);
   await page.route("**/api/guest/profile", (route) => route.fulfill({

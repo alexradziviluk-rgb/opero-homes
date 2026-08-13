@@ -27,6 +27,8 @@ const PropertyLocationMap = dynamic(() => import("@/components/guest/PropertyLoc
   ssr: false,
 });
 
+const BOOKING_CONTACT_DRAFT_KEY = "opero-booking-contact";
+
 function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("ru-RU");
 }
@@ -124,7 +126,18 @@ export default function GuestPropertyDetailsPage() {
   const apartment = useMemo(() => apartments.find((item) => item.id === apartmentId), [apartments, apartmentId]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (isAuthLoading) return;
+
+    if (!currentUser) {
+      window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY);
+      const clearContactTimer = window.setTimeout(() => {
+        setFirstName("");
+        setLastName("");
+        setPhone("");
+        setEmail("");
+      }, 0);
+      return () => window.clearTimeout(clearContactTimer);
+    }
 
     const profileLoadId = window.setTimeout(() => {
       if (!firstName) setFirstName(currentUser.firstName || "");
@@ -136,7 +149,7 @@ export default function GuestPropertyDetailsPage() {
     return () => {
       window.clearTimeout(profileLoadId);
     };
-  }, [currentUser, email, firstName, lastName, phone]);
+  }, [currentUser, email, firstName, isAuthLoading, lastName, phone]);
 
   useEffect(() => {
     if (searchParams.get("openBooking") === "1") {
@@ -263,7 +276,18 @@ export default function GuestPropertyDetailsPage() {
     if (checkIn) nextParams.set("checkIn", checkIn);
     if (checkOut) nextParams.set("checkOut", checkOut);
     if (guests) nextParams.set("guests", guests);
-    window.sessionStorage.setItem("opero-booking-contact", JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), phone: phone.trim(), email: email.trim() }));
+    const flowId = crypto.randomUUID();
+    window.sessionStorage.setItem(BOOKING_CONTACT_DRAFT_KEY, JSON.stringify({
+      userId: currentUser?.id,
+      apartmentId: apartment.id,
+      flowId,
+      createdAt: Date.now(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+    }));
+    nextParams.set("flowId", flowId);
 
     setIsSubmitting(true);
     try {

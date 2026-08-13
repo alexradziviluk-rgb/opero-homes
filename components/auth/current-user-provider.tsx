@@ -87,6 +87,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       data: { subscription },
     } = supabaseClient.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
+        window.sessionStorage.removeItem("opero-booking-contact");
         setCurrentUser(null);
         setCurrentUserContext(null);
         setHasPropertyAccess(false);
@@ -136,6 +137,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   const logout = useCallback(async () => {
     const redirectPath = currentUser?.role === "Гость" ? "/guest/login" : "/login";
     await logoutAuth();
+    window.sessionStorage.removeItem("opero-booking-contact");
 
     setCurrentUser(null);
     setCurrentUserContext(null);
