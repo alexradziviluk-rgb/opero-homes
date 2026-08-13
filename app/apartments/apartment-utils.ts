@@ -351,14 +351,17 @@ export function normalizeLocalApartments(apartments: Apartment[]) {
 }
 
 export function toPublicApartment(apartment: Apartment): Apartment {
+  const publicApartment = { ...apartment };
+
+  delete publicApartment.internalNumber;
+  delete publicApartment.responsibleUserId;
+  delete publicApartment.backupManagerUserId;
+
   return {
-    ...apartment,
-    internalNumber: undefined,
+    ...publicApartment,
     ownerName: "",
     ownerPhone: "",
     ownerEmail: "",
-    responsibleUserId: null,
-    backupManagerUserId: null,
   };
 }
 
