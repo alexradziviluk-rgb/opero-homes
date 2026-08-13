@@ -45,7 +45,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const [periods, blocks] = await Promise.all([
     resolved.supabase.rpc("get_property_owner_occupied_periods", { target_apartment_id: resolved.id }),
-    resolved.supabase.from("availability_blocks").select("id,apartment_id,start_date,end_date,reason_code,private_note,status,created_by,created_by_role,owner_guest_name,owner_guest_count,owner_comment,created_at,updated_at").eq("apartment_id", resolved.id).eq("created_by", resolved.auth.context.authUserId).eq("block_source", "owner").order("start_date", { ascending: true }),
+    resolved.supabase.from("availability_blocks").select("id,apartment_id,start_date,end_date,reason_code,private_note,status,created_by,owner_guest_name,owner_guest_count,owner_comment,created_at,updated_at").eq("apartment_id", resolved.id).eq("created_by", resolved.auth.context.authUserId).eq("block_source", "owner").order("start_date", { ascending: true }),
   ]);
 
   if (periods.error) return errorResponse(periods.error.message, 422);
