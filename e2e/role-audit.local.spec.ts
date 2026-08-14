@@ -106,7 +106,12 @@ async function openRole(browser: Browser, role: AuditRole) {
   const failedRequests: string[] = [];
   const failedResponses: string[] = [];
   page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("favicon")) consoleErrors.push(message.text()); });
-  page.on("requestfailed", (request) => failedRequests.push(`${request.method()} ${request.url()}`));
+  page.on("requestfailed", (request) => {
+    if (request.failure()?.errorText === "net::ERR_ABORTED") return;
+    if (request.resourceType() !== "document") {
+      failedRequests.push(`${request.method()} ${request.url()}`);
+    }
+  });
   page.on("response", (response) => {
     if (response.status() >= 400) {
       failedResponses.push(`${response.status()} ${response.url()}`);
@@ -301,6 +306,86 @@ test("cleaner and maintenance are limited to assigned operations", async ({ brow
     expect(bookingMutation.status(), `${role} booking mutation API`).toBe(403);
     await expectDenied(page, "/settings/billing");
   }
+});
+
+test("cleaner and maintenance receive only assigned task data and complete their own work", async ({ browser }) => {
+  const cleaner = await openRole(browser, "cleaner");
+  const cleanerTasksResponse = await cleaner.page.request.get("/api/operations/tasks");
+  expect(cleanerTasksResponse.status()).toBe(200);
+  const cleanerTasksPayload = await cleanerTasksResponse.json() as { data?: Array<Record<string, unknown>> };
+  expect(cleanerTasksPayload.data?.map((task) => task.id)).toEqual([fixture.cleaningTaskId]);
+  expect(JSON.stringify(cleanerTasksPayload)).not.toMatch(/payment_status|total_amount|guest_email|guest_phone|created_by|organization_id|internal admin/i);
+  const cleanerForeignTaskMutation = await cleaner.page.request.patch("/api/operations/tasks", { data: { id: fixture.foreignCleaningTaskId, status: "completed" } });
+  expect(cleanerForeignTaskMutation.status()).toBe(404);
+
+  const maintenance = await openRole(browser, "maintenance");
+  const maintenanceTasksResponse = await maintenance.page.request.get("/api/operations/tasks");
+  expect(maintenanceTasksResponse.status()).toBe(200);
+  const maintenanceTasksPayload = await maintenanceTasksResponse.json() as { data?: Array<Record<string, unknown>> };
+  expect(maintenanceTasksPayload.data?.map((task) => task.id)).toEqual([fixture.maintenanceTaskId]);
+  const maintenanceCompletion = await maintenance.page.request.patch("/api/operations/tasks", { data: { id: fixture.maintenanceTaskId, status: "completed" } });
+  expect(maintenanceCompletion.status()).toBe(200);
+  expect(await maintenanceCompletion.json()).toMatchObject({ data: { id: fixture.maintenanceTaskId, status: "completed" } });
+  const maintenanceCleaningMutation = await maintenance.page.request.patch("/api/operations/tasks", { data: { id: fixture.cleaningTaskId, status: "completed" } });
+  expect([403, 404]).toContain(maintenanceCleaningMutation.status());
+  const maintenanceBookingMutation = await maintenance.page.request.patch(`/api/bookings/${fixture.confirmedBookingId}`, { data: { status: "checked_in" } });
+  expect(maintenanceBookingMutation.status()).toBe(403);
+  const maintenanceForeignMutation = await maintenance.page.request.patch("/api/operations/tasks", { data: { id: fixture.foreignMaintenanceTaskId, status: "completed" } });
+  expect(maintenanceForeignMutation.status()).toBe(404);
+
+  const manager = await openRole(browser, "manager");
+  const managerTasksResponse = await manager.page.request.get("/api/operations/tasks");
+  const managerTasksPayload = await managerTasksResponse.json() as { data?: Array<Record<string, unknown>> };
+  expect(managerTasksPayload.data?.filter((task) => task.id === fixture.maintenanceTaskId)).toHaveLength(1);
+  expect(managerTasksPayload.data?.find((task) => task.id === fixture.maintenanceTaskId)?.completed_at).toEqual(expect.any(String));
+});
+
+test("cleaner completion is visible to an independent manager and foreign resources stay isolated", async ({ browser }) => {
+  const cleaner = await openRole(browser, "cleaner");
+  const completionResponse = await cleaner.page.request.patch("/api/operations/tasks", {
+    data: { id: fixture.cleaningTaskId, status: "completed" },
+  });
+  expect(completionResponse.status()).toBe(200);
+  const completionPayload = (await completionResponse.json()) as { data?: Record<string, unknown> };
+  expect(completionPayload).toMatchObject({ data: { id: fixture.cleaningTaskId, status: "completed", apartment_id: fixture.apartmentPublishedId } });
+  expect(completionPayload.data?.completed_at).toEqual(expect.any(String));
+
+  const unrelatedTaskResponse = await cleaner.page.request.patch("/api/operations/tasks", {
+    data: { id: fixture.maintenanceTaskId, status: "completed" },
+  });
+  expect([403, 404]).toContain(unrelatedTaskResponse.status());
+
+  const manager = await openRole(browser, "manager");
+  const managerTasksResponse = await manager.page.request.get("/api/operations/tasks");
+  expect(managerTasksResponse.status()).toBe(200);
+  const managerTasksPayload = (await managerTasksResponse.json()) as { data?: Array<Record<string, unknown>> };
+  const visibleCleaningTasks = (managerTasksPayload.data ?? []).filter((task) => task.id === fixture.cleaningTaskId);
+  expect(visibleCleaningTasks).toHaveLength(1);
+  expect(visibleCleaningTasks[0]).toMatchObject({ id: fixture.cleaningTaskId, status: "completed", apartment_id: fixture.apartmentPublishedId, booking_id: fixture.confirmedBookingId });
+  expect(visibleCleaningTasks[0].completed_at).toEqual(expect.any(String));
+
+  const foreignRead = await manager.page.request.get(`/api/bookings/${fixture.foreignBookingId}`);
+  expect(foreignRead.status()).toBe(404);
+  const foreignBookingBefore = await fixture.admin.from("bookings").select("status,request_status").eq("id", fixture.foreignBookingId).single();
+  const foreignEventsBefore = await fixture.admin.from("notification_events").select("id", { count: "exact", head: true }).eq("booking_id", fixture.foreignBookingId);
+
+  for (const mutation of [
+    () => manager.page.request.patch(`/api/bookings/${fixture.foreignBookingId}`, { data: { status: "checked_in" } }),
+    () => manager.page.request.put("/api/operations/checklists", { data: { bookingId: fixture.foreignBookingId, field: "check_in_completed", value: true } }),
+    () => manager.page.request.put("/api/operations/checklists", { data: { bookingId: fixture.foreignBookingId, field: "check_out_completed", value: true } }),
+    () => manager.page.request.patch("/api/operations/tasks", { data: { id: fixture.foreignCleaningTaskId, status: "completed" } }),
+    () => manager.page.request.patch("/api/operations/tasks", { data: { id: fixture.foreignMaintenanceTaskId, status: "completed" } }),
+  ]) {
+    expect((await mutation()).status()).toBe(404);
+  }
+
+  const foreignBookingAfter = await fixture.admin.from("bookings").select("status,request_status").eq("id", fixture.foreignBookingId).single();
+  const foreignEventsAfter = await fixture.admin.from("notification_events").select("id", { count: "exact", head: true }).eq("booking_id", fixture.foreignBookingId);
+  expect(foreignBookingAfter.data).toEqual(foreignBookingBefore.data);
+  expect(foreignEventsAfter.count).toBe(foreignEventsBefore.count);
+  const managerTasksAfter = await manager.page.request.get("/api/operations/tasks");
+  const managerTasksAfterPayload = (await managerTasksAfter.json()) as { data?: Array<Record<string, unknown>> };
+  expect(managerTasksAfterPayload.data?.some((task) => task.id === fixture.foreignCleaningTaskId || task.id === fixture.foreignMaintenanceTaskId)).toBe(false);
 });
 
 test("guest sees public booking surface but cannot access staff or owner data", async ({ browser }) => {
