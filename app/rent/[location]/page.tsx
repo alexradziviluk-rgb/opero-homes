@@ -109,7 +109,10 @@ export default async function LocationPage({ params }: LocationPageProps) {
                   <p className="mt-2 text-sm text-slate-400">{getApartmentPublicLocation(apartment)}</p>
                   <p className="mt-3 text-cyan-300">{formatApartmentPrice(apartment)}</p>
                   <p className="mt-2 text-sm text-slate-300">{apartment.maxGuests} гостей · {apartment.bedrooms} спальни · {apartment.bathrooms} санузла</p>
-                  <Link href={`/properties/${apartment.id}`} className="mt-4 inline-flex rounded-xl border border-cyan-400/30 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/10">Открыть объект</Link>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link href={`/properties/${apartment.id}`} className="inline-flex rounded-xl border border-cyan-400/30 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/10">Проверить доступность</Link>
+                    <Link href={`/properties/${apartment.id}?openBooking=1`} className="inline-flex rounded-xl bg-cyan-300 px-3 py-2 text-sm font-medium text-slate-950 hover:bg-cyan-200">Забронировать</Link>
+                  </div>
                 </div>
               </article>
             );

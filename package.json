@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "verify:netlify": "node scripts/verify-netlify-build.mjs",
-    "verify:seo": "node scripts/verify-seo.mjs"
+    "verify:seo": "node scripts/verify-seo.mjs",
+    "verify:ads": "node scripts/verify-ads.mjs",
+    "campaign:url": "node scripts/generate-campaign-url.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

@@ -322,7 +322,11 @@ function GuestBookingForm() {
       }
 
       window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY);
-      trackEvent("booking_completed", { property_id: apartmentId });
+      trackEvent("booking_completed", {
+        property_name: selectedApartment.title,
+        value: totalAmount > 0 ? totalAmount : undefined,
+        currency: payload.data.quote.currency,
+      }, { dedupeKey: flowIdFromUrl || `${apartmentId}:${checkIn}:${checkOut}` });
       setSuccess(`Запрос отправлен. Номер заявки: ${formatBookingReference(payload.data.id)}. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
     } finally {
       setIsSubmitting(false);

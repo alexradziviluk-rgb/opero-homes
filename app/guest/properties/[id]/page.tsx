@@ -129,7 +129,7 @@ export default function GuestPropertyDetailsPage({ initialApartment }: { initial
 
   useEffect(() => {
     if (apartmentId && apartment) {
-      trackEvent("property_view", { property_id: apartmentId, location: getApartmentPublicLocation(apartment) });
+      trackEvent("property_view", { property_name: apartment.title, location: getApartmentPublicLocation(apartment) }, { dedupeKey: apartment.id });
     }
   }, [apartment, apartmentId]);
 
@@ -260,7 +260,7 @@ export default function GuestPropertyDetailsPage({ initialApartment }: { initial
     setCheckOut(next.checkOut);
     setSelectedStatuses(next.statuses);
     if (next.checkIn && next.checkOut && apartment) {
-      trackEvent("availability_search", { property_id: apartment.id, location: getApartmentPublicLocation(apartment) });
+      trackEvent("availability_search", { property_name: apartment.title, location: getApartmentPublicLocation(apartment) });
     }
   }
 
@@ -288,7 +288,7 @@ export default function GuestPropertyDetailsPage({ initialApartment }: { initial
     if (checkOut) nextParams.set("checkOut", checkOut);
     if (guests) nextParams.set("guests", guests);
     const flowId = crypto.randomUUID();
-    trackEvent("booking_started", { property_id: apartment.id, location: getApartmentPublicLocation(apartment) });
+    trackEvent("booking_started", { property_name: apartment.title, location: getApartmentPublicLocation(apartment) }, { dedupeKey: flowId });
     window.sessionStorage.setItem(BOOKING_CONTACT_DRAFT_KEY, JSON.stringify({
       userId: currentUser?.id,
       apartmentId: apartment.id,

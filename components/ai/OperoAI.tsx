@@ -267,8 +267,8 @@ export default function OperoAI() {
     const payload = await response.json() as { ok?: boolean; message?: string; error?: string; publicNumber?: string; conversationState?: ConversationState; trackingUrl?: string | null };
     setMessages((current) => [...current, { id: `handoff-${Date.now()}`, role: "assistant", text: payload.ok ? payload.message || `Обращение ${payload.publicNumber} передано менеджеру.` : payload.error || "Не удалось передать обращение. Попробуйте ещё раз." }]);
     if (payload.ok) {
-      trackEvent("contact_started", { page: pathname });
-      trackEvent("manager_requested", { page: pathname });
+      trackEvent("contact_started", { page: pathname }, { dedupeKey: payload.publicNumber || handoff.details.actionId });
+      trackEvent("manager_requested", { page: pathname }, { dedupeKey: payload.publicNumber || handoff.details.actionId });
       setHandoff(null); setContactEmail(""); setContactPhone(""); setContactConsent(false);
       if (payload.publicNumber) {
         setConversationId(payload.publicNumber);
