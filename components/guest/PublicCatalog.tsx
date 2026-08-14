@@ -157,7 +157,7 @@ function ApartmentCard({
   );
 }
 
-export default function PublicCatalog({ embedded = false }: { embedded?: boolean }) {
+export default function PublicCatalog({ embedded = false, initialApartments = [] }: { embedded?: boolean; initialApartments?: PublicApartment[] }) {
   const [language, setLanguage] = useLanguage();
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
@@ -172,8 +172,8 @@ export default function PublicCatalog({ embedded = false }: { embedded?: boolean
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("recommended");
   const [viewMode, setViewMode] = useState<CatalogViewMode>("map");
-  const [apartments, setApartments] = useState<PublicApartment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [apartments, setApartments] = useState<PublicApartment[]>(initialApartments);
+  const [isLoading, setIsLoading] = useState(initialApartments.length === 0);
   const [bookings, setBookings] = useState<ReturnType<typeof getBookings>>([]);
   const [loadError, setLoadError] = useState(false);
 
@@ -269,7 +269,7 @@ export default function PublicCatalog({ embedded = false }: { embedded?: boolean
         {embedded ? <PublicCatalogHeader language={language} isMapHidden={viewMode === "list"} onShowMap={() => setViewMode("map")} onLanguageChange={setLanguage} /> : null}
         <section className="space-y-12">
           <section id="catalog-results" aria-labelledby="catalog-heading">
-            <div className="mb-6"><p className="text-sm font-medium text-cyan-300">{copy.resort}</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">{copy.allProperties}</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">{copy.catalogIntro}</p></div>
+            <div className="mb-6"><p className="text-sm font-medium text-cyan-300">{copy.resort}</p><h1 id="catalog-heading" className="mt-1 text-3xl font-semibold text-white">{copy.allProperties}</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">{copy.catalogIntro}</p><nav className="mt-4 flex flex-wrap gap-3 text-sm" aria-label="Каталог по районам"><Link href="/rent/alanya" className="text-cyan-200 underline-offset-4 hover:underline">Аренда в Аланье</Link><Link href="/rent/mahmutlar" className="text-cyan-200 underline-offset-4 hover:underline">Аренда в Махмутларе</Link></nav></div>
             {viewMode === "map" && !isLoading && visibleApartments.length > 0 ? (
               <div className="mb-12 space-y-4" aria-labelledby="map-heading">
                 <div>

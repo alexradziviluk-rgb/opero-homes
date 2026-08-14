@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "verify:netlify": "node scripts/verify-netlify-build.mjs"
+    "verify:netlify": "node scripts/verify-netlify-build.mjs",
+    "verify:seo": "node scripts/verify-seo.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",

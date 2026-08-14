@@ -13,6 +13,7 @@ import type { Apartment } from "@/types/apartment";
 import PhoneInput from "@/components/PhoneInput";
 import { formatBookingReference } from "@/lib/bookings/booking-reference";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
+import { trackEvent } from "@/lib/analytics/client";
 
 const BOOKING_CONTACT_DRAFT_KEY = "opero-booking-contact";
 const BOOKING_CONTACT_DRAFT_TTL_MS = 10 * 60 * 1000;
@@ -321,6 +322,7 @@ function GuestBookingForm() {
       }
 
       window.sessionStorage.removeItem(BOOKING_CONTACT_DRAFT_KEY);
+      trackEvent("booking_completed", { property_id: apartmentId });
       setSuccess(`Запрос отправлен. Номер заявки: ${formatBookingReference(payload.data.id)}. Владелец подтвердит даты и свяжется с вами. Итог: ${payload.data.quote.currency} ${Number(totalAmount || 0).toLocaleString("ru-RU")}`);
     } finally {
       setIsSubmitting(false);

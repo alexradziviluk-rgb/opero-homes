@@ -22,6 +22,7 @@ import {
 } from "@/lib/apartments/public-catalog";
 import type { ApartmentPhoto } from "@/types/apartment";
 import type { Apartment } from "@/types/apartment";
+import { trackEvent } from "@/lib/analytics/client";
 
 const PropertyLocationMap = dynamic(() => import("@/components/guest/PropertyLocationMap"), {
   ssr: false,
@@ -60,7 +61,7 @@ function getMinimumStayText(apartment: {
   return "Без минимального срока";
 }
 
-export default function GuestPropertyDetailsPage() {
+export default function GuestPropertyDetailsPage({ initialApartment }: { initialApartment?: Apartment } = {}) {
   const router = useRouter();
   const { currentUser, isAuthLoading } = useCurrentUser();
   const searchParams = useSearchParams();
@@ -84,7 +85,7 @@ export default function GuestPropertyDetailsPage() {
   const [isBookingPanelOpen, setIsBookingPanelOpen] = useState(() => searchParams.get("openBooking") === "1");
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
-  const [apartments, setApartments] = useState<Apartment[]>([]);
+  const [apartments, setApartments] = useState<Apartment[]>(initialApartment ? [initialApartment] : []);
   const [bookings, setBookings] = useState<AvailabilityBooking[]>([]);
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function GuestPropertyDetailsPage() {
     let cancelled = false;
 
     async function loadApartments() {
+      if (initialApartment) return;
       const loaded = await loadApartmentsFromSupabase({ publicOnly: true });
       if (!cancelled) {
         setApartments(loaded);
@@ -121,9 +123,15 @@ export default function GuestPropertyDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [apartmentId]);
+  }, [apartmentId, initialApartment]);
 
   const apartment = useMemo(() => apartments.find((item) => item.id === apartmentId), [apartments, apartmentId]);
+
+  useEffect(() => {
+    if (apartmentId && apartment) {
+      trackEvent("property_view", { property_id: apartmentId, location: getApartmentPublicLocation(apartment) });
+    }
+  }, [apartment, apartmentId]);
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -251,6 +259,9 @@ export default function GuestPropertyDetailsPage() {
     setCheckIn(next.checkIn);
     setCheckOut(next.checkOut);
     setSelectedStatuses(next.statuses);
+    if (next.checkIn && next.checkOut && apartment) {
+      trackEvent("availability_search", { property_id: apartment.id, location: getApartmentPublicLocation(apartment) });
+    }
   }
 
   async function handleSubmitBooking() {
@@ -277,6 +288,7 @@ export default function GuestPropertyDetailsPage() {
     if (checkOut) nextParams.set("checkOut", checkOut);
     if (guests) nextParams.set("guests", guests);
     const flowId = crypto.randomUUID();
+    trackEvent("booking_started", { property_id: apartment.id, location: getApartmentPublicLocation(apartment) });
     window.sessionStorage.setItem(BOOKING_CONTACT_DRAFT_KEY, JSON.stringify({
       userId: currentUser?.id,
       apartmentId: apartment.id,
@@ -326,7 +338,7 @@ export default function GuestPropertyDetailsPage() {
         </article>
 
         <aside className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
-          <h1 className="text-2xl font-semibold text-white">{apartment.title}</h1>
+          <h2 className={`${initialApartment ? "text-xl" : "text-2xl"} font-semibold text-white`}>{apartment.title}</h2>
           <p className="mt-1 text-sm text-slate-300">{getApartmentPublicLocation(apartment)}</p>
           <p className="mt-1 text-sm text-slate-400">{apartment.address || "Адрес уточняется после подтверждения"}</p>
 

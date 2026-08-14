@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { resolvePublicSiteUrl } from "@/lib/auth/site-url";
+import AnalyticsScripts from "@/components/analytics/AnalyticsScripts";
 import "./globals.css";
 import Providers from "./providers";
 
@@ -14,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://operohq.netlify.app"),
+  metadataBase: new URL(resolvePublicSiteUrl()),
   title: {
     default: "Opero Homes | Управление недвижимостью",
     template: "%s | Opero Homes",
@@ -29,6 +31,12 @@ export const metadata: Metadata = {
     url: "/",
   },
   robots: { index: true, follow: true },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.BING_SITE_VERIFICATION
+      ? { "msvalidate.01": process.env.BING_SITE_VERIFICATION }
+      : undefined,
+  },
 };
 
 export default function RootLayout({
@@ -42,6 +50,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} w-full h-full antialiased`}
     >
       <body className="w-full min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
+        <AnalyticsScripts />
         <Providers>{children}</Providers>
       </body>
     </html>

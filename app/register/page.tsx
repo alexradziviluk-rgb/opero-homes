@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { createSupabaseClient } from "@/lib/supabase/client";
 import { getPlan, type PlanCode } from "@/lib/subscriptions/plans";
+import { trackEvent } from "@/lib/analytics/client";
 
 export default function RegisterPage() {
   const [companyName, setCompanyName] = useState("");
@@ -25,6 +26,7 @@ export default function RegisterPage() {
       setError("Укажите компанию, имя, фамилию, email и пароль не короче 8 символов.");
       return;
     }
+    trackEvent("owner_lead_started", { page: "/register" });
     const supabase = createSupabaseClient();
     if (!supabase) { setError("Регистрация недоступна: проверьте переменные Supabase."); return; }
     setIsSubmitting(true);
