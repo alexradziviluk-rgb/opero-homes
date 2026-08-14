@@ -241,6 +241,13 @@ test("check-in and check-out checklist transitions persist booking state", async
   });
   expect(repeatedCheckOut.status(), await repeatedCheckOut.text()).toBe(200);
 
+  const illegalStatusJump = await page.request.patch(`/api/bookings/${bookingId}`, {
+    data: { status: "checked_in" },
+  });
+  expect(illegalStatusJump.status(), await illegalStatusJump.text()).toBe(409);
+  expect(await illegalStatusJump.json()).toMatchObject({ ok: false, code: "invalid_booking_transition" });
+  await expect.poll(async () => (await readBookingForAudit(bookingId))?.status).toBe("checked_out");
+
   const invalidBookingId = randomUUID();
   const invalidCreateResponse = await page.request.post("/api/bookings", {
     data: {

@@ -10,6 +10,14 @@ import { formatBookingReference } from "@/lib/bookings/booking-reference";
 const BOOKING_STATUSES = new Set(["pending", "confirmed", "checked_in", "checked_out", "cancelled"]);
 const BOOKING_REQUEST_STATUSES = new Set(["pending", "confirmed", "rejected", "cancelled"]);
 
+const BOOKING_STATUS_TRANSITIONS: Record<string, Set<string>> = {
+  pending: new Set(["pending", "confirmed", "cancelled"]),
+  confirmed: new Set(["confirmed", "checked_in", "cancelled"]),
+  checked_in: new Set(["checked_in", "checked_out", "cancelled"]),
+  checked_out: new Set(["checked_out"]),
+  cancelled: new Set(["cancelled"]),
+};
+
 function error(status: number, message: string, code?: string) {
   return NextResponse.json({ ok: false, error: message, code }, { status });
 }
@@ -182,6 +190,9 @@ export async function PATCH(
   const status = isReject ? "cancelled" : requestedStatus;
   if (!BOOKING_STATUSES.has(status)) return error(400, "Invalid booking status");
   if (!BOOKING_REQUEST_STATUSES.has(requestStatus)) return error(400, "Invalid booking request status");
+  if (!BOOKING_STATUS_TRANSITIONS[existing.status]?.has(status)) {
+    return error(409, "Invalid booking status transition", "invalid_booking_transition");
+  }
 
   if (isReject && existing.status === "cancelled" && existing.request_status === "rejected") {
     return NextResponse.json({
