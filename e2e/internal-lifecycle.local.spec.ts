@@ -137,7 +137,11 @@ test("creates and reloads one linked internal lifecycle apartment", async ({ pag
 
   const confirmResponse = await page.request.patch(`/api/bookings/${bookingId}`, { data: { status: "confirmed" } });
   expect(confirmResponse.status()).toBe(200);
-  expect(await confirmResponse.json()).toMatchObject({ ok: true, data: { id: bookingId, status: "confirmed" } });
+  expect(await confirmResponse.json()).toMatchObject({
+    ok: true,
+    data: { id: bookingId, status: "confirmed" },
+    notification: { status: expect.stringMatching(/^(sent|queued|failed)$/) },
+  });
 
   const availabilityResponse = await page.request.get(`/api/availability/blocks?apartmentId=${apartmentId}`);
   expect(availabilityResponse.status()).toBe(200);

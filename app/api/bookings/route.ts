@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
-import { isStaffRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
+import { isManagerRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
 import { formatBookingReference } from "@/lib/bookings/booking-reference";
 
@@ -72,13 +72,16 @@ export async function GET() {
   if (!auth.ok) {
     return auth.response;
   }
+  if (["cleaner", "maintenance"].includes(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+    return error(403, "Insufficient permissions");
+  }
 
   const organizationId = auth.context.organization.id;
 
-  const { data: bookings, error } = await loadBookingsForOrganization(supabase, organizationId);
+  const { data: bookings, error: loadError } = await loadBookingsForOrganization(supabase, organizationId);
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: 422 });
+  if (loadError) {
+    return NextResponse.json({ ok: false, error: loadError.message, code: loadError.code }, { status: 422 });
   }
 
   const apartmentIds = Array.from(new Set((bookings ?? []).map((booking) => booking.apartment_id).filter(Boolean)));
@@ -162,7 +165,7 @@ export async function POST(request: Request) {
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
-  if (!isStaffRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+  if (!isManagerRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
     return error(403, "Insufficient permissions");
   }
 

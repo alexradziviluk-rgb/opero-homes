@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireStaffApiAuth } from "@/lib/supabase/api-auth";
-import { isStaffRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
+import { isManagerRoleCode, normalizeRoleCode } from "@/lib/supabase/role-code";
 import { createBookingNotifications } from "@/lib/notifications/service";
 import { processNotificationQueue } from "@/lib/notifications/queue";
 import { hasPastBookingDate } from "@/lib/bookings/date-validation";
@@ -29,7 +29,7 @@ async function notifyBookingChange(params: {
   booking: Record<string, unknown>;
   eventType: "booking_confirmed" | "booking_cancelled" | "booking_changed";
   idempotencyKey: string;
-}) {
+}): Promise<{ status: "sent" | "queued" | "failed"; warning?: string }> {
   const { supabase, actorUserId, organizationId, booking, eventType, idempotencyKey } = params;
   const apartmentId = String(booking.apartment_id ?? "");
   const { data: apartment } = await supabase.from("apartments").select("title:name").eq("id", apartmentId).maybeSingle();
@@ -37,10 +37,12 @@ async function notifyBookingChange(params: {
   const checkOut = String(booking.check_out_date ?? booking.check_out ?? "");
   const guestEmail = String(booking.guest_email ?? "").trim().toLowerCase();
 
-  if (!apartmentId || !checkIn || !checkOut || !guestEmail) return;
+  if (!apartmentId || !checkIn || !checkOut || !guestEmail) {
+    return { status: "failed", warning: "Booking notification was not queued" };
+  }
 
   try {
-    await createBookingNotifications({
+    const notification = await createBookingNotifications({
       supabase,
       organizationId,
       actorUserId,
@@ -68,9 +70,17 @@ async function notifyBookingChange(params: {
         },
       },
     });
-    await processNotificationQueue({ supabase, organizationId, limit: 10 });
+    const queue = await processNotificationQueue({ supabase, organizationId, limit: 10 });
+    if (queue.permanentlyFailed > 0) {
+      return { status: "failed", warning: "Booking updated, but notification delivery failed" };
+    }
+    if (queue.retryScheduled > 0) {
+      return { status: "queued", warning: "Booking updated; notification delivery is scheduled for retry" };
+    }
+    return { status: notification.queuedDeliveries > 0 ? "queued" : "sent" };
   } catch (notificationError) {
     console.error("Failed to send booking lifecycle notifications:", notificationError);
+    return { status: "failed", warning: "Booking updated, but notification delivery could not be completed" };
   }
 }
 
@@ -100,14 +110,17 @@ export async function GET(
   if (!auth.ok) {
     return auth.response;
   }
+  if (["cleaner", "maintenance"].includes(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+    return error(403, "Insufficient permissions");
+  }
 
   const { id } = await context.params;
   const organizationId = auth.context.organization.id;
 
-  const { data: booking, error } = await loadBookingById(supabase, organizationId, id);
+  const { data: booking, error: loadError } = await loadBookingById(supabase, organizationId, id);
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: 422 });
+  if (loadError) {
+    return NextResponse.json({ ok: false, error: loadError.message, code: loadError.code }, { status: 422 });
   }
 
   if (!booking) {
@@ -171,7 +184,7 @@ export async function PATCH(
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
-  if (!isStaffRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+  if (!isManagerRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
     return error(403, "Insufficient permissions");
   }
 
@@ -281,7 +294,7 @@ export async function PATCH(
     : requestStatus === "confirmed" || status === "confirmed"
     ? "booking_confirmed"
     : "booking_changed";
-  await notifyBookingChange({
+  const notification = await notifyBookingChange({
     supabase,
     actorUserId: auth.context.authUserId,
     organizationId: auth.context.organization.id,
@@ -290,7 +303,7 @@ export async function PATCH(
     idempotencyKey: `booking-lifecycle:${id}:${eventType}:${data.updated_at}`,
   });
 
-  return NextResponse.json({ ok: true, data });
+  return NextResponse.json({ ok: true, data, notification });
 }
 
 export async function DELETE(
@@ -302,7 +315,7 @@ export async function DELETE(
 
   const auth = await requireStaffApiAuth();
   if (!auth.ok) return auth.response;
-  if (!isStaffRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
+  if (!isManagerRoleCode(normalizeRoleCode(auth.context.organizationMember.role_code))) {
     return error(403, "Insufficient permissions");
   }
 

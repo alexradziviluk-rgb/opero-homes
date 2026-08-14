@@ -295,6 +295,10 @@ test("cleaner and maintenance are limited to assigned operations", async ({ brow
     expect([200, 404], `${role} assigned task API`).toContain(taskResponse.status());
     const usersResponse = await page.request.get("/api/users");
     expect(usersResponse.status(), `${role} users API`).toBeGreaterThanOrEqual(400);
+    const bookingsResponse = await page.request.get("/api/bookings");
+    expect(bookingsResponse.status(), `${role} booking list API`).toBe(403);
+    const bookingMutation = await page.request.patch(`/api/bookings/${fixture.confirmedBookingId}`, { data: { status: "checked_in" } });
+    expect(bookingMutation.status(), `${role} booking mutation API`).toBe(403);
     await expectDenied(page, "/settings/billing");
   }
 });
@@ -307,6 +311,8 @@ test("guest sees public booking surface but cannot access staff or owner data", 
   await expectDenied(page, "/account/properties");
   const ownerProperties = await page.request.get("/api/owner/properties");
   expect(ownerProperties.status()).toBe(403);
+  const bookingMutation = await page.request.patch(`/api/bookings/${fixture.confirmedBookingId}`, { data: { status: "checked_in" } });
+  expect(bookingMutation.status()).toBe(403);
 });
 
 test("external property owner and guest cannot access apartment management UI", async ({ browser }) => {
@@ -318,6 +324,8 @@ test("external property owner and guest cannot access apartment management UI", 
     await gotoRolePage(page, `/apartments/${fixture.apartmentPublishedId}/edit`);
     await expect(page).not.toHaveURL(/\/apartments\/[^/]+\/edit/, { timeout: 15_000 });
     await expect(page.getByText("Фотографии объекта")).toHaveCount(0);
+    const bookingMutation = await page.request.patch(`/api/bookings/${fixture.confirmedBookingId}`, { data: { status: "checked_in" } });
+    expect(bookingMutation.status(), `${role} booking mutation API`).toBe(403);
   }
 });
 
