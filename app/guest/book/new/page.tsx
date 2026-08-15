@@ -431,7 +431,7 @@ function GuestBookingForm() {
           <button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={isSubmitting || isLoadingProfile || Boolean(profileError) || isLoadingQuote || !quote}
+            disabled={isSubmitting || isLoadingQuote || !quote}
             className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Отправляем..." : "Отправить запрос на бронирование"}
