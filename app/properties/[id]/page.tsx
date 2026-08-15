@@ -6,6 +6,7 @@ import { loadApartmentFromSupabase } from "@/lib/apartments/supabase-apartments"
 import { formatApartmentPrice, getApartmentPhotoUrl, getApartmentPublicLocation, isApartmentPublic } from "@/lib/apartments/public-catalog";
 import { resolvePublicSiteUrl } from "@/lib/auth/site-url";
 import { getLocationSlugForApartment } from "@/lib/seo/public-locations";
+import OperoContact from "@/components/contact/OperoContact";
 
 export const revalidate = 600;
 
@@ -93,6 +94,10 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 			</article>
 			<script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 			<GuestPropertyDetailsPage initialApartment={apartment} />
+			<div className="mx-auto mt-6 max-w-7xl px-5 sm:px-8">
+				<OperoContact language="ru" placement="property" />
+			</div>
+			<OperoContact language="ru" variant="footer" placement="property" className="mt-6" />
 		</>
 	);
 }

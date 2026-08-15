@@ -20,6 +20,7 @@ import {
 } from "@/lib/apartments/public-catalog";
 import type { Apartment, PublicApartment } from "@/types/apartment";
 import LanguageSwitcher, { useLanguage, type Language } from "@/components/LanguageSwitcher";
+import OperoContact from "@/components/contact/OperoContact";
 
 const PublicCatalogMap = dynamic(() => import("@/components/guest/PublicCatalogMap"), {
   ssr: false,
@@ -301,8 +302,10 @@ export default function PublicCatalog({ embedded = false, initialApartments = []
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4"><p className="text-sm text-slate-200">{isLoading ? copy.loading : `${copy.found}: ${visibleApartments.length}`}</p><div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1"><button type="button" onClick={() => setViewMode((current) => current === "map" ? "list" : "map")} className={`rounded-lg px-3 py-1 text-sm ${viewMode === "map" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}>{viewMode === "map" ? copy.hide : copy.showMap}</button></div></div>
           </section>
           <PartnerCallout language={language} />
+          <OperoContact language={language} placement="homepage" />
         </section>
       </main>
+      <OperoContact language={language} variant="footer" placement="homepage" />
     </div>
   );
 }
