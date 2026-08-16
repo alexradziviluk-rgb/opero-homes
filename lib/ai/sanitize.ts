@@ -30,6 +30,8 @@ function sanitizeProperties(value: unknown): RecordValue {
         ...(typeof property.minimumNights === "number" ? { minimumNights: property.minimumNights } : {}),
         maxGuests: typeof property.maxGuests === "number" ? property.maxGuests : 0,
         dailyPrice: typeof property.dailyPrice === "number" ? property.dailyPrice : null,
+        ...(typeof property.monthlyPrice === "number" ? { monthlyPrice: property.monthlyPrice } : {}),
+        ...(property.pricePeriod === "night" || property.pricePeriod === "month" ? { pricePeriod: property.pricePeriod } : {}),
         currency: typeof property.currency === "string" ? property.currency : "EUR",
           ...(typeof property.coverPhotoUrl === "string" && /^(?:https?:\/\/|\/)/i.test(property.coverPhotoUrl) ? { coverPhotoUrl: property.coverPhotoUrl } : {}),
         publicationStatus: property.publicationStatus === "published" ? "published" : undefined,

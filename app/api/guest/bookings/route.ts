@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import {
   createGuestBooking,
   listGuestBookings,
@@ -65,12 +65,12 @@ export async function POST(request: Request) {
     guestComment: String(body.guestComment ?? "").trim(),
   };
 
-  const result = await createGuestBooking(supabase, input);
+  const result = await createGuestBooking(supabase, input, createSupabaseServiceRoleClient() ?? supabase);
   if (!result.ok) {
     const status =
       result.errorCode === "permission_denied"
         ? 403
-        : result.errorCode === "booking_conflict" || result.errorCode === "apartment_unavailable"
+        : result.errorCode === "booking_conflict" || result.errorCode === "apartment_unavailable" || result.errorCode === "guest_resolution_failed"
         ? 409
         : 422;
 

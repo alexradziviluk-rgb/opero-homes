@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getApartmentPriceInfo, isApartmentManuallyUnavailable, isApartmentPublic } from "@/lib/apartments/public-catalog";
+import { isApartmentManuallyUnavailable, isApartmentPublic } from "@/lib/apartments/public-catalog";
 import { getServerCurrentUserContext } from "@/lib/supabase/server";
 import type { Apartment } from "@/types/apartment";
 
@@ -70,6 +70,7 @@ type ApartmentRow = {
   daily_price?: number | null;
   weekly_price?: number | null;
   monthly_price?: number | null;
+  rental_types?: { daily?: boolean; weekly?: boolean; monthly?: boolean } | null;
   cleaning_fee?: number | null;
   deposit?: number | null;
   minimum_nights?: number | null;
@@ -119,6 +120,7 @@ export type GuestBookingServiceErrorCode =
   | "pricing_not_configured"
   | "rental_type_not_allowed"
   | "booking_conflict"
+  | "guest_resolution_failed"
   | "insert_failed"
   | "permission_denied"
   | "session_expired"
@@ -180,9 +182,9 @@ function toApartment(row: ApartmentRow): ServerApartment {
     deposit: row.deposit ?? null,
     cleaningFee: row.cleaning_fee ?? null,
     rentalTypes: {
-      daily: Boolean(row.daily_price),
-      weekly: Boolean(row.weekly_price),
-      monthly: Boolean(row.monthly_price),
+      daily: Boolean(row.rental_types?.daily ?? row.daily_price),
+      weekly: Boolean(row.rental_types?.weekly ?? row.weekly_price),
+      monthly: Boolean(row.rental_types?.monthly ?? row.monthly_price),
     },
     dailyPrice: row.daily_price ?? null,
     weeklyPrice: row.weekly_price ?? null,
@@ -215,16 +217,7 @@ function parsePriceAmount(apartment: Apartment, rentalType: GuestBookingInput["r
     return { amount: configuredAmount as number, currency: "EUR", period: configuredPeriod };
   }
 
-  const info = getApartmentPriceInfo(apartment);
-  if (!info || !Number.isFinite(info.amount) || info.amount <= 0) {
-    return null;
-  }
-
-  return {
-    amount: info.amount,
-    currency: info.currency,
-    period: info.period,
-  };
+  return null;
 }
 
 async function fetchApartment(supabase: SupabaseClient, apartmentId: string): Promise<GuestBookingServiceResult<ServerApartment>> {
@@ -237,6 +230,7 @@ async function fetchApartment(supabase: SupabaseClient, apartmentId: string): Pr
     "daily_price",
     "weekly_price",
     "monthly_price",
+    "rental_types",
     "cleaning_fee",
     "deposit",
     "minimum_nights",
@@ -286,6 +280,18 @@ async function loadBookingsForApartment(supabase: SupabaseClient, apartmentId: s
     .rpc("get_public_apartment_booking_periods", { target_apartment_id: apartmentId });
 
   if (error) {
+    if (error.code === "42501") {
+      const fallback = await supabase
+        .from("bookings")
+        .select("id,apartment_id,check_in_date,check_out_date,status")
+        .eq("apartment_id", apartmentId);
+      if (!fallback.error) {
+        return {
+          ok: true as const,
+          data: (fallback.data ?? []).map((booking) => ({ id: booking.id, apartment_id: booking.apartment_id, check_in: booking.check_in_date, check_out: booking.check_out_date, status: booking.status })),
+        };
+      }
+    }
     const errorCode: GuestBookingServiceErrorCode = error.code === "42501" ? "permission_denied" : "unexpected";
     return {
       ok: false as const,
@@ -316,7 +322,11 @@ function formatGuestName(profile: { first_name: string | null; last_name: string
   return profile.email ?? "Гость";
 }
 
-export async function buildGuestBookingQuote(supabase: SupabaseClient, input: GuestBookingInput): Promise<GuestBookingServiceResult<GuestBookingQuote>> {
+export async function buildGuestBookingQuote(
+  supabase: SupabaseClient,
+  input: GuestBookingInput,
+  publicReadClient: SupabaseClient = supabase,
+): Promise<GuestBookingServiceResult<GuestBookingQuote>> {
   if (!isValidDate(input.checkIn) || !isValidDate(input.checkOut)) {
     return { ok: false, errorCode: "invalid_dates", errorMessage: "Invalid check-in or check-out date." };
   }
@@ -329,7 +339,7 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
     return { ok: false, errorCode: "invalid_guest_count", errorMessage: "Guest count must be positive." };
   }
 
-  const apartmentResult = await fetchApartment(supabase, input.apartmentId);
+  const apartmentResult = await fetchApartment(publicReadClient, input.apartmentId);
   if (!apartmentResult.ok) {
     return apartmentResult;
   }
@@ -345,6 +355,10 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
     }
 
     return { ok: false, errorCode: "apartment_unavailable", errorMessage: "Apartment is temporarily unavailable." };
+  }
+
+  if (!apartment.rentalTypes[input.rentalType]) {
+    return { ok: false, errorCode: "rental_type_not_allowed", errorMessage: "The requested rental type is not available for this apartment." };
   }
 
   const priceInfo = parsePriceAmount(apartment, input.rentalType);
@@ -389,7 +403,7 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
     return { ok: false, errorCode: "pricing_not_configured", errorMessage: "Apartment pricing is not configured." };
   }
 
-  const currentBookingsResult = await loadBookingsForApartment(supabase, apartment.id);
+  const currentBookingsResult = await loadBookingsForApartment(publicReadClient, apartment.id);
   if (!currentBookingsResult.ok) {
     return currentBookingsResult;
   }
@@ -447,8 +461,9 @@ export async function buildGuestBookingQuote(supabase: SupabaseClient, input: Gu
 export async function createGuestBooking(
   supabase: SupabaseClient,
   input: GuestBookingInput,
+  publicReadClient: SupabaseClient = supabase,
 ): Promise<GuestBookingServiceResult<GuestBookingRecord & { quote: GuestBookingQuote }>> {
-  const quoteResult = await buildGuestBookingQuote(supabase, input);
+  const quoteResult = await buildGuestBookingQuote(supabase, input, publicReadClient);
   if (!quoteResult.ok) {
     return quoteResult;
   }
@@ -468,11 +483,24 @@ export async function createGuestBooking(
   }).maybeSingle();
 
   if (error || !data) {
+    const databaseMessage = error?.message ?? "";
+    const errorCode: GuestBookingServiceErrorCode = databaseMessage.includes("booking_conflict")
+      ? "booking_conflict"
+      : databaseMessage.includes("rental_type_not_allowed")
+      ? "rental_type_not_allowed"
+      : databaseMessage.includes("guests_organization_lower_email_unique") || error?.code === "23505"
+      ? "guest_resolution_failed"
+      : "insert_failed";
     return {
       ok: false,
-      errorCode: error?.message?.includes("booking_conflict") ? "booking_conflict" : error?.message?.includes("rental_type_not_allowed") ? "rental_type_not_allowed" : "insert_failed",
-      errorMessage: error?.message ?? "Failed to create booking.",
-      supabaseErrorCode: error?.code,
+      errorCode,
+      errorMessage: errorCode === "booking_conflict"
+        ? "Выбранные даты уже заняты. Выберите другой период."
+        : errorCode === "rental_type_not_allowed"
+        ? "Выбранный тариф недоступен для этого объекта."
+        : errorCode === "guest_resolution_failed"
+        ? "Не удалось определить клиента. Повторите попытку через несколько секунд."
+        : "Не удалось создать бронирование. Проверьте данные и попробуйте ещё раз.",
     };
   }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { buildGuestBookingQuote, type GuestBookingInput } from "@/lib/bookings/guest-booking-service";
 
 function parseGuests(value: unknown): number {
@@ -12,6 +12,8 @@ export async function POST(request: Request) {
   if (!supabase) {
     return NextResponse.json({ ok: false, errorCode: "configuration_missing", errorMessage: "Supabase is not configured." }, { status: 500 });
   }
+
+  const publicReadClient = createSupabaseServiceRoleClient() ?? supabase;
 
   const body = (await request.json().catch(() => null)) as Partial<GuestBookingInput> | null;
   if (!body) {
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
     guestComment: "",
   };
 
-  const result = await buildGuestBookingQuote(supabase, input);
+  const result = await buildGuestBookingQuote(supabase, input, publicReadClient);
   if (!result.ok) {
     const status = result.errorCode === "apartment_not_found" ? 404 : result.errorCode === "booking_conflict" || result.errorCode === "apartment_unavailable" ? 409 : 422;
     return NextResponse.json(result, { status });

@@ -62,7 +62,9 @@ function propertyAnswer(language: "ru" | "en" | "tr", properties: unknown[]): st
     const title = String(property.title ?? "Квартира");
     const location = [property.district, property.city].filter(Boolean).join(", ");
     const guests = Number(property.maxGuests ?? 0);
-    const price = property.dailyPrice == null ? "" : ` · ${property.dailyPrice} ${String(property.currency ?? "EUR")}/ночь`;
+    const price = property.pricePeriod === "month"
+      ? property.monthlyPrice == null ? "" : ` · ${property.monthlyPrice} ${String(property.currency ?? "EUR")}/месяц`
+      : property.dailyPrice == null ? "" : ` · ${property.dailyPrice} ${String(property.currency ?? "EUR")}/ночь`;
     return `${title}${location ? ` (${location})` : ""}${guests ? ` · до ${guests} гостей` : ""}${price}`;
   });
   if (language === "en") return `I found ${properties.length} published option${properties.length === 1 ? "" : "s"}. ${rows.join("; ")}. Tell me your dates and number of guests and I’ll check the next step.`;

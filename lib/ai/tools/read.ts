@@ -5,6 +5,7 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getServerCurrentUserContext, createSupabaseServerClient } from "@/lib/supabase/server";
 import { canUseTool } from "../permissions";
 import type { AIContext, AIToolResult, PublicSearchFilters } from "../types";
+import { getRentalSearchMode, isApartmentSuitableForRentalSearch } from "@/lib/apartments/rental-mode";
 
 type PublicProperty = {
   id: string;
@@ -14,6 +15,9 @@ type PublicProperty = {
   shortDesc: string;
   maxGuests: number;
   dailyPrice: number | null;
+  monthlyPrice: number | null;
+  pricePeriod: "night" | "month" | null;
+  rentalTypes: { daily: boolean; monthly: boolean };
   currency: string;
   publicationStatus: string;
   minimumNights?: number | null;
@@ -24,8 +28,11 @@ function unauthorized(tool: string): AIToolResult {
   return { tool, data: { error: "Недостаточно прав для этого запроса." } };
 }
 
-function compactProperty(row: Record<string, unknown>): PublicProperty {
+function compactProperty(row: Record<string, unknown>, mode: ReturnType<typeof getRentalSearchMode> = null): PublicProperty {
   const rawPrice = row.daily_price;
+  const rawMonthlyPrice = row.monthly_price;
+  const monthlyPrice = Number.isFinite(Number(rawMonthlyPrice)) && Number(rawMonthlyPrice) > 0 ? Number(rawMonthlyPrice) : null;
+  const useMonthlyPrice = mode === "monthly";
   return {
     id: String(row.id),
     title: String(row.title ?? row.name ?? "Объект"),
@@ -33,7 +40,13 @@ function compactProperty(row: Record<string, unknown>): PublicProperty {
     district: String(row.district ?? ""),
     shortDesc: String(row.short_desc ?? "").replace(/\s+/g, " ").slice(0, 180),
     maxGuests: Number(row.max_guests ?? 0),
-    dailyPrice: typeof rawPrice === "number" ? rawPrice > 0 ? rawPrice : null : Number.isFinite(Number(rawPrice)) && Number(rawPrice) > 0 ? Number(rawPrice) : null,
+    dailyPrice: useMonthlyPrice ? null : typeof rawPrice === "number" ? rawPrice > 0 ? rawPrice : null : Number.isFinite(Number(rawPrice)) && Number(rawPrice) > 0 ? Number(rawPrice) : null,
+    monthlyPrice,
+    pricePeriod: useMonthlyPrice ? "month" : "night",
+    rentalTypes: {
+      daily: Boolean((row.rental_types as Record<string, unknown> | null)?.daily),
+      monthly: Boolean((row.rental_types as Record<string, unknown> | null)?.monthly),
+    },
     currency: "EUR",
     publicationStatus: "published",
     minimumNights: typeof row.minimum_nights === "number" ? row.minimum_nights : Number.isFinite(Number(row.minimum_nights)) ? Number(row.minimum_nights) : null,
@@ -46,7 +59,7 @@ async function publicProperties(filters: PublicSearchFilters): Promise<PublicPro
   if (!supabase) return [];
   let query = supabase
     .from("public_apartments")
-    .select("id,name,city,district,short_desc,max_guests,daily_price,minimum_nights,publication_status,availability,status,cover_photo_url")
+    .select("id,name,city,district,short_desc,max_guests,daily_price,monthly_price,rental_types,minimum_nights,minimum_months,publication_status,availability,status,cover_photo_url")
     .eq("publication_status", "published")
     .limit(20);
   if (filters.location) {
@@ -62,14 +75,22 @@ async function publicProperties(filters: PublicSearchFilters): Promise<PublicPro
     const status = String(row.status ?? "").toLocaleLowerCase("ru-RU");
     const minimumNights = Number(row.minimum_nights ?? 0);
     const requestedNights = filters.checkIn && filters.checkOut ? Math.ceil((new Date(`${filters.checkOut}T00:00:00Z`).getTime() - new Date(`${filters.checkIn}T00:00:00Z`).getTime()) / 86400000) : 0;
-    return !availability.includes("обслуж") && !availability.includes("занят") && !status.includes("чернов") && !status.includes("архив") && (!minimumNights || !requestedNights || requestedNights >= minimumNights);
+    const mode = getRentalSearchMode(filters.checkIn, filters.checkOut);
+    const rentalTypes = (row.rental_types as Record<string, unknown> | null) ?? {};
+    const apartment = {
+      rentalTypes: { daily: Boolean(rentalTypes.daily), weekly: Boolean(rentalTypes.weekly), monthly: Boolean(rentalTypes.monthly) },
+      dailyPrice: Number(row.daily_price),
+      monthlyPrice: Number(row.monthly_price),
+    };
+    return !availability.includes("обслуж") && !availability.includes("занят") && !status.includes("чернов") && !status.includes("архив") && (!mode || isApartmentSuitableForRentalSearch(apartment, mode)) && (!minimumNights || !requestedNights || requestedNights >= minimumNights) && (!Number(row.minimum_months) || !requestedNights || Math.ceil(requestedNights / 30) >= Number(row.minimum_months));
   });
-  if (!filters.checkIn || !filters.checkOut) return candidates.map(compactProperty).slice(0, 5);
+  const mode = getRentalSearchMode(filters.checkIn, filters.checkOut);
+  if (!filters.checkIn || !filters.checkOut) return candidates.map((row) => compactProperty(row, mode)).slice(0, 5);
   const available = await Promise.all(candidates.map(async (row) => {
     const { data: periods, error: availabilityError } = await supabase.rpc("get_public_apartment_booking_periods", { target_apartment_id: String(row.id) });
     if (availabilityError) return null;
     const overlaps = ((periods ?? []) as Array<{ check_in: string; check_out: string; status: string }>).some((period) => period.check_in < filters.checkOut! && period.check_out > filters.checkIn! && ["pending", "confirmed", "checked_in", "blocked"].includes(period.status));
-    return overlaps ? null : compactProperty(row);
+    return overlaps ? null : compactProperty(row, mode);
   }));
   return available.filter((property): property is PublicProperty => property !== null).slice(0, 5);
 }

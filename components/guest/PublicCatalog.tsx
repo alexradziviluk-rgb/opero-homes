@@ -18,8 +18,10 @@ import {
   isApartmentPublic,
   matchesApartmentLocation,
 } from "@/lib/apartments/public-catalog";
+import { getRentalSearchMode, getRentalSearchPrice, isApartmentSuitableForRentalSearch } from "@/lib/apartments/rental-mode";
 import type { Apartment, PublicApartment } from "@/types/apartment";
 import LanguageSwitcher, { useLanguage, type Language } from "@/components/LanguageSwitcher";
+import OperoContact from "@/components/contact/OperoContact";
 
 const PublicCatalogMap = dynamic(() => import("@/components/guest/PublicCatalogMap"), {
   ssr: false,
@@ -111,6 +113,8 @@ function ApartmentCard({
   const availableForDates = checkIn && checkOut
     ? isApartmentAvailableForDates({ apartment, bookings, checkIn, checkOut })
     : true;
+  const datedMode = getRentalSearchMode(checkIn, checkOut);
+  const searchPrice = datedMode ? getRentalSearchPrice(apartment, datedMode) : null;
   const bookingQuery = `${checkIn ? `&checkIn=${encodeURIComponent(checkIn)}` : ""}${checkOut ? `&checkOut=${encodeURIComponent(checkOut)}` : ""}${guests ? `&guests=${encodeURIComponent(guests)}` : ""}`;
 
   return (
@@ -136,7 +140,7 @@ function ApartmentCard({
         {!compact ? <p className="mt-1 text-sm text-slate-300">{apartment.address || copy.addressPending}</p> : null}
 
         <div className="mt-2 flex items-center justify-between gap-3">
-          <p className="text-cyan-300">{formatApartmentPrice(apartment)}</p>
+          <p className="text-cyan-300">{searchPrice ? `${searchPrice.amount.toLocaleString(language === "ru" ? "ru-RU" : language === "tr" ? "tr-TR" : "en-US")} € / ${searchPrice.period === "month" ? catalogCopy[language].month : catalogCopy[language].night}` : formatApartmentPrice(apartment)}</p>
           <p className="text-xs text-slate-300">{availableForDates ? copy.available : copy.occupied}</p>
         </div>
 
@@ -229,7 +233,9 @@ export default function PublicCatalog({ embedded = false, initialApartments = []
       if (selectedDistrict && getAddressDistrictFallback(apartment) !== selectedDistrict) return false;
       if (guestsValue !== null && Number.isFinite(guestsValue) && apartment.maxGuests < guestsValue) return false;
       if (bedroomsValue !== null && Number.isFinite(bedroomsValue) && apartment.bedrooms < bedroomsValue) return false;
-      const priceInfo = getApartmentPriceInfo(apartment);
+      const datedMode = getRentalSearchMode(checkIn, checkOut);
+      if (datedMode && !isApartmentSuitableForRentalSearch(apartment, datedMode)) return false;
+      const priceInfo = datedMode ? getRentalSearchPrice(apartment, datedMode) : getApartmentPriceInfo(apartment);
       if (pricePeriod && (!priceInfo || priceInfo.period !== pricePeriod)) return false;
       if (minPriceValue !== null && Number.isFinite(minPriceValue) && priceInfo && (!pricePeriod || priceInfo.period === pricePeriod) && priceInfo.amount < minPriceValue) return false;
       if (maxPriceValue !== null && Number.isFinite(maxPriceValue) && priceInfo && (!pricePeriod || priceInfo.period === pricePeriod) && priceInfo.amount > maxPriceValue) return false;
@@ -241,8 +247,9 @@ export default function PublicCatalog({ embedded = false, initialApartments = []
     const periodRank: Record<"night" | "week" | "month", number> = { night: 1, week: 2, month: 3 };
     if (sortMode === "price_asc" || sortMode === "price_desc") {
       sorted.sort((first, second) => {
-        const firstPrice = getApartmentPriceInfo(first);
-        const secondPrice = getApartmentPriceInfo(second);
+        const datedMode = getRentalSearchMode(checkIn, checkOut);
+        const firstPrice = datedMode ? getRentalSearchPrice(first, datedMode) : getApartmentPriceInfo(first);
+        const secondPrice = datedMode ? getRentalSearchPrice(second, datedMode) : getApartmentPriceInfo(second);
         if (!firstPrice && !secondPrice) return 0;
         if (!firstPrice) return 1;
         if (!secondPrice) return -1;
@@ -286,7 +293,7 @@ export default function PublicCatalog({ embedded = false, initialApartments = []
                 )}
               </div>
             ) : null}
-            {isLoading ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.loading}</div> : loadError ? <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-6 text-rose-100">{copy.loadError}</div> : publicApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.empty}</div> : visibleApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><p className="text-slate-100">{copy.noResults}</p><p className="mt-2 text-sm text-slate-400">{copy.noResultsHint}</p><button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.reset}</button></div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleApartments.map((apartment) => <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} compact language={language} />)}</div>}
+            {isLoading ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.loading}</div> : loadError ? <div role="alert" className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-6 text-rose-100">{copy.loadError}</div> : publicApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 text-slate-300">{copy.empty}</div> : visibleApartments.length === 0 ? <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6"><p className="text-slate-100">{copy.noResults}</p><p className="mt-2 text-sm text-slate-400">{copy.noResultsHint}</p><button type="button" onClick={resetFilters} className="mt-4 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 hover:bg-white/10">{copy.reset}</button></div> : <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{visibleApartments.map((apartment) => <ApartmentCard key={apartment.id} apartment={apartment} bookings={bookings} checkIn={checkIn} checkOut={checkOut} guests={guests} compact language={language} />)}</div>}
           </section>
 
           <section id="find-another-property" aria-labelledby="search-heading">
@@ -301,8 +308,10 @@ export default function PublicCatalog({ embedded = false, initialApartments = []
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4"><p className="text-sm text-slate-200">{isLoading ? copy.loading : `${copy.found}: ${visibleApartments.length}`}</p><div className="inline-flex rounded-xl border border-white/10 bg-black/20 p-1"><button type="button" onClick={() => setViewMode((current) => current === "map" ? "list" : "map")} className={`rounded-lg px-3 py-1 text-sm ${viewMode === "map" ? "bg-cyan-500/20 text-cyan-200" : "text-slate-300"}`}>{viewMode === "map" ? copy.hide : copy.showMap}</button></div></div>
           </section>
           <PartnerCallout language={language} />
+          <OperoContact language={language} />
         </section>
       </main>
+      <OperoContact language={language} variant="footer" />
     </div>
   );
 }
