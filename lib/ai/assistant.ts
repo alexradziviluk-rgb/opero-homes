@@ -48,8 +48,16 @@ function shiftDate(value: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function singleMonthDateFrom(message: string): string | null {
+  const match = message.match(/(?:^|[?!.]\s*|\bесли\s+|\bif\s+|\beğer\s+)(?:а\s+)?(?:с|на|from|on)\s+(\d{1,2})\s+(январ|феврал|март|апрел|ма[йея]|июн|июл|август|сентябр|октябр|ноябр|декабр|january|february|march|april|may|june|july|august|september|october|november|december|ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)\b(?!\s+(?:по|до))/iu);
+  if (!match) return null;
+  const months = ["январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık"];
+  const monthIndex = months.findIndex((value) => match[2].toLocaleLowerCase("ru-RU").startsWith(value)) % 12;
+  return monthIndex >= 0 ? `${new Date().getFullYear()}-${String(monthIndex + 1).padStart(2, "0")}-${match[1].padStart(2, "0")}` : null;
+}
+
 function guestsFrom(message: string): number | null {
-  const match = message.match(/\b(\d+)\s*(?:гост|чел|guest|person|kişi)/iu);
+  const match = message.match(/\b(\d+)\s*(?:гост|чел|взросл|adult|guest|person|kişi)/iu);
   if (match) return Math.max(1, Number(match[1]));
   const words: Record<string, number> = { двое: 2, трое: 3, четверо: 4, пятеро: 5, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, iki: 2, üç: 3, dört: 4, beş: 5 };
   const normalized = message.toLocaleLowerCase("ru-RU");
@@ -57,11 +65,14 @@ function guestsFrom(message: string): number | null {
   return word ? words[word] : null;
 }
 
-function searchFilters(message: string): PublicSearchFilters {
+function searchFilters(message: string, latestMessage = message): PublicSearchFilters {
   const dates = datesFrom(message);
+  const latestCheckIn = singleMonthDateFrom(latestMessage);
   const shiftedDates = dates && /(?:на|через)\s+день\s+(?:позже|позднее)|a day later|one day later|bir gün sonra/iu.test(message)
     ? { checkIn: shiftDate(dates.checkIn, 1), checkOut: shiftDate(dates.checkOut, 1) }
-    : dates;
+    : latestCheckIn && dates
+      ? { checkIn: latestCheckIn, checkOut: dates.checkOut }
+      : dates;
   const budget = message.match(/(?:до|under|below)\s*(?:€|eur|евро)?\s*(\d{2,6})/iu);
   const location = message.match(/(?:в|у|near|in|в районе)\s+([\p{L}][\p{L}\s-]{2,30}?)(?=\s+(?:с|на|до|для|за|и)\b|$)/iu)?.[1]?.trim() ?? null;
   return { checkIn: shiftedDates?.checkIn ?? null, checkOut: shiftedDates?.checkOut ?? null, guests: guestsFrom(message), maxPrice: budget ? Number(budget[1]) : null, location };
@@ -124,7 +135,7 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
   const contextText = [...history.filter((turn) => turn.role === "user").map((turn) => turn.text), message].join(" ");
   const lower = contextText.toLocaleLowerCase("ru-RU");
   const results: AIToolResult[] = [];
-  const filters = searchFilters(contextText);
+  const filters = searchFilters(contextText, message);
   const apartmentId = message.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i)?.[0] ?? "";
   const taskId = message.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i)?.[0] ?? "";
   const wantsBookings = hasAny(lower, ["мои заявки", "мои бронирования", "my booking", "my request", "мои поездки"]);
