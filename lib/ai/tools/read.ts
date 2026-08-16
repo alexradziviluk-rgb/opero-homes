@@ -28,12 +28,12 @@ function compactProperty(row: Record<string, unknown>): PublicProperty {
   const rawPrice = row.daily_price;
   return {
     id: String(row.id),
-    title: String(row.title ?? "Объект"),
+    title: String(row.title ?? row.name ?? "Объект"),
     city: String(row.city ?? ""),
     district: String(row.district ?? ""),
     shortDesc: String(row.short_desc ?? "").replace(/\s+/g, " ").slice(0, 180),
     maxGuests: Number(row.max_guests ?? 0),
-    dailyPrice: typeof rawPrice === "number" ? rawPrice : Number.isFinite(Number(rawPrice)) ? Number(rawPrice) : null,
+    dailyPrice: typeof rawPrice === "number" ? rawPrice > 0 ? rawPrice : null : Number.isFinite(Number(rawPrice)) && Number(rawPrice) > 0 ? Number(rawPrice) : null,
     currency: "EUR",
     publicationStatus: "published",
     minimumNights: typeof row.minimum_nights === "number" ? row.minimum_nights : Number.isFinite(Number(row.minimum_nights)) ? Number(row.minimum_nights) : null,
