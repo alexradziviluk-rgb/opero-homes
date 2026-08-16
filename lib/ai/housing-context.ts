@@ -21,6 +21,18 @@ function dateRangeFrom(message: string, fallback: HousingSearchContext): Partial
   if (iso.length >= 2) return { checkIn: iso[0], checkOut: iso[1] };
   const local = [...message.matchAll(/\b(\d{1,2})[./](\d{1,2})[./](20\d{2})\b/g)].map((match) => `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`);
   if (local.length >= 2) return { checkIn: local[0], checkOut: local[1] };
+  const namedWithYears = message.match(/\b(\d{1,2})\s+([\p{L}]+)\s+(20\d{2})\s+(?:по|до|[-–])\s+(\d{1,2})(?:\s+([\p{L}]+))?(?:\s+(20\d{2}))?\b/iu);
+  if (namedWithYears) {
+    const checkInMonth = monthNumber(namedWithYears[2]);
+    const checkOutMonth = monthNumber(namedWithYears[5] ?? namedWithYears[2]);
+    if (checkInMonth && checkOutMonth) {
+      const year = namedWithYears[3];
+      return {
+        checkIn: `${year}-${String(checkInMonth).padStart(2, "0")}-${namedWithYears[1].padStart(2, "0")}`,
+        checkOut: `${namedWithYears[6] ?? year}-${String(checkOutMonth).padStart(2, "0")}-${namedWithYears[4].padStart(2, "0")}`,
+      };
+    }
+  }
   const range = message.match(/(\d{1,2})\s*(?:по|до|с|from|to|[-–])\s*(\d{1,2})?\s*(январ|феврал|март|апрел|ма[йея]|июн|июл|август|сентябр|октябр|ноябр|декабр|january|february|march|april|may|june|july|august|september|october|november|december|ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)/iu);
   if (!range) return {};
   const month = monthNumber(range[3]);

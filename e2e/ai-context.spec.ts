@@ -10,6 +10,10 @@ test.describe("Opero AI housing context", () => {
     expect(updated).toMatchObject({ checkIn: `${new Date().getFullYear()}-08-21`, checkOut: `${new Date().getFullYear()}-08-25`, guests: 2 });
   });
 
+  test("parses named date ranges with an explicit year", () => {
+    expect(patchHousingSearchContext(undefined, "10 августа 2030 по 15 августа 2030", "ru")).toMatchObject({ checkIn: "2030-08-10", checkOut: "2030-08-15" });
+  });
+
   test("retains budget and preferences across later search turns", () => {
     const initial = patchHousingSearchContext(undefined, "20 по 25 августа, 2 взрослых, до 150 евро в Аланье", "ru");
     const cheaper = patchHousingSearchContext(initial, "Покажи дешевле", "ru");
