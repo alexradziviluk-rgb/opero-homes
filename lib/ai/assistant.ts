@@ -137,9 +137,15 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
   const wantsTaskDetails = hasAny(lower, ["детали задачи", "что сделать", "task details"]);
   const wantsCalendar = hasAny(lower, ["календарь", "занятые даты", "occupied dates"]);
   const wantsPropertyKnowledge = hasAny(lower, ["животн", "питом", "курить", "парков", "выезд", "заезд", "wifi", "wi-fi", "вайфай", "удобств", "amenit", "pet", "parking"]);
+  const wantsManager = /менеджер|человек|оператор|сотрудник|manager|human|agent|çalışan|insan/i.test(message);
   const routeApartmentId = context.route.match(/^\/properties\/([0-9a-f-]{36})$/i)?.[1] ?? "";
 
-  if (wantsPropertyKnowledge && routeApartmentId && canUseTool(context.role, "getPublicPropertyKnowledge")) {
+  if (wantsManager) {
+    const handoff = buildHandoff(context, message);
+    const language = languageOf(message, preferredLanguage);
+    const messageText = language === "en" ? "I can connect you with a manager. Would you like to send your request and contact details?" : language === "tr" ? "Sizi bir yöneticiye bağlayabilirim. Talebinizi ve iletişim bilgilerinizi göndermemi ister misiniz?" : "Подключу менеджера. Передать ваш запрос и контактные данные?";
+    return { ok: true, message: messageText, role: context.role, tools: [], results: [], suggestions: suggestions(context), handoff };
+  } else if (wantsPropertyKnowledge && routeApartmentId && canUseTool(context.role, "getPublicPropertyKnowledge")) {
     results.push(await getPublicPropertyKnowledge(context, routeApartmentId));
   } else if (wantsBookings && canUseTool(context.role, "getMyBookingRequests")) {
     results.push(await getMyBookingRequests(context));
