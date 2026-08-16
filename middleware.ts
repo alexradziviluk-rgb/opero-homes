@@ -44,6 +44,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(targetUrl);
   }
 
+  function redirectToStaffLogin(nextPath?: string) {
+    return redirectTo("/staff/login", nextPath);
+  }
+
   if (!supabase) {
     logServerAuthError({
       stage: "session",
@@ -56,7 +60,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (isProtectedPath(pathname)) {
-      return redirectTo("/login");
+      return redirectToStaffLogin(currentPathWithSearch);
     }
 
     if (isClientProtectedPath(pathname)) {
@@ -90,7 +94,7 @@ export async function middleware(request: NextRequest) {
       code: "cookie_session_error",
     });
 
-    return redirectTo("/login");
+    return redirectToStaffLogin(currentPathWithSearch);
   }
 
   if (!user && isClientProtectedPath(pathname)) {
@@ -130,7 +134,7 @@ export async function middleware(request: NextRequest) {
 
       if (isProtectedPath(pathname)) {
         if (isPropertyOwner) return middlewareClient.response;
-        return redirectTo("/login");
+        return redirectToStaffLogin(currentPathWithSearch);
       }
 
       if (isClientProtectedPath(pathname)) {

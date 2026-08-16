@@ -317,11 +317,11 @@ test("manager session persists across protected route reloads", async ({ browser
   }
 
   await page.getByRole("button", { name: /Выйти/ }).first().click();
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/staff\/login$/);
   await page.goto("/admin");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/staff\/login/);
 
-  const loginForm = page.locator("form").filter({ has: page.locator('input[type="password"]') });
+  const loginForm = page.locator("form").first();
   await loginForm.locator('input[type="email"]').fill(fixture.accounts.manager.email);
   await loginForm.locator('input[type="password"]').fill(fixture.accounts.manager.password);
   await loginForm.locator('button[type="submit"]').click();

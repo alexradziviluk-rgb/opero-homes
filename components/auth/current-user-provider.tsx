@@ -77,7 +77,9 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
       bootstrapSettled = true;
       setCurrentUser(resolved.currentUser);
       setCurrentUserContext(resolved.currentUserContext);
-      void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+      if (resolved.currentUser.role === "Гость") {
+        void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+      }
       setAuthStatus("authenticated");
     }
 
@@ -114,7 +116,9 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
           userRepository.upsert(resolved.currentUser);
           setCurrentUser(resolved.currentUser);
           setCurrentUserContext(resolved.currentUserContext);
-          void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+          if (resolved.currentUser.role === "Гость") {
+            void fetch("/api/owner/properties", { cache: "no-store" }).then((response) => setHasPropertyAccess(response.ok));
+          }
           setAuthStatus("authenticated");
         });
       });
@@ -135,7 +139,7 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const logout = useCallback(async () => {
-    const redirectPath = currentUser?.role === "Гость" ? "/guest/login" : "/login";
+    const redirectPath = currentUser?.role === "Гость" ? "/guest/login" : "/staff/login";
     await logoutAuth();
     window.sessionStorage.removeItem("opero-booking-contact");
 
@@ -197,11 +201,12 @@ export function CurrentUserProvider({ children }: { children: React.ReactNode })
     const isAuthRoute = authRoutes.includes(pathname);
     const internalRoots = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users", "/owner", "/account"];
     const isInternalRoute = internalRoots.some((route) => routeMatches(route));
+    const isStaffInternalRoute = ["/admin", "/apartments", "/bookings", "/calendar", "/customers", "/clients", "/users"].some((route) => routeMatches(route));
     const guestProtectedRoots = ["/guest/bookings", "/guest/messages", "/guest/properties"];
     const isGuestProtectedRoute = pathname === "/guest" || guestProtectedRoots.some((route) => routeMatches(route));
 
     if (authStatus === "anonymous" && !currentUser && isInternalRoute && !isAuthRoute) {
-      router.replace("/login");
+      router.replace(isStaffInternalRoute ? "/staff/login" : "/login");
       router.refresh();
       return;
     }

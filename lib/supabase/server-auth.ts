@@ -141,7 +141,7 @@ export async function requireServerStaffPage(): Promise<CurrentUserContext> {
   const authState = await getServerAuthState();
 
   if (!authState.isAuthenticated) {
-    redirect("/login");
+    redirect("/staff/login");
   }
 
   if (!authState.isStaff || !authState.context) {
@@ -155,7 +155,7 @@ export async function requireServerRoleCodesPage(allowedRoleCodes: string[]): Pr
   const authState = await getServerAuthState();
 
   if (!authState.isAuthenticated) {
-    redirect("/login");
+    redirect("/staff/login");
   }
 
   if (!authState.isStaff || !authState.context) {
