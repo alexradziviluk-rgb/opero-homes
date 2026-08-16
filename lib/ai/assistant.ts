@@ -98,7 +98,7 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
   const wantsTasks = hasAny(lower, ["мои задачи", "задачи сегодня", "просроченные задачи", "my tasks", "overdue tasks"]);
   const wantsSummary = hasAny(lower, ["что требует внимания", "сводка", "summary", "today", "внимани сегодня"]);
   const wantsPending = hasAny(lower, ["новые заявки", "pending", "pending requests"]);
-  const wantsSearch = hasAny(lower, ["найти", "жилье", "жильё", "квартир", "property", "апартамент", "ev", "cheaper", "дешевле", "морю", "sea"]);
+  const wantsSearch = hasAny(lower, ["найти", "жилье", "жильё", "квартир", "property", "апартамент", "ev", "cheaper", "дешевле", "морю", "sea", "konut", "bul", "müsait", "rezervasyon"]);
   const wantsEmployees = hasAny(lower, ["сотрудник", "сотрудников", "employees"]);
   const wantsApartments = hasAny(lower, ["объекты организации", "все квартиры", "apartments"]);
   const wantsTaskDetails = hasAny(lower, ["детали задачи", "что сделать", "task details"]);

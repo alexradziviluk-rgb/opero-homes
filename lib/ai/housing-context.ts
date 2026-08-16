@@ -73,15 +73,17 @@ export function patchHousingSearchContext(previous: Partial<HousingSearchContext
   if (/(?:дешевле|cheaper|daha ucuz)/iu.test(message) && !preferences.includes("cheaper")) preferences.push("cheaper");
   if (/(?:ближе к морю|near the sea|near sea|denize yakın)/iu.test(message) && !preferences.includes("near_sea")) preferences.push("near_sea");
   const detectedLanguage = languageFrom(message);
+  const nextCheckIn = singleDate ?? range.checkIn ?? base.checkIn;
+  const nextCheckOut = range.checkOut ?? (singleDate && base.checkOut && singleDate >= base.checkOut ? null : base.checkOut);
   return {
     ...base,
     ...range,
-    checkIn: singleDate ?? range.checkIn ?? base.checkIn,
-    checkOut: range.checkOut ?? base.checkOut,
+    checkIn: nextCheckIn,
+    checkOut: nextCheckOut,
     guests: guestsFrom(message) ?? base.guests,
     maxPrice: budget ? Number(budget[1]) : base.maxPrice,
     location: location ?? base.location,
     preferences,
-    language: preferredLanguage && preferredLanguage !== "ru" ? preferredLanguage : detectedLanguage ?? base.language,
+    language: preferredLanguage ?? detectedLanguage ?? base.language,
   };
 }

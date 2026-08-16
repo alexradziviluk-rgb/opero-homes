@@ -22,6 +22,6 @@ test.describe("Opero AI housing context", () => {
   test("keeps each conversation language deterministic", () => {
     expect(patchHousingSearchContext(undefined, "Find accommodation", "en").language).toBe("en");
     expect(patchHousingSearchContext(undefined, "Konut bul", "tr").language).toBe("tr");
-    expect(patchHousingSearchContext({ language: "en" }, "What about 21 August?", "ru").language).toBe("en");
+    expect(patchHousingSearchContext({ language: "en" }, "What about 21 August?", "ru").language).toBe("ru");
   });
 });
