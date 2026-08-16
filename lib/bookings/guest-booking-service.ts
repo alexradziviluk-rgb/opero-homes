@@ -543,15 +543,15 @@ export async function listGuestBookings(
     };
   }
 
-  const guestEmail = (currentUserResult.currentUserContext.profile.email ?? currentUserResult.currentUserContext.authEmail).trim().toLowerCase();
   const bookingFields = "id,organization_id,apartment_id,primary_guest_id,check_in_date,check_out_date,total_amount,status,payment_status,source,created_at,updated_at";
   const authUserId = currentUserResult.currentUserContext.authUserId;
-  const [emailResult, identityResult] = await Promise.all([
-    supabase.from("bookings").select(bookingFields).eq("guest_email", guestEmail).order("created_at", { ascending: false }),
-    supabase.from("bookings").select(bookingFields).eq("primary_guest_id", authUserId).order("created_at", { ascending: false }),
-  ]);
+  const identityResult = await supabase
+    .from("bookings")
+    .select(bookingFields)
+    .eq("primary_guest_id", authUserId)
+    .order("created_at", { ascending: false });
 
-  const queryError = emailResult.error ?? identityResult.error;
+  const queryError = identityResult.error;
   if (queryError) {
     return {
       ok: false,
@@ -561,11 +561,7 @@ export async function listGuestBookings(
     };
   }
 
-  const bookings = Array.from(
-    new Map(
-      [...((emailResult.data ?? []) as BookingRow[]), ...((identityResult.data ?? []) as BookingRow[])].map((booking) => [booking.id, booking]),
-    ).values(),
-  ).sort((first, second) => second.created_at.localeCompare(first.created_at));
+  const bookings = (identityResult.data ?? []) as BookingRow[];
   const context = currentUserResult.currentUserContext;
   const apartmentIds = Array.from(new Set(bookings.map((booking) => booking.apartment_id).filter((value): value is string => Boolean(value))));
 
@@ -588,7 +584,7 @@ export async function listGuestBookings(
       organizationId: booking.organization_id,
       apartmentId: booking.apartment_id,
       apartmentTitle: apartmentTitleById.get(booking.apartment_id) ?? "Объект",
-      clientId: booking.primary_guest_id ?? guestEmail,
+      clientId: booking.primary_guest_id ?? authUserId,
       guestName: formatGuestName(context.profile),
       guestEmail: context?.profile.email ?? currentUserResult.currentUserContext?.authEmail ?? "",
       guestPhone: context?.profile.phone ?? "",

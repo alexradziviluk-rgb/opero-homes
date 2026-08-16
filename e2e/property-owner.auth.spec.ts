@@ -180,9 +180,20 @@ test("active property owner sees only related apartment and no private or financ
   }
 });
 
-test("dual-role client can book a foreign apartment without owner access", async ({ page }) => {
+test("dual-role client can book a foreign apartment without owner access", async ({ page, browser }) => {
   await login(page, fixture.activeOwner.email);
   await expect(page).toHaveURL(/\/guest(?:\?|$)/);
+
+  const admin = createClient(LOCAL_SUPABASE_URL, LOCAL_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { error: userBGuestError } = await admin.from("guests").upsert({
+    id: fixture.bindingOwner.id,
+    organization_id: fixture.organizationA,
+    first_name: "Binding",
+    last_name: "Fixture",
+    email: fixture.bindingOwner.email,
+    phone: "+79990004444",
+  });
+  expect(userBGuestError).toBeNull();
 
   await page.goto("/account/properties");
   await expect(page.getByRole("heading", { name: "Мои объекты", exact: true })).toBeVisible();
@@ -200,7 +211,45 @@ test("dual-role client can book a foreign apartment without owner access", async
   const bookingBody = await booking.json();
   expect(bookingBody.data.apartmentId).toBe(fixture.apartmentB);
   expect(bookingBody.data.clientId).toBe(fixture.activeOwner.id);
-  expect(bookingBody.data.guestEmail).toBe(fixture.activeOwner.email);
+  expect(bookingBody.data.guestEmail).toBe("spoofed@example.test");
+
+  const { data: storedBooking, error: storedBookingError } = await admin
+    .from("bookings")
+    .select("primary_guest_id,guest_email")
+    .eq("id", bookingBody.data.id)
+    .single();
+  expect(storedBookingError).toBeNull();
+  expect(storedBooking).toMatchObject({ primary_guest_id: fixture.activeOwner.id, guest_email: "spoofed@example.test" });
+
+  const { data: canonicalGuest, error: canonicalGuestError } = await admin
+    .from("guests")
+    .select("id,email")
+    .eq("id", fixture.activeOwner.id)
+    .single();
+  expect(canonicalGuestError).toBeNull();
+  expect(canonicalGuest).toMatchObject({ id: fixture.activeOwner.id, email: fixture.activeOwner.email });
+
+  const collisionDates = { ...dates, checkIn: "2030-09-20", checkOut: "2030-09-22" };
+  const collisionBooking = await page.request.post("/api/guest/bookings", {
+    data: { ...collisionDates, guestName: "Contact Collision", guestEmail: fixture.bindingOwner.email, guestPhone: "+79990005555" },
+  });
+  expect(collisionBooking.status(), await collisionBooking.text()).toBe(201);
+  const collisionBody = await collisionBooking.json();
+  const { data: storedCollision, error: storedCollisionError } = await admin
+    .from("bookings")
+    .select("primary_guest_id,guest_email")
+    .eq("id", collisionBody.data.id)
+    .single();
+  expect(storedCollisionError).toBeNull();
+  expect(storedCollision).toMatchObject({ primary_guest_id: fixture.activeOwner.id, guest_email: fixture.bindingOwner.email });
+
+  const userBContext = await browser.newContext();
+  const userBPage = await userBContext.newPage();
+  await login(userBPage, fixture.bindingOwner.email);
+  const userBBookings = await userBPage.request.get("/api/guest/bookings");
+  expect(userBBookings.status(), await userBBookings.text()).toBe(200);
+  expect(JSON.stringify((await userBBookings.json()).data)).not.toContain(collisionBody.data.id);
+  await userBContext.close();
 
   const foreignOwnerAccess = await page.request.get(`/api/owner/properties/${fixture.apartmentB}/blocks`);
   expect(foreignOwnerAccess.status()).toBeGreaterThanOrEqual(400);
