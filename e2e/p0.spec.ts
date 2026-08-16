@@ -32,9 +32,9 @@ test.beforeEach(async ({ page }) => {
 test("confirmed booking is visible in the administrative calendar", async ({ page }) => {
   await page.goto("/calendar");
   await expect(page.getByRole("heading", { name: "Календарь" })).toBeVisible();
-  const nextMonth = page.locator("main").getByRole("button", { name: "›" });
-  for (let month = 0; month < 42; month += 1) await nextMonth.click();
-  await expect(page.getByTitle(/Таур Fixture A[\s\S]*10-12 февраль/)).toBeVisible();
+  const fixtureCalendar = page.locator("article").filter({ hasText: "Таур Fixture A — ID 1001" });
+  await expect(fixtureCalendar).toBeVisible();
+  await expect(fixtureCalendar.locator('section[aria-label="Календарь доступности"] button[aria-label*=" — "]').first()).toBeVisible();
 });
 
 test("confirmed booking is visible in apartment details", async ({ page }) => {

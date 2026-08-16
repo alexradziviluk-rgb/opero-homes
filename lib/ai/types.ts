@@ -29,6 +29,11 @@ export type PublicSearchFilters = {
   guests: number | null;
   maxPrice: number | null;
   location: string | null;
+  preferences?: string[];
+};
+
+export type HousingSearchContext = PublicSearchFilters & {
+  language: "ru" | "en" | "tr";
 };
 
 export type AIToolResult = {
@@ -44,6 +49,7 @@ export type AIChatResponse = {
   tools: string[];
   results: AIToolResult[];
   suggestions: string[];
+  housingContext?: HousingSearchContext;
   intent?: string;
   action?: string;
   operationalAction?: {

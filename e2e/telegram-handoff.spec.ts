@@ -47,6 +47,34 @@ test.describe("Opero Telegram handoff T1", () => {
     expect(openButton?.url).not.toMatch(/localhost|127\.0\.0\.1/i);
   });
 
+  test("repeats an anonymous handoff without an authenticated 401 or duplicate ticket", async ({ page }) => {
+    let ticketCreates = 0;
+    await page.route("**/api/ai/chat", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, message: "Передать менеджеру?", role: "anonymous", tools: [], results: [], suggestions: [], handoff: { offered: true, requiresConfirmation: true, critical: false, category: "general", priority: "normal", subject: "Вопрос клиента", summary: "Не выполнялось.", actionId: "action-repeat", expiresAt: "2099-01-01T00:00:00.000Z" } }) });
+    });
+    await page.route("**/api/support/tickets", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      ticketCreates += 1;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, publicNumber: "OP-REPEAT", conversationState: "waiting_manager", deliveryStatus: "sent", message: "Обращение OP-REPEAT передано менеджеру." }) });
+    });
+    await page.route("**/api/support/conversations/**", async (route) => {
+      await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ ok: false, error: "Authentication required" }) });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Открыть Opero AI" }).click();
+    await page.getByRole("textbox", { name: "Сообщение Opero AI" }).fill("Свяжи меня с менеджером");
+    await page.getByRole("button", { name: "Отправить" }).click();
+    await page.getByRole("textbox", { name: "Email для связи" }).fill("repeat@example.com");
+    await page.getByRole("checkbox", { name: "Согласен на связь по этому вопросу" }).check();
+    await page.getByRole("button", { name: "Передать менеджеру" }).click();
+    await expect(page.getByText("Обращение OP-REPEAT передано менеджеру.", { exact: true })).toBeVisible();
+    await page.getByRole("textbox", { name: "Сообщение Opero AI" }).fill("Свяжи меня с менеджером");
+    await page.getByRole("button", { name: "Отправить" }).click();
+    await expect(page.getByText("Ваш запрос уже передан менеджеру. Номер обращения: OP-REPEAT.", { exact: true })).toBeVisible();
+    expect(ticketCreates).toBe(1);
+  });
+
   test("rejects Telegram webhook without the secret", async ({ page }) => {
     const response = await page.request.post("/api/telegram/webhook", { data: { callback_query: { data: "support:accept:OP-1042", message: { chat: { id: 1 } } } } });
     expect(response.status()).toBe(401);

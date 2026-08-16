@@ -19,6 +19,7 @@ import {
 } from "./tools/read";
 import { sanitizeAiToolResultForClient } from "./sanitize";
 import type { AIChatResponse, AIContext, AIConversationTurn, AIToolResult, PublicSearchFilters } from "./types";
+import { patchHousingSearchContext } from "./housing-context";
 import { buildHandoff } from "@/lib/support/service";
 
 function languageOf(message: string, preferred?: "ru" | "en" | "tr"): "ru" | "en" | "tr" {
@@ -28,65 +29,19 @@ function languageOf(message: string, preferred?: "ru" | "en" | "tr"): "ru" | "en
   return "ru";
 }
 
-function datesFrom(message: string): { checkIn: string; checkOut: string } | null {
-  const iso = [...message.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)].map((match) => match[1]);
-  if (iso.length >= 2) return { checkIn: iso[0], checkOut: iso[1] };
-  const local = [...message.matchAll(/\b(\d{1,2})[./](\d{1,2})[./](20\d{2})\b/g)].map((match) => `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`);
-  if (local.length >= 2) return { checkIn: local[0], checkOut: local[1] };
-  const month = message.match(/(\d{1,2})\s*(?:по|до|с|from|to|[-–])\s*(\d{1,2})?\s*(январ|феврал|март|апрел|ма[йея]|июн|июл|август|сентябр|октябр|ноябр|декабр|january|february|march|april|may|june|july|august|september|october|november|december|ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)/iu);
-  if (!month) return null;
-  const months = ["январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık"];
-  const monthIndex = months.findIndex((value) => month[3].toLocaleLowerCase("ru-RU").startsWith(value)) % 12;
-  const year = new Date().getFullYear();
-  const checkOutDay = month[2] ?? month[1];
-  return monthIndex >= 0 ? { checkIn: `${year}-${String(monthIndex + 1).padStart(2, "0")}-${month[1].padStart(2, "0")}`, checkOut: `${year}-${String(monthIndex + 1).padStart(2, "0")}-${checkOutDay.padStart(2, "0")}` } : null;
-}
-
-function shiftDate(value: string, days: number): string {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function singleMonthDateFrom(message: string): string | null {
-  const match = message.match(/(?:^|[?!.]\s*|\bесли\s+|\bif\s+|\beğer\s+)(?:а\s+)?(?:с|на|from|on)\s+(\d{1,2})\s+(январ|феврал|март|апрел|ма[йея]|июн|июл|август|сентябр|октябр|ноябр|декабр|january|february|march|april|may|june|july|august|september|october|november|december|ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)\b(?!\s+(?:по|до))/iu);
-  if (!match) return null;
-  const months = ["январ", "феврал", "март", "апрел", "ма", "июн", "июл", "август", "сентябр", "октябр", "ноябр", "декабр", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz", "ağustos", "eylül", "ekim", "kasım", "aralık"];
-  const monthIndex = months.findIndex((value) => match[2].toLocaleLowerCase("ru-RU").startsWith(value)) % 12;
-  return monthIndex >= 0 ? `${new Date().getFullYear()}-${String(monthIndex + 1).padStart(2, "0")}-${match[1].padStart(2, "0")}` : null;
-}
-
-function guestsFrom(message: string): number | null {
-  const match = message.match(/\b(\d+)\s*(?:гост|чел|взросл|adult|guest|person|kişi)/iu);
-  if (match) return Math.max(1, Number(match[1]));
-  const words: Record<string, number> = { двое: 2, трое: 3, четверо: 4, пятеро: 5, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, iki: 2, üç: 3, dört: 4, beş: 5 };
-  const normalized = message.toLocaleLowerCase("ru-RU");
-  const word = Object.keys(words).find((value) => normalized.includes(value));
-  return word ? words[word] : null;
-}
-
-function searchFilters(message: string, latestMessage = message): PublicSearchFilters {
-  const dates = datesFrom(message);
-  const latestCheckIn = singleMonthDateFrom(latestMessage);
-  const shiftedDates = dates && /(?:на|через)\s+день\s+(?:позже|позднее)|a day later|one day later|bir gün sonra/iu.test(message)
-    ? { checkIn: shiftDate(dates.checkIn, 1), checkOut: shiftDate(dates.checkOut, 1) }
-    : latestCheckIn && dates
-      ? { checkIn: latestCheckIn, checkOut: dates.checkOut }
-      : dates;
-  const budget = message.match(/(?:до|under|below)\s*(?:€|eur|евро)?\s*(\d{2,6})/iu);
-  const location = message.match(/(?:в|у|near|in|в районе)\s+([\p{L}][\p{L}\s-]{2,30}?)(?=\s+(?:с|на|до|для|за|и)\b|$)/iu)?.[1]?.trim() ?? null;
-  return { checkIn: shiftedDates?.checkIn ?? null, checkOut: shiftedDates?.checkOut ?? null, guests: guestsFrom(message), maxPrice: budget ? Number(budget[1]) : null, location };
-}
-
 function hasAny(message: string, values: string[]): boolean {
   return values.some((value) => message.includes(value));
 }
 
-function suggestions(context: AIContext): string[] {
-  if (context.role === "anonymous" || context.role === "client") return ["Найти жильё", "Показать мои заявки", "Проверить свободные даты"];
-  if (context.role === "property_owner") return ["Показать мои квартиры", "Какие даты заняты?"];
-  if (["employee", "cleaner", "maintenance"].includes(context.role)) return ["Мои задачи на сегодня", "Что нужно сделать в этой квартире?"];
-  return ["Что требует внимания сегодня?", "Показать новые заявки", "Есть ли просроченные задачи?"];
+function suggestions(context: AIContext, language: "ru" | "en" | "tr" = "ru"): string[] {
+  if (context.role === "anonymous" || context.role === "client") {
+    if (language === "en") return ["Find accommodation", "Show my requests", "Check available dates"];
+    if (language === "tr") return ["Konut bul", "Taleplerimi göster", "Müsait tarihleri kontrol et"];
+    return ["Найти жильё", "Показать мои заявки", "Проверить свободные даты"];
+  }
+  if (context.role === "property_owner") return language === "en" ? ["Show my properties", "Which dates are occupied?"] : language === "tr" ? ["Konutlarımı göster", "Hangi tarihler dolu?"] : ["Показать мои квартиры", "Какие даты заняты?"];
+  if (["employee", "cleaner", "maintenance"].includes(context.role)) return language === "en" ? ["My tasks today", "What needs doing in this property?"] : language === "tr" ? ["Bugünkü görevlerim", "Bu konutta ne yapılmalı?"] : ["Мои задачи на сегодня", "Что нужно сделать в этой квартире?"];
+  return language === "en" ? ["What needs attention today?", "Show new requests", "Are there overdue tasks?"] : language === "tr" ? ["Bugün neye dikkat edilmeli?", "Yeni talepleri göster", "Geciken görev var mı?"] : ["Что требует внимания сегодня?", "Показать новые заявки", "Есть ли просроченные задачи?"];
 }
 
 function formatRoleMessage(context: AIContext, message: string): string {
@@ -130,19 +85,20 @@ function dataAnswer(language: "ru" | "en" | "tr", count: number | null, results:
   return "Проверил доступные вашей роли данные Opero Homes. Напишите, что именно нужно уточнить дальше, и разберём это по шагам.";
 }
 
-export async function answerWithTools(context: AIContext, rawMessage: string, history: AIConversationTurn[] = [], preferredLanguage?: "ru" | "en" | "tr"): Promise<AIChatResponse> {
+export async function answerWithTools(context: AIContext, rawMessage: string, history: AIConversationTurn[] = [], preferredLanguage?: "ru" | "en" | "tr", previousHousingContext?: Partial<import("./types").HousingSearchContext>): Promise<AIChatResponse> {
   const message = rawMessage.replace(/\s+/g, " ").trim();
+  const housingContext = patchHousingSearchContext(previousHousingContext, message, preferredLanguage);
   const contextText = [...history.filter((turn) => turn.role === "user").map((turn) => turn.text), message].join(" ");
   const lower = contextText.toLocaleLowerCase("ru-RU");
   const results: AIToolResult[] = [];
-  const filters = searchFilters(contextText, message);
+  const filters: PublicSearchFilters = housingContext;
   const apartmentId = message.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i)?.[0] ?? "";
   const taskId = message.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i)?.[0] ?? "";
   const wantsBookings = hasAny(lower, ["мои заявки", "мои бронирования", "my booking", "my request", "мои поездки"]);
   const wantsTasks = hasAny(lower, ["мои задачи", "задачи сегодня", "просроченные задачи", "my tasks", "overdue tasks"]);
   const wantsSummary = hasAny(lower, ["что требует внимания", "сводка", "summary", "today", "внимани сегодня"]);
   const wantsPending = hasAny(lower, ["новые заявки", "pending", "pending requests"]);
-  const wantsSearch = hasAny(lower, ["найти", "жилье", "жильё", "квартир", "property", "апартамент", "ev"]);
+  const wantsSearch = hasAny(lower, ["найти", "жилье", "жильё", "квартир", "property", "апартамент", "ev", "cheaper", "дешевле", "морю", "sea"]);
   const wantsEmployees = hasAny(lower, ["сотрудник", "сотрудников", "employees"]);
   const wantsApartments = hasAny(lower, ["объекты организации", "все квартиры", "apartments"]);
   const wantsTaskDetails = hasAny(lower, ["детали задачи", "что сделать", "task details"]);
@@ -153,9 +109,9 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
 
   if (wantsManager) {
     const handoff = buildHandoff(context, message);
-    const language = languageOf(message, preferredLanguage);
+    const language = housingContext.language;
     const messageText = language === "en" ? "I can connect you with a manager. Would you like to send your request and contact details?" : language === "tr" ? "Sizi bir yöneticiye bağlayabilirim. Talebinizi ve iletişim bilgilerinizi göndermemi ister misiniz?" : "Подключу менеджера. Передать ваш запрос и контактные данные?";
-    return { ok: true, message: messageText, role: context.role, tools: [], results: [], suggestions: suggestions(context), handoff };
+    return { ok: true, message: messageText, role: context.role, tools: [], results: [], suggestions: suggestions(context, housingContext.language), housingContext, handoff };
   } else if (wantsPropertyKnowledge && routeApartmentId && canUseTool(context.role, "getPublicPropertyKnowledge")) {
     results.push(await getPublicPropertyKnowledge(context, routeApartmentId));
   } else if (wantsBookings && canUseTool(context.role, "getMyBookingRequests")) {
@@ -186,12 +142,12 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
     results.push(await calculatePublicQuote(context, apartmentId, filters.checkIn, filters.checkOut, filters.guests ?? 1));
   } else if (wantsSearch || !message) {
     if (!filters.checkIn || !filters.checkOut) {
-      const language = languageOf(message, preferredLanguage);
-      return { ok: true, message: language === "en" ? "Of course. What dates are you planning?" : language === "tr" ? "Elbette. Hangi tarihler için plan yapıyorsunuz?" : "Конечно. На какие даты планируете поездку?", role: context.role, tools: [], results: [], suggestions: suggestions(context) };
+      const language = housingContext.language;
+      return { ok: true, message: language === "en" ? "Of course. What dates are you planning?" : language === "tr" ? "Elbette. Hangi tarihler için plan yapıyorsunuz?" : "Конечно. На какие даты планируете поездку?", role: context.role, tools: [], results: [], suggestions: suggestions(context, housingContext.language), housingContext };
     }
     if (!filters.guests) {
-      const language = languageOf(message, preferredLanguage);
-      return { ok: true, message: language === "en" ? "How many guests will there be?" : language === "tr" ? "Kaç misafir olacak?" : "Сколько будет гостей?", role: context.role, tools: [], results: [], suggestions: suggestions(context) };
+      const language = housingContext.language;
+      return { ok: true, message: language === "en" ? "How many guests will there be?" : language === "tr" ? "Kaç misafir olacak?" : "Сколько будет гостей?", role: context.role, tools: [], results: [], suggestions: suggestions(context, housingContext.language), housingContext };
     }
     results.push(await searchPublishedProperties(context, filters));
   } else if (canUseTool(context.role, "getMyProfile") && hasAny(lower, ["профиль", "контакт", "profile", "phone", "телефон"])) {
@@ -200,17 +156,17 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
 
   if (results.length === 0) {
     const handoff = buildHandoff(context, message);
-    const language = languageOf(message);
+    const language = housingContext.language;
     const messageText = handoff.offered
       ? language === "en" ? "I don’t have enough verified information to answer this reliably. Would you like me to connect you with a manager?"
         : language === "tr" ? "Bu soruyu güvenilir şekilde yanıtlamak için doğrulanmış yeterli bilgim yok. Sizi bir yöneticiye bağlamamı ister misiniz?"
         : "У меня нет достаточно подтверждённых данных, чтобы ответить надёжно. Подключить менеджера?"
       : formatRoleMessage(context, message) + (context.role === "anonymous" ? " Укажите город, даты и количество гостей, чтобы начать поиск." : " Уточните, что именно нужно найти или проверить.");
-    return { ok: true, message: messageText, role: context.role, tools: [], results: [], suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
+    return { ok: true, message: messageText, role: context.role, tools: [], results: [], suggestions: suggestions(context, housingContext.language), housingContext, ...(handoff.offered ? { handoff } : {}) };
   }
 
   const publicResults = results.map((result) => sanitizeAiToolResultForClient(context.role, result));
-  const language = languageOf(message, preferredLanguage);
+  const language = housingContext.language;
   const first = results[0]?.data as Record<string, unknown> | undefined;
   const count = Array.isArray(first?.properties) ? first.properties.length : Array.isArray(first) ? first.length : null;
   const messageText = dataAnswer(language, count, results);
@@ -221,5 +177,5 @@ export async function answerWithTools(context: AIContext, rawMessage: string, hi
   const finalMessage = noResult && !hasToolError
     ? language === "en" ? "I couldn't find an available home for these dates. I can change the dates, show nearby options, change the number of guests, or connect you with a manager." : language === "tr" ? "Bu tarihler için müsait bir konut bulamadım. Tarihleri, misafir sayısını değiştirebilir, yakındaki seçenekleri gösterebilir veya bir yöneticiye bağlanabilirim." : "На выбранные даты свободных вариантов не нашёл. Можно изменить даты, показать ближайшие варианты, изменить количество гостей или подключить менеджера."
     : messageText;
-  return { ok: true, message: finalMessage, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context), ...(handoff.offered ? { handoff } : {}) };
+  return { ok: true, message: finalMessage, role: context.role, tools: publicResults.map((result) => result.tool), results: publicResults, suggestions: suggestions(context, housingContext.language), housingContext, ...(handoff.offered ? { handoff } : {}) };
 }

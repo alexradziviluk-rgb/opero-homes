@@ -19,6 +19,7 @@ async function resolveBookingContext(supabase: NonNullable<ReturnType<typeof cre
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
+  const language = body?.language === "en" || body?.language === "tr" ? body.language : "ru";
   const confirmed = body?.confirmed === true;
   const idempotencyKey = typeof body?.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
   if (!message || message.length > 2000 || !confirmed || !idempotencyKey || idempotencyKey.length > 200) return NextResponse.json({ ok: false, error: "Подтвердите передачу обращения менеджеру." }, { status: 400 });
@@ -35,9 +36,12 @@ export async function POST(request: Request) {
     const result = await createSupportTicket({ supabase, context, message, route: context.route, handoff: { ...handoff, actionId: typeof body?.actionId === "string" ? body.actionId : handoff.actionId, expiresAt: typeof body?.expiresAt === "string" ? body.expiresAt : handoff.expiresAt }, idempotencyKey, apartmentId: links.apartmentId, bookingId: links.bookingId, contact: { email: typeof body?.email === "string" ? body.email : undefined, phone: typeof body?.phone === "string" ? body.phone : undefined, consent: body?.consent === true } });
     const classification = classifyAiIntent(message);
     await supabase.from("ai_operation_audit").insert({ organization_id: context.organizationId, actor_user_id: context.userId, conversation_id: result.ticket.id, intent: classification.intent, action: classification.action, action_result: result.duplicate ? "duplicate" : "created", ticket_reference: result.ticket.public_number, task_reference: null, fallback_used: false, metadata: { route: context.route, category: result.ticket.category, priority: result.ticket.priority } });
-    const contactMessage = context.role === "anonymous" ? " Ответ будет отправлен по указанному контакту." : "";
+    const contactMessage = context.role === "anonymous" ? language === "en" ? " A reply will be sent to the contact you provided." : language === "tr" ? " Yanıt, verdiğiniz iletişim bilgisine gönderilecek." : " Ответ будет отправлен по указанному контакту." : "";
     const trackingUrl = result.anonymousAccessToken ? `${(process.env.NEXT_PUBLIC_SITE_URL || "https://operohq.netlify.app").replace(/\/$/, "")}/support/conversation/${encodeURIComponent(result.ticket.public_number)}?access=${encodeURIComponent(result.anonymousAccessToken)}` : null;
-    return NextResponse.json({ ok: true, publicNumber: result.ticket.public_number, status: result.ticket.status, conversationState: result.ticket.conversation_state ?? "waiting_manager", deliveryStatus: result.deliveryStatus, duplicate: result.duplicate, trackingUrl, message: result.deliveryStatus === "sent" ? `Обращение ${result.ticket.public_number} передано менеджеру.${contactMessage}` : `Обращение ${result.ticket.public_number} создано. Уведомление сотруднику временно задерживается.${contactMessage}` }, { headers: { "Cache-Control": "no-store" } });
+    const messageText = result.deliveryStatus === "sent"
+      ? language === "en" ? `Request ${result.ticket.public_number} was sent to the manager.${contactMessage}` : language === "tr" ? `${result.ticket.public_number} numaralı talep yöneticiye iletildi.${contactMessage}` : `Обращение ${result.ticket.public_number} передано менеджеру.${contactMessage}`
+      : language === "en" ? `Request ${result.ticket.public_number} was created. The manager notification is temporarily delayed.${contactMessage}` : language === "tr" ? `${result.ticket.public_number} numaralı talep oluşturuldu. Yönetici bildirimi geçici olarak gecikiyor.${contactMessage}` : `Обращение ${result.ticket.public_number} создано. Уведомление сотруднику временно задерживается.${contactMessage}`;
+    return NextResponse.json({ ok: true, publicNumber: result.ticket.public_number, status: result.ticket.status, conversationState: result.ticket.conversation_state ?? "waiting_manager", deliveryStatus: result.deliveryStatus, duplicate: result.duplicate, trackingUrl, message: messageText }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ ok: false, error: "Не удалось создать обращение." }, { status: 422 });
   }

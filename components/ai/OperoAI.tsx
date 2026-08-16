@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { trackEvent } from "@/lib/analytics/client";
 import { createSupabaseClient } from "@/lib/supabase/client";
-import type { AIChatResponse, AIToolResult } from "@/lib/ai/types";
+import type { AIChatResponse, AIToolResult, HousingSearchContext } from "@/lib/ai/types";
 import { canClientSend, type ConversationState } from "@/lib/support/conversation";
 import type { SupportHandoff } from "@/lib/support/types";
 import { useLanguage } from "@/components/LanguageSwitcher";
@@ -115,6 +115,7 @@ export default function OperoAI() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [trackingUrl, setTrackingUrl] = useState<string | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>("bot_active");
+  const [housingContext, setHousingContext] = useState<Partial<HousingSearchContext> | undefined>();
   const [connectionState, setConnectionState] = useState<"online" | "offline">("online");
   const recentEvents = useRef(new Set<string>());
   const pendingClientMessages = useRef(new Map<string, string>());
@@ -235,6 +236,13 @@ export default function OperoAI() {
     setMessages((current) => [...current, userMessage]);
     try {
       if (conversationId && conversationState !== "bot_active") {
+        if (!currentUser && !trackingUrl) {
+          setMessages((current) => current.map((message) => message.id === userMessage.id ? { ...message, status: "sent" } : message));
+          setMessages((current) => [...current, { id: `${messageId}-handoff-state`, role: "assistant", text: language === "en" ? `Your request has already been sent to the manager. Reference: ${conversationId}.` : language === "tr" ? `Talebiniz zaten yöneticiye iletildi. Referans: ${conversationId}.` : `Ваш запрос уже передан менеджеру. Номер обращения: ${conversationId}.` }]);
+          setLastFailedPrompt(null);
+          setFailedClientMessageId(null);
+          return;
+        }
         const target = trackingUrl ? new URL(trackingUrl, window.location.origin) : null;
         const publicNumber = target?.pathname.split("/").filter(Boolean).pop() || "";
         const response = await fetch(target ? `/api/support/anonymous/${encodeURIComponent(publicNumber)}${target.search}` : `/api/support/conversations/${encodeURIComponent(conversationId)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, clientMessageId }) });
@@ -248,7 +256,7 @@ export default function OperoAI() {
         return;
       }
       const history = messages.filter((message) => message.role === "user" || message.role === "assistant").slice(-10).map((message) => ({ role: message.role, text: message.text }));
-      const response = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, route: pathname, history, language }) });
+      const response = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, route: pathname, history, language, housingContext }) });
       const payload = await response.json() as AIChatResponse & { error?: string };
       const assistantMessage: ChatMessage = { id: `${messageId}-assistant`, role: "assistant", text: response.ok ? payload.message : payload.error ?? "Не удалось получить ответ.", response: response.ok ? payload : undefined };
       if (response.ok) setMessages((current) => current.map((message) => message.id === userMessage.id ? { ...message, status: "sent" } : message));
@@ -256,6 +264,7 @@ export default function OperoAI() {
       setLastFailedPrompt(response.ok ? null : value);
       setFailedClientMessageId(response.ok ? null : clientMessageId);
       if (payload.suggestions) setSuggestions(payload.suggestions);
+      if (response.ok && payload.housingContext) setHousingContext(payload.housingContext);
       if (response.ok && payload.handoff?.offered) setHandoff({ prompt: value, details: payload.handoff });
     } catch {
       pendingClientMessages.current.delete(clientMessageId);
@@ -270,7 +279,7 @@ export default function OperoAI() {
 
   async function confirmHandoff() {
     if (!handoff) return;
-    const response = await fetch("/api/support/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: handoff.prompt, route: pathname, confirmed: true, idempotencyKey: handoff.details.actionId, actionId: handoff.details.actionId, expiresAt: handoff.details.expiresAt, email: contactEmail, phone: contactPhone, consent: currentUser ? true : contactConsent }) });
+    const response = await fetch("/api/support/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: handoff.prompt, route: pathname, confirmed: true, idempotencyKey: handoff.details.actionId, actionId: handoff.details.actionId, expiresAt: handoff.details.expiresAt, email: contactEmail, phone: contactPhone, consent: currentUser ? true : contactConsent, language }) });
     const payload = await response.json() as { ok?: boolean; message?: string; error?: string; publicNumber?: string; conversationState?: ConversationState; trackingUrl?: string | null };
     setMessages((current) => [...current, { id: `handoff-${Date.now()}`, role: "assistant", text: payload.ok ? payload.message || `Обращение ${payload.publicNumber} передано менеджеру.` : payload.error || "Не удалось передать обращение. Попробуйте ещё раз." }]);
     if (payload.ok) {

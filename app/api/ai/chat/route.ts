@@ -35,7 +35,7 @@ function allowedByRateLimit(key: string): boolean {
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const body = (await request.json().catch(() => null)) as { message?: unknown; route?: unknown; conversationId?: unknown; history?: unknown; language?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { message?: unknown; route?: unknown; conversationId?: unknown; history?: unknown; language?: unknown; housingContext?: unknown } | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   if (!message || message.length > MAX_MESSAGE_LENGTH) return NextResponse.json({ ok: false, error: "Сообщение должно содержать от 1 до 2000 символов." }, { status: 400 });
 
@@ -53,7 +53,8 @@ export async function POST(request: Request) {
   const classification = classifyAiIntent(message);
   const history = Array.isArray(body?.history) ? body.history.filter((item): item is AIConversationTurn => Boolean(item) && typeof item === "object" && (((item as AIConversationTurn).role === "user") || ((item as AIConversationTurn).role === "assistant")) && typeof (item as AIConversationTurn).text === "string").slice(-10) : [];
   const language = body?.language === "en" || body?.language === "tr" || body?.language === "ru" ? body.language : undefined;
-  const response = await answerWithTools(context, message, history, language);
+  const housingContext = body?.housingContext && typeof body.housingContext === "object" ? body.housingContext as Parameters<typeof answerWithTools>[4] : undefined;
+  const response = await answerWithTools(context, message, history, language, housingContext);
   response.intent = classification.intent;
   response.action = classification.action;
   if (classification.action === "CREATE_MAINTENANCE_TASK" || classification.action === "CREATE_CLEANING_TASK" || classification.action === "URGENT_HANDOFF") {
