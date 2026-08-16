@@ -18,6 +18,19 @@ export type AIContext = {
   allowedTools: readonly string[];
 };
 
+export type AIConversationTurn = {
+  role: "user" | "assistant";
+  text: string;
+};
+
+export type PublicSearchFilters = {
+  checkIn: string | null;
+  checkOut: string | null;
+  guests: number | null;
+  maxPrice: number | null;
+  location: string | null;
+};
+
 export type AIToolResult = {
   tool: string;
   data: unknown;

@@ -1,9 +1,10 @@
 import "server-only";
 
 import { buildGuestBookingQuote, listGuestBookings } from "@/lib/bookings/guest-booking-service";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getServerCurrentUserContext, createSupabaseServerClient } from "@/lib/supabase/server";
 import { canUseTool } from "../permissions";
-import type { AIContext, AIToolResult } from "../types";
+import type { AIContext, AIToolResult, PublicSearchFilters } from "../types";
 
 type PublicProperty = {
   id: string;
@@ -15,6 +16,8 @@ type PublicProperty = {
   dailyPrice: number | null;
   currency: string;
   publicationStatus: string;
+  minimumNights?: number | null;
+  coverPhotoUrl?: string;
 };
 
 function unauthorized(tool: string): AIToolResult {
@@ -33,33 +36,47 @@ function compactProperty(row: Record<string, unknown>): PublicProperty {
     dailyPrice: typeof rawPrice === "number" ? rawPrice : Number.isFinite(Number(rawPrice)) ? Number(rawPrice) : null,
     currency: "EUR",
     publicationStatus: "published",
+    minimumNights: typeof row.minimum_nights === "number" ? row.minimum_nights : Number.isFinite(Number(row.minimum_nights)) ? Number(row.minimum_nights) : null,
+    ...(typeof row.cover_photo_url === "string" && row.cover_photo_url ? { coverPhotoUrl: row.cover_photo_url } : {}),
   };
 }
 
-async function publicProperties(message: string): Promise<PublicProperty[]> {
+async function publicProperties(filters: PublicSearchFilters): Promise<PublicProperty[]> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return [];
-  const locationMatch = message.match(/(?:в|у|near|in|в районе)\s+([\p{L}\s-]{3,30})/iu);
-  const guestsMatch = message.match(/(\d+)\s*(?:гост|чел|guest|person)/iu);
-  const budgetMatch = message.match(/(?:до|under|below)\s*(\d{2,6})/iu);
   let query = supabase
-    .from("apartments")
-    .select("id,title:name,city,district,short_desc,max_guests,daily_price,publication_status")
+    .from("public_apartments")
+    .select("id,name,city,district,short_desc,max_guests,daily_price,minimum_nights,publication_status,availability,status,cover_photo_url")
     .eq("publication_status", "published")
     .limit(20);
-  if (locationMatch?.[1]) {
-    const location = locationMatch[1].trim().replace(/\s+(?:на|с|от|for)\s+.*$/iu, "");
+  if (filters.location) {
+    const location = filters.location.replace(/[(),]/g, " ").trim();
     query = query.or(`city.ilike.%${location}%,district.ilike.%${location}%,name.ilike.%${location}%`);
   }
-  if (guestsMatch?.[1]) query = query.gte("max_guests", Number(guestsMatch[1]));
-  if (budgetMatch?.[1]) query = query.lte("daily_price", Number(budgetMatch[1]));
-  const { data } = await query;
-  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(compactProperty).slice(0, 5);
+  if (filters.guests) query = query.gte("max_guests", filters.guests);
+  if (filters.maxPrice) query = query.lte("daily_price", filters.maxPrice);
+  const { data, error } = await query;
+  if (error) return [];
+  const candidates = ((data ?? []) as unknown as Array<Record<string, unknown>>).filter((row) => {
+    const availability = String(row.availability ?? "").toLocaleLowerCase("ru-RU");
+    const status = String(row.status ?? "").toLocaleLowerCase("ru-RU");
+    const minimumNights = Number(row.minimum_nights ?? 0);
+    const requestedNights = filters.checkIn && filters.checkOut ? Math.ceil((new Date(`${filters.checkOut}T00:00:00Z`).getTime() - new Date(`${filters.checkIn}T00:00:00Z`).getTime()) / 86400000) : 0;
+    return !availability.includes("обслуж") && !availability.includes("занят") && !status.includes("чернов") && !status.includes("архив") && (!minimumNights || !requestedNights || requestedNights >= minimumNights);
+  });
+  if (!filters.checkIn || !filters.checkOut) return candidates.map(compactProperty).slice(0, 5);
+  const available = await Promise.all(candidates.map(async (row) => {
+    const { data: periods, error: availabilityError } = await supabase.rpc("get_public_apartment_booking_periods", { target_apartment_id: String(row.id) });
+    if (availabilityError) return null;
+    const overlaps = ((periods ?? []) as Array<{ check_in: string; check_out: string; status: string }>).some((period) => period.check_in < filters.checkOut! && period.check_out > filters.checkIn! && ["pending", "confirmed", "checked_in", "blocked"].includes(period.status));
+    return overlaps ? null : compactProperty(row);
+  }));
+  return available.filter((property): property is PublicProperty => property !== null).slice(0, 5);
 }
 
-export async function searchPublishedProperties(context: AIContext, message: string): Promise<AIToolResult> {
+export async function searchPublishedProperties(context: AIContext, filters: PublicSearchFilters): Promise<AIToolResult> {
   if (!canUseTool(context.role, "searchPublishedProperties")) return unauthorized("searchPublishedProperties");
-  return { tool: "searchPublishedProperties", data: { properties: await publicProperties(message) }, source: "Публичный каталог Opero Homes" };
+  return { tool: "searchPublishedProperties", data: { properties: await publicProperties(filters) }, source: "Публичный каталог Opero Homes" };
 }
 
 export async function getPublicPropertyKnowledge(context: AIContext, apartmentId: string): Promise<AIToolResult> {
@@ -100,7 +117,7 @@ export async function getPublicAvailability(context: AIContext, apartmentId: str
 
 export async function calculatePublicQuote(context: AIContext, apartmentId: string, checkIn: string, checkOut: string, guests: number): Promise<AIToolResult> {
   if (!canUseTool(context.role, "calculatePublicQuote")) return unauthorized("calculatePublicQuote");
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient() ?? await createSupabaseServerClient();
   if (!supabase) return { tool: "calculatePublicQuote", data: { error: "Сервис временно недоступен." } };
   const result = await buildGuestBookingQuote(supabase, { apartmentId, checkIn, checkOut, guests, rentalType: "daily", guestName: "", guestEmail: "", guestPhone: "", guestComment: "" });
   return { tool: "calculatePublicQuote", data: result.ok ? result.data : { error: result.errorMessage } };

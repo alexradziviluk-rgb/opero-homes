@@ -9,6 +9,7 @@ import { createSupabaseClient } from "@/lib/supabase/client";
 import type { AIChatResponse, AIToolResult } from "@/lib/ai/types";
 import { canClientSend, type ConversationState } from "@/lib/support/conversation";
 import type { SupportHandoff } from "@/lib/support/types";
+import { useLanguage } from "@/components/LanguageSwitcher";
 
 type ChatMessage = {
   id: string;
@@ -70,21 +71,24 @@ function ResultCard({ result }: { result: AIToolResult }) {
   const record = result.data && typeof result.data === "object" && !Array.isArray(result.data) ? result.data as Record<string, unknown> : null;
   if (items.length === 0) {
     const error = record?.error;
-    return error ? <p className="mt-2 text-sm text-rose-200">{String(error)}</p> : <p className="mt-2 text-sm text-slate-300">Данных не найдено.</p>;
+    return error ? <p className="mt-2 text-sm text-rose-200">{String(error)}</p> : null;
   }
 
   return (
     <div className="mt-3 space-y-2">
       {items.map((item, index) => {
         const title = String(item.title ?? item.apartmentTitle ?? item.name ?? `Запись ${index + 1}`);
-        const id = typeof item.bookingNumber === "string" || typeof item.taskNumber === "string" ? String(item.bookingNumber ?? item.taskNumber) : "";
+        const id = typeof item.bookingNumber === "string" || typeof item.taskNumber === "string" ? String(item.bookingNumber ?? item.taskNumber) : String(item.publicRoute ?? index);
         const link = typeof item.publicRoute === "string" ? item.publicRoute : null;
         return (
           <div key={`${result.tool}-${id}-${index}`} className="rounded-xl border border-white/10 bg-slate-900/70 p-3">
+            {typeof item.coverPhotoUrl === "string" && item.coverPhotoUrl ? <img src={item.coverPhotoUrl} alt="" className="mb-3 h-32 w-full rounded-lg object-cover" /> : null}
             {link ? <Link href={link} className="font-medium text-cyan-200 hover:text-cyan-100">{title}</Link> : <p className="font-medium text-slate-100">{title}</p>}
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              {[item.city, item.district, item.checkIn && `Заезд: ${item.checkIn}`, item.checkOut && `Выезд: ${item.checkOut}`, item.status && `Статус: ${item.status}`, item.dueAt && `Срок: ${item.dueAt}`].filter(Boolean).map(String).join(" · ")}
+              {[item.city, item.district, item.dailyPrice != null && `${item.dailyPrice} ${String(item.currency ?? "EUR")}/ночь`, item.maxGuests && `до ${item.maxGuests} гостей`, item.checkIn && `Заезд: ${item.checkIn}`, item.checkOut && `Выезд: ${item.checkOut}`, item.status && `Статус: ${item.status}`, item.dueAt && `Срок: ${item.dueAt}`].filter(Boolean).map(String).join(" · ")}
             </p>
+            {typeof item.shortDesc === "string" && item.shortDesc ? <p className="mt-2 text-sm leading-5 text-slate-300">{item.shortDesc}</p> : null}
+            {link ? <div className="mt-3 flex gap-2"><Link href={link} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200">Подробнее</Link><Link href={`${link}?openBooking=1`} className="rounded-lg bg-cyan-400 px-3 py-2 text-xs font-semibold text-slate-950">Забронировать</Link></div> : null}
           </div>
         );
       })}
@@ -94,7 +98,9 @@ function ResultCard({ result }: { result: AIToolResult }) {
 
 export default function OperoAI() {
   const pathname = usePathname();
+  const [language] = useLanguage();
   const { currentUser, isAuthLoading } = useCurrentUser();
+  const isDataEntryPage = pathname === "/apartments/new" || pathname === "/bookings/new";
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -241,7 +247,8 @@ export default function OperoAI() {
         setFailedClientMessageId(null);
         return;
       }
-      const response = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, route: pathname }) });
+      const history = messages.filter((message) => message.role === "user" || message.role === "assistant").slice(-10).map((message) => ({ role: message.role, text: message.text }));
+      const response = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, route: pathname, history, language }) });
       const payload = await response.json() as AIChatResponse & { error?: string };
       const assistantMessage: ChatMessage = { id: `${messageId}-assistant`, role: "assistant", text: response.ok ? payload.message : payload.error ?? "Не удалось получить ответ.", response: response.ok ? payload : undefined };
       if (response.ok) setMessages((current) => current.map((message) => message.id === userMessage.id ? { ...message, status: "sent" } : message));
@@ -285,6 +292,7 @@ export default function OperoAI() {
   }
 
   if (isAuthLoading && !open) return null;
+  if (isDataEntryPage) return null;
 
   return (
     <>
@@ -293,7 +301,7 @@ export default function OperoAI() {
           <header className="flex items-center justify-between border-b border-white/10 px-4 py-4">
             <div>
               <p className="text-sm font-semibold text-cyan-200">Opero AI</p>
-              <p className="text-xs text-slate-400">Данные Opero Homes · только чтение</p>
+              <p className="text-xs text-slate-400">Помощник по отдыху и бронированию</p>
             </div>
             <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть Opero AI" className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-lg text-slate-300 hover:bg-white/10">×</button>
           </header>

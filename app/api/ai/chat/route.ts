@@ -6,6 +6,7 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { createSupportTicket } from "@/lib/support/service";
 import { classifyAiIntent } from "@/lib/ai/intent";
 import { executeAiOperationalAction } from "@/lib/ai/operations";
+import type { AIConversationTurn } from "@/lib/ai/types";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
@@ -34,7 +35,7 @@ function allowedByRateLimit(key: string): boolean {
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const body = (await request.json().catch(() => null)) as { message?: unknown; route?: unknown; conversationId?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { message?: unknown; route?: unknown; conversationId?: unknown; history?: unknown; language?: unknown } | null;
   const message = typeof body?.message === "string" ? body.message.trim() : "";
   if (!message || message.length > MAX_MESSAGE_LENGTH) return NextResponse.json({ ok: false, error: "Сообщение должно содержать от 1 до 2000 символов." }, { status: 400 });
 
@@ -50,7 +51,9 @@ export async function POST(request: Request) {
   const rateKey = context.userId ? `user:${context.userId}` : `ip:${ip}`;
   if (!allowedByRateLimit(rateKey)) return NextResponse.json({ ok: false, error: "Слишком много запросов. Повторите позже." }, { status: 429 });
   const classification = classifyAiIntent(message);
-  const response = await answerWithTools(context, message);
+  const history = Array.isArray(body?.history) ? body.history.filter((item): item is AIConversationTurn => Boolean(item) && typeof item === "object" && (((item as AIConversationTurn).role === "user") || ((item as AIConversationTurn).role === "assistant")) && typeof (item as AIConversationTurn).text === "string").slice(-10) : [];
+  const language = body?.language === "en" || body?.language === "tr" || body?.language === "ru" ? body.language : undefined;
+  const response = await answerWithTools(context, message, history, language);
   response.intent = classification.intent;
   response.action = classification.action;
   if (classification.action === "CREATE_MAINTENANCE_TASK" || classification.action === "CREATE_CLEANING_TASK" || classification.action === "URGENT_HANDOFF") {

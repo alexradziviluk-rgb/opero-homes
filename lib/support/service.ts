@@ -22,10 +22,10 @@ function classify(message: string): { category: SupportCategory; priority: Suppo
   return { category: "general", priority: "normal", subject: "Вопрос клиента", critical: false };
 }
 
-export function buildHandoff(context: AIContext, message: string, toolError = false, noResult = false): SupportHandoff {
+export function buildHandoff(context: AIContext, message: string, toolError = false): SupportHandoff {
   const classified = classify(message);
   const direct = /менеджер|человек|сотрудник|оператор|manager|human|agent|çalışan|insan/i.test(message);
-  const uncertain = toolError || noResult || direct || classified.category !== "general";
+  const uncertain = toolError || direct || classified.category !== "general";
   return { offered: uncertain, requiresConfirmation: !classified.critical, critical: classified.critical, category: classified.category, priority: classified.priority, subject: classified.subject, summary: sanitizeSupportSummary(`${classified.subject}. Автоматическое действие не выполнялось.`), actionId: randomUUID(), expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() };
 }
 

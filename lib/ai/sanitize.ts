@@ -27,9 +27,11 @@ function sanitizeProperties(value: unknown): RecordValue {
         city: typeof property.city === "string" ? property.city : "",
         district: typeof property.district === "string" ? property.district : "",
         shortDesc: typeof property.shortDesc === "string" ? property.shortDesc : "",
+        ...(typeof property.minimumNights === "number" ? { minimumNights: property.minimumNights } : {}),
         maxGuests: typeof property.maxGuests === "number" ? property.maxGuests : 0,
         dailyPrice: typeof property.dailyPrice === "number" ? property.dailyPrice : null,
         currency: typeof property.currency === "string" ? property.currency : "EUR",
+          ...(typeof property.coverPhotoUrl === "string" && /^(?:https?:\/\/|\/)/i.test(property.coverPhotoUrl) ? { coverPhotoUrl: property.coverPhotoUrl } : {}),
         publicationStatus: property.publicationStatus === "published" ? "published" : undefined,
       };
     }),
