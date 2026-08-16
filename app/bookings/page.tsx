@@ -12,6 +12,7 @@ import { emitBookingNotificationEvent } from "@/lib/notifications/client-events"
 import { deleteRemoteBooking, persistBookingStatus } from "@/lib/bookings/remote-bookings";
 import { createRemoteBookingTasks } from "@/lib/bookings/remote-booking-tasks";
 import { fetchStaffBookings, type StaffBooking } from "@/lib/bookings/staff-bookings";
+import { getApartmentStaffLabel } from "@/lib/apartments/staff-label";
 
 export default function BookingsPage() {
   const { currentUser } = useCurrentUser();
@@ -294,7 +295,7 @@ export default function BookingsPage() {
                           </td>
                         ) : null}
                         <td className="px-3 py-2">{b.guestName}</td>
-                        <td className="px-3 py-2">{b.apartmentTitle}</td>
+                        <td className="px-3 py-2">{getApartmentStaffLabel({ id: b.apartmentId, internalNumber: b.apartmentInternalNumber ?? undefined, title: b.apartmentTitle })}</td>
                         <td className="px-3 py-2">{new Date(`${b.checkIn}T00:00:00`).toLocaleDateString("ru-RU", { timeZone: "UTC" })}</td>
                         <td className="px-3 py-2">{new Date(`${b.checkOut}T00:00:00`).toLocaleDateString("ru-RU", { timeZone: "UTC" })}</td>
                         <td className="px-3 py-2">{b.guests}</td>

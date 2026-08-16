@@ -100,6 +100,8 @@ export async function seedPropertyOwnerFixtures(): Promise<OwnerFixture> {
   const apartmentA = randomUUID();
   const apartmentB = randomUUID();
   const apartmentC = randomUUID();
+  const duplicateApartmentA = randomUUID();
+  const duplicateApartmentB = randomUUID();
   const client = randomUUID();
   const confirmedBooking = randomUUID();
   const pendingBooking = randomUUID();
@@ -108,10 +110,12 @@ export async function seedPropertyOwnerFixtures(): Promise<OwnerFixture> {
   runLocalSql(`insert into public.organization_members (organization_id,user_id,role,role_code,status,invited_by) values
     (${sql(organizationA)},${sql(owner.id)},'owner','owner','active',null),(${sql(organizationA)},${sql(manager.id)},'manager','manager','active',${sql(owner.id)}),
     (${sql(organizationB)},${sql(owner.id)},'owner','owner','active',null);
-    insert into public.apartments (id,organization_id,title,name,city,address,price,daily_price,rental_types,max_guests,status,availability,publication_status,publish_status) values
-    (${sql(apartmentA)},${sql(organizationA)},'Таур Fixture A','Таур Fixture A','Test City','Local A',100,100,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
-    (${sql(apartmentC)},${sql(organizationA)},'Binding Fixture C','Binding Fixture C','Test City','Local C',150,150,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
-    (${sql(apartmentB)},${sql(organizationB)},'Foreign Fixture B','Foreign Fixture B','Other City','Local B',200,200,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published');
+    insert into public.apartments (id,organization_id,title,name,internal_number,city,address,price,daily_price,rental_types,max_guests,status,availability,publication_status,publish_status) values
+    (${sql(apartmentA)},${sql(organizationA)},'Таур Fixture A','Таур Fixture A',1001,'Test City','Local A',100,100,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
+    (${sql(apartmentC)},${sql(organizationA)},'Binding Fixture C','Binding Fixture C',1002,'Test City','Local C',150,150,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
+    (${sql(duplicateApartmentA)},${sql(organizationA)},'Best Home','Best Home',1042,'Test City','Local Duplicate A',125,125,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
+    (${sql(duplicateApartmentB)},${sql(organizationA)},'Best Home','Best Home',1077,'Test City','Local Duplicate B',130,130,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published'),
+    (${sql(apartmentB)},${sql(organizationB)},'Foreign Fixture B','Foreign Fixture B',1003,'Other City','Local B',200,200,'{"daily":true}'::jsonb,4,'Свободно','Свободен','published','published');
     insert into public.apartment_owner_access (organization_id,apartment_id,user_id,owner_name,owner_email,status) values
     (${sql(organizationA)},${sql(apartmentA)},${sql(activeOwner.id)},'Active Fixture',${sql(activeOwner.email)},'active'),(${sql(organizationA)},${sql(apartmentA)},${sql(bindingOwner.id)},'Binding Fixture',${sql(bindingOwner.email)},'active'),(${sql(organizationA)},${sql(apartmentA)},${sql(pausedOwner.id)},'Paused Fixture',${sql(pausedOwner.email)},'paused');
     insert into public.clients (id,organization_id,name,email,phone) values (${sql(client)},${sql(organizationA)},'Private Fixture Guest','guest-private@local.test','+79990000000');

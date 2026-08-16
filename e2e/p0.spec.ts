@@ -54,10 +54,24 @@ test("staff operational pages do not expose UUIDs", async ({ page }) => {
 test("selected apartment only offers enabled rental modes and canonical price", async ({ page }) => {
   await page.goto("/bookings/new");
   await page.locator("select").nth(1).selectOption(fixture.apartmentA);
+  await expect(page.locator("select").nth(1).locator(`option[value="${fixture.apartmentA}"]`)).toHaveText(/Таур Fixture A — ID 1001/);
+  await expect(page.getByText("Выбран объект: Таур Fixture A — ID 1001")).toBeVisible();
   const rentalType = page.getByLabel("Тип аренды");
   await expect(rentalType.locator("option")).toHaveText(["Посуточно"]);
   await expect(rentalType).toHaveValue("daily");
   await expect(page.getByLabel("Цена за период")).toHaveValue("100");
+});
+
+test("duplicate property names remain distinct and searchable by ID", async ({ page }) => {
+  await page.goto("/bookings/new");
+  const propertySelect = page.locator("select").nth(1);
+  await expect(propertySelect.locator("option").filter({ hasText: "Best Home — ID 1042" })).toHaveCount(1);
+  await expect(propertySelect.locator("option").filter({ hasText: "Best Home — ID 1077" })).toHaveCount(1);
+
+  await page.goto("/calendar");
+  await page.getByPlaceholder("Название, ID или город").fill("1042");
+  await expect(page.locator("article").filter({ hasText: "Best Home — ID 1042" })).toBeVisible();
+  await expect(page.locator("article").filter({ hasText: "Best Home — ID 1077" })).toHaveCount(0);
 });
 
 test("zero price requires explicit complimentary confirmation", async ({ page }) => {

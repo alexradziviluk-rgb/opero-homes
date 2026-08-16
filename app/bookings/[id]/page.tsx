@@ -13,6 +13,7 @@ import BookingControlChecklist from "@/components/booking/BookingControlChecklis
 import { useCurrentUser } from "@/components/auth/current-user-provider";
 import { hasEffectivePermission } from "@/lib/permissions";
 import { deleteRemoteBooking } from "@/lib/bookings/remote-bookings";
+import { getApartmentStaffLabel } from "@/lib/apartments/staff-label";
 
 type BookingDetailsResponse =
   | {
@@ -21,6 +22,7 @@ type BookingDetailsResponse =
         id: string;
         apartmentId: string | null;
         apartmentTitle: string;
+        apartmentInternalNumber?: number | null;
         guestName: string;
         guestPhone: string | null;
         guestEmail: string | null;
@@ -54,6 +56,7 @@ export default function BookingPage() {
   const router = useRouter();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [apartmentTitle, setApartmentTitle] = useState("Объект");
+  const [apartmentInternalNumber, setApartmentInternalNumber] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,6 +73,7 @@ export default function BookingPage() {
         if (response.ok && payload.ok) {
           if (!cancelled) {
             setApartmentTitle(payload.data.apartmentTitle);
+            setApartmentInternalNumber(payload.data.apartmentInternalNumber ?? null);
             setBooking({
               id: payload.data.id,
               apartmentId: payload.data.apartmentId ?? "",
@@ -143,7 +147,7 @@ export default function BookingPage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-semibold">Бронирование</h1>
-                <p className="text-sm text-slate-400">{booking.guestName} — {apartmentTitle}</p>
+                <p className="text-sm text-slate-400">{booking.guestName} — {getApartmentStaffLabel({ id: booking.apartmentId, internalNumber: apartmentInternalNumber ?? undefined, title: apartmentTitle })}</p>
               </div>
               <div className="flex gap-2">
                 <Link href="/bookings" className="rounded px-3 py-2 bg-white/5">Назад к бронированиям</Link>
@@ -168,7 +172,7 @@ export default function BookingPage() {
                 </div>
                 <div>
                   <div className="text-sm text-slate-300">Объект</div>
-                  <div className="text-white">{apartmentTitle}</div>
+                  <div className="text-white">{getApartmentStaffLabel({ id: booking.apartmentId, internalNumber: apartmentInternalNumber ?? undefined, title: apartmentTitle })}</div>
                 </div>
                 <div>
                   <div className="text-sm text-slate-300">Заезд — Выезд</div>

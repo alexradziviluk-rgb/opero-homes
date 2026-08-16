@@ -129,7 +129,7 @@ export async function GET(
 
   const { data: apartment } = await supabase
     .from("apartments")
-    .select("id,title:name")
+    .select("id,title:name,internal_number")
     .eq("id", booking.apartment_id)
     .maybeSingle();
 
@@ -148,6 +148,7 @@ export async function GET(
       bookingNumber: formatBookingReference(String(booking.id)),
       apartmentId: booking.apartment_id,
       apartmentTitle: apartment?.title ?? "Объект",
+      apartmentInternalNumber: typeof apartment?.internal_number === "number" ? apartment.internal_number : null,
       clientId: booking.client_id ?? null,
       guestName: booking.guest_name ?? booking.customer_name ?? (`${guest?.first_name ?? ""} ${guest?.last_name ?? ""}`.trim() || "Гость"),
       guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,

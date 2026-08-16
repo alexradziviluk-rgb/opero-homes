@@ -5,6 +5,7 @@ import type { Task, TaskPriority, TaskStatus, TaskType } from "@/types/task";
 import { loadApartmentsFromSupabase } from "@/lib/apartments/supabase-apartments";
 import type { Apartment } from "@/types/apartment";
 import { useAdminText } from "@/lib/i18n/admin";
+import { getApartmentStaffLabel } from "@/lib/apartments/staff-label";
 
 type Assignee = {
   userId: string;
@@ -44,7 +45,7 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 };
 
 function getApartmentLabel(apartment: Apartment): string {
-  return `${apartment.title}${apartment.internalNumber ? ` · ID-${apartment.internalNumber}` : ""}`;
+  return getApartmentStaffLabel(apartment);
 }
 
 function getLocalDateParts(value: string): { date: string; time: string } {

@@ -2,6 +2,7 @@ import type { Booking } from "@/types/booking";
 
 export type StaffBooking = Booking & {
   apartmentTitle: string;
+  apartmentInternalNumber?: number | null;
   bookingNumber: string;
   checkInTime: string;
   checkOutTime: string;
@@ -11,6 +12,7 @@ type StaffBookingRecord = {
   id: string;
   apartmentId: string | null;
   apartmentTitle: string;
+  apartmentInternalNumber?: number | null;
   bookingNumber?: string | null;
   clientId?: string | null;
   guestName: string;
@@ -53,6 +55,7 @@ export async function fetchStaffBookings(): Promise<StaffBooking[]> {
     id: booking.id,
     apartmentId: booking.apartmentId ?? "",
     apartmentTitle: booking.apartmentTitle || "Объект",
+    apartmentInternalNumber: booking.apartmentInternalNumber ?? null,
     bookingNumber: booking.bookingNumber || "Бронирование",
     clientId: booking.clientId ?? "",
     guestName: booking.guestName || "Гость",

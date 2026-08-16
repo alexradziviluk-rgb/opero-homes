@@ -17,6 +17,7 @@ import BookingCalendar from "@/components/booking/BookingCalendar";
 import type { CanonicalAvailabilityPeriod } from "@/lib/bookings/canonical-availability";
 import type { Apartment } from "@/types/apartment";
 import type { Booking } from "@/types/booking";
+import { getApartmentStaffLabel } from "@/lib/apartments/staff-label";
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -49,12 +50,6 @@ function formatPeriod(checkIn: string, checkOut: string): string {
   return `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
 }
 
-type ApartmentLabelSource = Apartment & {
-  number?: string | number;
-  unitNumber?: string | number;
-  name?: string;
-};
-
 type AvailabilityBlock = {
   id: string;
   apartment_id: string;
@@ -70,25 +65,11 @@ type AvailabilityBlock = {
 };
 
 function getApartmentCalendarLabel(booking: Booking, apartments: Apartment[]): string {
-  const apartment = apartments.find((item) => item.id === booking.apartmentId) as ApartmentLabelSource | undefined;
+  const apartment = apartments.find((item) => item.id === booking.apartmentId);
   if (!apartment) {
     return "Объект не найден";
   }
-
-  const numberCandidate = apartment.number ?? apartment.unitNumber;
-  if (numberCandidate != null && String(numberCandidate).trim()) {
-    return `№${String(numberCandidate).trim()}`;
-  }
-
-  if (apartment.name?.trim()) {
-    return apartment.name.trim();
-  }
-
-  if (apartment.title.trim()) {
-    return apartment.title.trim();
-  }
-
-  return "Объект не найден";
+  return getApartmentStaffLabel(apartment);
 }
 
 export default function CalendarPage() {
@@ -200,7 +181,7 @@ export default function CalendarPage() {
     if (filterApartment && apartment.id !== filterApartment) return false;
     const query = searchApartment.trim().toLocaleLowerCase();
     if (!query) return true;
-    return `${apartment.title} ${apartment.city}`.toLocaleLowerCase().includes(query);
+    return `${getApartmentStaffLabel(apartment)} ${apartment.city} ${apartment.district} ${apartment.id}`.toLocaleLowerCase().includes(query);
   });
 
   function getCanonicalPeriods(apartmentId: string): CanonicalAvailabilityPeriod[] {
@@ -375,7 +356,7 @@ export default function CalendarPage() {
                     <option value="">Выберите объект</option>
                     {apartments.map((apartment) => (
                       <option key={apartment.id} value={apartment.id}>
-                        {apartment.title}
+                        {getApartmentStaffLabel(apartment)}
                       </option>
                     ))}
                   </select>
@@ -411,7 +392,7 @@ export default function CalendarPage() {
                     <input
                       value={searchApartment}
                       onChange={(event) => setSearchApartment(event.target.value)}
-                      placeholder="Название или город"
+                      placeholder="Название, ID или город"
                       className="mt-1 block rounded-xl bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500"
                     />
                   </div>
@@ -424,7 +405,7 @@ export default function CalendarPage() {
                   >
                     <option value="">Все объекты</option>
                     {apartments.map((apartment) => (
-                      <option key={apartment.id} value={apartment.id}>{apartment.title} - {apartment.city}</option>
+                      <option key={apartment.id} value={apartment.id}>{getApartmentStaffLabel(apartment)} — {apartment.city}</option>
                     ))}
                   </select>
                   </div>
@@ -462,7 +443,7 @@ export default function CalendarPage() {
               <div className="grid gap-5">
                 {visibleApartments.map((apartment) => (
                   <article key={apartment.id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                    <div className="mb-3"><p className="font-medium text-white">{apartment.title}</p><p className="text-xs text-slate-500">{apartment.city}</p></div>
+                    <div className="mb-3"><p className="font-medium text-white">{getApartmentStaffLabel(apartment)}</p><p className="text-xs text-slate-500">{apartment.city}</p></div>
                     <BookingCalendar
                       apartmentId={apartment.id}
                       periods={getCanonicalPeriods(apartment.id)}

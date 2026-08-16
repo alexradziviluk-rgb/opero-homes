@@ -15,6 +15,7 @@ import { userRepository } from "@/lib/repositories/users";
 import { initialClientDraft, type Client, type ClientDraft } from "@/types/client";
 import { emitBookingNotificationEvent } from "@/lib/notifications/client-events";
 import PhoneInput from "@/components/PhoneInput";
+import { getApartmentStaffLabel } from "@/lib/apartments/staff-label";
 
 function nightsBetween(a: string, b: string) {
   const d1 = new Date(a);
@@ -428,9 +429,10 @@ function NewBookingPageContent() {
                     <select value={form.apartmentId} onChange={(e) => update("apartmentId", e.target.value)} className="mt-1 w-full rounded-xl border border-white/10 bg-white/3 px-3 py-2 text-sm text-white outline-none">
                       <option value="">Выберите объект</option>
                       {apartments.map((a) => (
-                        <option key={a.id} value={a.id}>{a.title} — {a.city}</option>
+                        <option key={a.id} value={a.id}>{getApartmentStaffLabel(a)} — {a.city}</option>
                       ))}
                     </select>
+                    {selectedApartment ? <p className="mt-1 text-xs text-slate-400">Выбран объект: {getApartmentStaffLabel(selectedApartment)}</p> : null}
                     {selectedApartmentUnavailable ? <p className="mt-1 text-sm text-amber-300">На данный момент бронирование этого объекта невозможно: объект занят</p> : null}
                     {errors.apartmentId ? <p className="text-rose-400 text-sm">{errors.apartmentId}</p> : null}
                   </label>

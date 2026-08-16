@@ -86,17 +86,20 @@ export async function GET() {
 
   const apartmentIds = Array.from(new Set((bookings ?? []).map((booking) => booking.apartment_id).filter(Boolean)));
   const guestIds = Array.from(new Set((bookings ?? []).map((booking) => booking.primary_guest_id).filter(Boolean)));
-  const apartmentTitleById = new Map<string, string>();
+  const apartmentById = new Map<string, { title: string; internalNumber: number | null }>();
   const guestById = new Map<string, { name: string; phone: string | null; email: string | null }>();
 
   if (apartmentIds.length > 0) {
     const { data: apartments } = await supabase
       .from("apartments")
-      .select("id,title:name")
+      .select("id,title:name,internal_number")
       .in("id", apartmentIds as string[]);
 
     (apartments ?? []).forEach((apartment) => {
-      apartmentTitleById.set(apartment.id as string, (apartment.title as string | null) ?? "Объект");
+      apartmentById.set(apartment.id as string, {
+        title: (apartment.title as string | null) ?? "Объект",
+        internalNumber: typeof apartment.internal_number === "number" ? apartment.internal_number : null,
+      });
     });
   }
 

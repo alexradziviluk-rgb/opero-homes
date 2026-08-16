@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import OperationalShell from "@/components/operations/OperationalShell";
+import { getApartmentStaffLabel } from "@/lib/apartments/staff-label";
 
 const CHECK_IN_ITEMS = [
   ["apartment_ready", "Апартаменты готовы — уведомить гостя"],
@@ -28,6 +29,7 @@ type OperationalBooking = {
   id: string;
   apartmentId: string | null;
   apartmentTitle: string;
+  apartmentInternalNumber?: number | null;
   guestName: string;
   checkIn: string;
   checkOut: string;
@@ -49,7 +51,7 @@ function BookingChecklist({ booking, items, values, onToggle }: {
   return (
     <article className="border-b border-white/10 bg-slate-900/60 p-5 last:border-b-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 className="font-semibold text-white">{booking.guestName}</h3><p className="mt-1 text-sm text-slate-400">Объект: {booking.apartmentTitle}</p></div>
+        <div><h3 className="font-semibold text-white">{booking.guestName}</h3><p className="mt-1 text-sm text-slate-400">Объект: {getApartmentStaffLabel({ id: booking.apartmentId ?? "", internalNumber: booking.apartmentInternalNumber ?? undefined, title: booking.apartmentTitle })}</p></div>
         <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">{booking.status}</span>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -121,7 +123,7 @@ export default function CheckInOutPage() {
           <div className="divide-y divide-white/5">
             {upcoming.map((booking) => (
               <article key={booking.id} className="grid gap-2 px-5 py-4 text-sm sm:grid-cols-[1fr_1fr_auto]">
-                <div><p className="font-medium text-white">{booking.guestName}</p><p className="text-slate-400">{booking.apartmentTitle}</p></div>
+                <div><p className="font-medium text-white">{booking.guestName}</p><p className="text-slate-400">{getApartmentStaffLabel({ id: booking.apartmentId ?? "", internalNumber: booking.apartmentInternalNumber ?? undefined, title: booking.apartmentTitle })}</p></div>
                 <div className="text-slate-300"><p>Заезд: {new Date(`${booking.checkIn}T00:00:00`).toLocaleDateString("ru-RU")} {booking.checkInTime ?? "15:00"}</p><p>Выезд: {new Date(`${booking.checkOut}T00:00:00`).toLocaleDateString("ru-RU")} {booking.checkOutTime ?? "11:00"}</p></div>
                 <span className="self-start rounded-full bg-cyan-500/10 px-3 py-1 text-xs text-cyan-200">Подтверждено</span>
               </article>
