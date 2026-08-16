@@ -8,7 +8,7 @@ import {
   isPublicPath,
 } from "@/lib/supabase/middleware";
 import { logServerAuthError } from "@/lib/supabase/server-auth-log";
-import { getRoleCodeFromContext, isStaffRoleCode } from "@/lib/supabase/role-code";
+import { hasStaffMembership } from "@/lib/supabase/role-code";
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -27,7 +27,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const { supabase, response } = createSupabaseMiddlewareClient(request);
+  const middlewareClient = createSupabaseMiddlewareClient(request);
+  const { supabase } = middlewareClient;
 
   function redirectTo(targetPath: string, nextPath?: string) {
     const targetUrl = new URL(targetPath, request.url);
@@ -37,7 +38,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (targetUrl.pathname === pathname && targetUrl.search === request.nextUrl.search) {
-      return response;
+      return middlewareClient.response;
     }
 
     return NextResponse.redirect(targetUrl);
@@ -51,7 +52,7 @@ export async function middleware(request: NextRequest) {
     });
 
     if (isAuthRoute) {
-      return response;
+      return middlewareClient.response;
     }
 
     if (isProtectedPath(pathname)) {
@@ -62,7 +63,7 @@ export async function middleware(request: NextRequest) {
       return redirectTo("/guest/login", currentPathWithSearch);
     }
 
-    return response;
+    return middlewareClient.response;
   }
 
   const {
@@ -79,7 +80,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!user && isAuthRoute) {
-    return response;
+    return middlewareClient.response;
   }
 
   if (!user && isProtectedPath(pathname)) {
@@ -124,11 +125,11 @@ export async function middleware(request: NextRequest) {
       });
 
       if (isAuthRoute) {
-        return response;
+        return middlewareClient.response;
       }
 
       if (isProtectedPath(pathname)) {
-        if (isPropertyOwner) return response;
+        if (isPropertyOwner) return middlewareClient.response;
         return redirectTo("/login");
       }
 
@@ -136,17 +137,16 @@ export async function middleware(request: NextRequest) {
         return redirectTo("/guest/login", currentPathWithSearch);
       }
 
-      return response;
+      return middlewareClient.response;
     }
 
     hasMembership = Boolean(loaded.context.organizationMember);
-    const membershipRoleCode = getRoleCodeFromContext(loaded.context);
-    hasAllowedStaffRole = hasMembership && isStaffRoleCode(membershipRoleCode);
+    hasAllowedStaffRole = hasStaffMembership(loaded.context);
     isGuestUser = !hasAllowedStaffRole;
   }
 
   if (user && isProtectedPath(pathname) && !hasAllowedStaffRole) {
-    if (isPropertyOwner) return response;
+    if (isPropertyOwner) return middlewareClient.response;
 
     if (!hasMembership) {
       return redirectTo("/guest");
@@ -169,7 +169,7 @@ export async function middleware(request: NextRequest) {
     return redirectTo(next);
   }
 
-  return response;
+  return middlewareClient.response;
 }
 
 export const config = {

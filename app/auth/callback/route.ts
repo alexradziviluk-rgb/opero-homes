@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getServerCurrentUserContext } from "@/lib/supabase/server";
 import { getAdminNextPath, getGuestNextPath, sanitizeNextPath } from "@/lib/auth/next-route";
-import { getRoleCodeFromContext, isStaffRoleCode } from "@/lib/supabase/role-code";
+import { hasStaffMembership } from "@/lib/supabase/role-code";
 
 type CallbackErrorCode =
   | "callback_code_missing"
@@ -97,8 +97,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(toLoginUrl(url, "access_denied", safeNext));
   }
 
-  const hasMembership = Boolean(context.organizationMember);
-  const isStaff = hasMembership && isStaffRoleCode(getRoleCodeFromContext(context));
+  const isStaff = hasStaffMembership(context);
 
   if (isStaff) {
     const next = getAdminNextPath(safeNext);

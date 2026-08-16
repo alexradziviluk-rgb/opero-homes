@@ -16,6 +16,11 @@ export function createSupabaseMiddlewareClient(request: NextRequest) {
     return { supabase: null, response };
   }
 
+  const result: {
+    supabase: ReturnType<typeof createServerClient>;
+    response: NextResponse;
+  } = { supabase: null as never, response };
+
   const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
     cookies: {
       getAll() {
@@ -29,11 +34,13 @@ export function createSupabaseMiddlewareClient(request: NextRequest) {
           },
         });
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        result.response = response;
       },
     },
   });
 
-  return { supabase, response };
+  result.supabase = supabase;
+  return result;
 }
 
 export function isProtectedPath(pathname: string) {

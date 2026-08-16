@@ -291,6 +291,46 @@ test("manager and employee have staff access but no owner UI or owner API", asyn
   }
 });
 
+test("manager session persists across protected route reloads", async ({ browser }) => {
+  const { page } = await openRole(browser, "manager");
+  const sessionContext = async () => {
+    const response = await page.request.get("/api/auth/session-context");
+    expect(response.status()).toBe(200);
+    return await response.json() as { ok: true; uid: string; organizationSlug: string };
+  };
+
+  const initialContext = await sessionContext();
+  expect(initialContext.uid).toBe(fixture.accounts.manager.id);
+  expect(initialContext.organizationSlug).toBe(fixture.prefix.toLowerCase());
+
+  const cookieMetadata = (await page.context().cookies()).map(({ name, domain, path, secure, sameSite, expires }) => ({ name, domain, path, secure, sameSite, expires }));
+  expect(cookieMetadata.some(({ name }) => name.startsWith("sb-"))).toBe(true);
+  expect(cookieMetadata.every((cookie) => !("value" in cookie))).toBe(true);
+
+  for (const path of ["/admin", "/apartments", "/bookings", "/clients", "/calendar"]) {
+    await page.goto(path, { waitUntil: "domcontentloaded" });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(new RegExp(`${path.replace("/", "\\/")}(?:[?#].*)?$`));
+    const afterReload = await sessionContext();
+    expect(afterReload.uid, path).toBe(initialContext.uid);
+    expect(afterReload.organizationSlug, path).toBe(initialContext.organizationSlug);
+  }
+
+  await page.getByRole("button", { name: /Выйти/ }).first().click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/login$/);
+
+  const loginForm = page.locator("form").filter({ has: page.locator('input[type="password"]') });
+  await loginForm.locator('input[type="email"]').fill(fixture.accounts.manager.email);
+  await loginForm.locator('input[type="password"]').fill(fixture.accounts.manager.password);
+  await loginForm.locator('button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/admin$/);
+  const loggedInAgain = await sessionContext();
+  expect(loggedInAgain.uid).toBe(initialContext.uid);
+  expect(loggedInAgain.organizationSlug).toBe(initialContext.organizationSlug);
+});
+
 test("cleaner and maintenance are limited to assigned operations", async ({ browser }) => {
   for (const [role, taskId, allowedPath] of [["cleaner", "cleaningTaskId", "/cleaning"], ["maintenance", "maintenanceTaskId", "/maintenance"]] as const) {
     const { page } = await openRole(browser, role);
