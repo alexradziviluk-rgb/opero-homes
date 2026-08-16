@@ -52,7 +52,8 @@ function guestsFrom(message: string): number | null {
   const match = message.match(/\b(\d+)\s*(?:гост|чел|guest|person|kişi)/iu);
   if (match) return Math.max(1, Number(match[1]));
   const words: Record<string, number> = { двое: 2, трое: 3, четверо: 4, пятеро: 5, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, iki: 2, üç: 3, dört: 4, beş: 5 };
-  const word = Object.keys(words).find((value) => new RegExp(`\\b${value}\\b`, "iu").test(message));
+  const normalized = message.toLocaleLowerCase("ru-RU");
+  const word = Object.keys(words).find((value) => normalized.includes(value));
   return word ? words[word] : null;
 }
 
