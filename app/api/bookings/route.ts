@@ -126,7 +126,7 @@ export async function GET() {
       id: booking.id,
       bookingNumber: formatBookingReference(String(booking.id)),
       apartmentId: booking.apartment_id,
-      apartmentTitle: booking.apartment_id ? apartmentTitleById.get(booking.apartment_id) ?? "Объект" : "Объект",
+      apartmentTitle: booking.apartment_id ? apartmentById.get(booking.apartment_id)?.title ?? "Объект" : "Объект",
       clientId: booking.client_id ?? null,
       guestName: booking.guest_name ?? booking.customer_name ?? guest?.name ?? "Гость",
       guestPhone: ("guest_phone" in booking ? booking.guest_phone : null) ?? guest?.phone ?? null,
