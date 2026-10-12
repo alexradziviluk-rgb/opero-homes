@@ -38,14 +38,15 @@ function getAttribution(): Partial<Attribution> {
 export function captureUtmAttribution(): void {
   const params = new URLSearchParams(window.location.search);
   const current = getAttribution();
-  const next = { ...current };
+  const hasNewCampaign = UTM_KEYS.some((key) => { const value = params.get(key)?.trim(); return Boolean(value && value !== current[key]); });
+  const next = hasNewCampaign ? {} as Partial<Attribution> : { ...current };
   let changed = false;
 
-  if (!current.landing_page) {
+  if (!next.landing_page) {
     next.landing_page = `${window.location.pathname}${window.location.search}`.slice(0, 500);
     changed = true;
   }
-  if (!current.referrer && document.referrer) {
+  if (!next.referrer && document.referrer) {
     try {
       const referrer = new URL(document.referrer);
       next.referrer = `${referrer.origin}${referrer.pathname}`.slice(0, 500);
@@ -57,7 +58,7 @@ export function captureUtmAttribution(): void {
 
   for (const key of UTM_KEYS) {
     const value = params.get(key)?.trim();
-    if (value && value !== current[key]) {
+    if (value && value !== next[key]) {
       next[key] = value.slice(0, 200);
       changed = true;
     }
@@ -94,6 +95,7 @@ export function trackEvent(name: AnalyticsEventName, params: SafeEventParams = {
   if (typeof window === "undefined") return;
 
   captureUtmAttribution();
+  if (!hasAnalyticsConsent()) return;
   if (options.dedupeKey) {
     const dedupeKey = `opero-event:${name}:${options.dedupeKey}`;
     try {
